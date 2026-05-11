@@ -1,0 +1,31 @@
+{
+  "name": "perpet-erp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ERP for Perpet Pilipinas Corp. — fuel wholesale and retail",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run start:dev --workspace=@perpet/api",
+    "dev:web": "npm run dev --workspace=@perpet/web",
+    "build:api": "npm run build --workspace=@perpet/api",
+    "build:web": "npm run build --workspace=@perpet/web",
+    "build:shared": "npm run build --workspace=@perpet/shared",
+    "build": "npm run build:shared && npm run build:api && npm run build:web",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "db:migrate": "bash scripts/migrate.sh",
+    "db:seed": "bash scripts/seed.sh",
+    "db:reset": "bash scripts/reset.sh"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "devDependencies": {
+    "bcryptjs": "^2.4.3",
+    "typescript": "^5.4.5"
+  }
+}
