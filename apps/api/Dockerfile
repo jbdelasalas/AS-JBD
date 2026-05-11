@@ -34,7 +34,7 @@ COPY --from=builder /repo/packages/shared/dist ./packages/shared/dist
 RUN npm install --workspaces --include-workspace-root --omit=dev
 
 # Default Railway/Render listen port
-EXPOSE 4000
+EXPOSE 10000
 
 # The app honours the PORT env var (Railway/Render inject this automatically)
 CMD ["node", "apps/api/dist/apps/api/src/main.js"]
