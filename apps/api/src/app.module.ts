@@ -31,7 +31,7 @@ import { CommonModule } from './modules/common/common.module';
           return {
             type: 'postgres' as const,
             url,
-            ssl: isProd ? { rejectUnauthorized: false } : false,
+            ssl: { rejectUnauthorized: false },
             autoLoadEntities: true,
             synchronize: false,
             logging: isProd ? ['error'] : ['error', 'warn'],
@@ -40,14 +40,14 @@ import { CommonModule } from './modules/common/common.module';
 
         return {
           type: 'postgres' as const,
-          host: cfg.get('DB_HOST', 'localhost'),
-          port: parseInt(cfg.get('DB_PORT', '5432'), 10),
-          username: cfg.get('DB_USER', 'postgres'),
-          password: cfg.get('DB_PASSWORD', 'postgres'),
-          database: cfg.get('DB_NAME', 'perpet_erp'),
+          host: cfg.get<string>('DB_HOST') ?? 'localhost',
+          port: parseInt(cfg.get<string>('DB_PORT') ?? '5432', 10),
+          username: cfg.get<string>('DB_USER') ?? 'postgres',
+          password: cfg.get<string>('DB_PASSWORD') ?? 'postgres',
+          database: cfg.get<string>('DB_NAME') ?? 'perpet_erp',
           autoLoadEntities: true,
           synchronize: false,
-          logging: cfg.get('NODE_ENV') === 'development' ? ['error', 'warn'] : ['error'],
+          logging: (cfg.get('NODE_ENV') === 'development' ? ['error', 'warn'] : ['error']) as ('error' | 'warn')[],
         };
       },
     }),

@@ -37,4 +37,4 @@ RUN npm install --workspaces --include-workspace-root --omit=dev
 EXPOSE 4000
 
 # The app honours the PORT env var (Railway/Render inject this automatically)
-CMD ["node", "apps/api/dist/main.js"]
+CMD ["node", "apps/api/dist/apps/api/src/main.js"]

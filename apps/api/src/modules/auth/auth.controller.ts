@@ -24,8 +24,8 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto, @Req() req: Request) {
-    const ip = req.ip ?? null;
-    const ua = req.headers['user-agent'] ?? null;
+    const ip = req.ip ?? undefined;
+    const ua = (req.headers['user-agent'] as string | undefined) ?? undefined;
     return this.auth.login(dto.email, dto.password, ip, ua);
   }
 

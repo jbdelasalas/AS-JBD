@@ -29,7 +29,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Companies (multi-entity support)
-CREATE TABLE companies (
+CREATE TABLE IF NOT EXISTS companies (
   id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   code         varchar(20)  NOT NULL UNIQUE,
   name         varchar(200) NOT NULL,
@@ -42,10 +42,10 @@ CREATE TABLE companies (
   created_at   timestamptz NOT NULL DEFAULT now(),
   updated_at   timestamptz NOT NULL DEFAULT now()
 );
-CREATE TRIGGER companies_updated BEFORE UPDATE ON companies FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE OR REPLACE TRIGGER companies_updated BEFORE UPDATE ON companies FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- Branches (depot, retail station, head office)
-CREATE TABLE branches (
+CREATE TABLE IF NOT EXISTS branches (
   id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id   uuid NOT NULL REFERENCES companies(id) ON DELETE RESTRICT,
   code         varchar(20)  NOT NULL,
@@ -57,10 +57,10 @@ CREATE TABLE branches (
   updated_at   timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, code)
 );
-CREATE TRIGGER branches_updated BEFORE UPDATE ON branches FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE OR REPLACE TRIGGER branches_updated BEFORE UPDATE ON branches FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- Currencies
-CREATE TABLE currencies (
+CREATE TABLE IF NOT EXISTS currencies (
   code        char(3) PRIMARY KEY,
   name        varchar(50) NOT NULL,
   symbol      varchar(10)
@@ -72,7 +72,7 @@ INSERT INTO currencies (code, name, symbol) VALUES
 ON CONFLICT DO NOTHING;
 
 -- Exchange rates (daily snapshots)
-CREATE TABLE fx_rates (
+CREATE TABLE IF NOT EXISTS fx_rates (
   id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   from_currency char(3) NOT NULL REFERENCES currencies(code),
   to_currency   char(3) NOT NULL REFERENCES currencies(code),
@@ -83,7 +83,7 @@ CREATE TABLE fx_rates (
 );
 
 -- Fiscal periods (for period locking)
-CREATE TABLE fiscal_periods (
+CREATE TABLE IF NOT EXISTS fiscal_periods (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id  uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   year        int  NOT NULL,
@@ -97,7 +97,7 @@ CREATE TABLE fiscal_periods (
 );
 
 -- Audit log: every state-changing action lands here
-CREATE TABLE audit_log (
+CREATE TABLE IF NOT EXISTS audit_log (
   id           bigserial PRIMARY KEY,
   occurred_at  timestamptz NOT NULL DEFAULT now(),
   user_id      uuid,
@@ -110,11 +110,11 @@ CREATE TABLE audit_log (
   ip_address   inet,
   user_agent   text
 );
-CREATE INDEX idx_audit_log_entity ON audit_log (entity_type, entity_id);
-CREATE INDEX idx_audit_log_user_time ON audit_log (user_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log (entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_user_time ON audit_log (user_id, occurred_at DESC);
 
 -- Document series (BIR-controlled invoice/OR/DR numbering)
-CREATE TABLE document_series (
+CREATE TABLE IF NOT EXISTS document_series (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   branch_id       uuid REFERENCES branches(id),
@@ -129,7 +129,7 @@ CREATE TABLE document_series (
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
-CREATE TRIGGER document_series_updated BEFORE UPDATE ON document_series FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE OR REPLACE TRIGGER document_series_updated BEFORE UPDATE ON document_series FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 COMMENT ON TABLE document_series IS 'BIR CAS-controlled document numbering. Issuing a number must be done in a transaction with the document insert to prevent gaps.';
 
@@ -139,7 +139,7 @@ COMMENT ON TABLE document_series IS 'BIR CAS-controlled document numbering. Issu
 -- 002_auth_rbac.sql
 -- Users, roles, permissions
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   email           varchar(200) NOT NULL UNIQUE,
   password_hash   varchar(200) NOT NULL,        -- bcrypt
@@ -152,10 +152,10 @@ CREATE TABLE users (
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
-CREATE TRIGGER users_updated BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE OR REPLACE TRIGGER users_updated BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- Refresh tokens for JWT rotation
-CREATE TABLE refresh_tokens (
+CREATE TABLE IF NOT EXISTS refresh_tokens (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   token_hash  varchar(200) NOT NULL UNIQUE,
@@ -163,10 +163,10 @@ CREATE TABLE refresh_tokens (
   revoked_at  timestamptz,
   created_at  timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_refresh_tokens_user ON refresh_tokens (user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens (user_id);
 
 -- Roles (system-wide role definitions)
-CREATE TABLE roles (
+CREATE TABLE IF NOT EXISTS roles (
   id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   code         varchar(50) NOT NULL UNIQUE,        -- e.g. 'finance_manager'
   name         varchar(100) NOT NULL,
@@ -186,7 +186,7 @@ INSERT INTO roles (code, name, description) VALUES
 ON CONFLICT DO NOTHING;
 
 -- Permissions (module + action grain)
-CREATE TABLE permissions (
+CREATE TABLE IF NOT EXISTS permissions (
   id     uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   code   varchar(80) NOT NULL UNIQUE,       -- e.g. 'gl.journal.post'
   module varchar(30) NOT NULL,              -- gl | ar | ap | sales | etc.
@@ -221,7 +221,7 @@ INSERT INTO permissions (code, module, action, name) VALUES
 ON CONFLICT DO NOTHING;
 
 -- Role-permission mapping
-CREATE TABLE role_permissions (
+CREATE TABLE IF NOT EXISTS role_permissions (
   role_id       uuid NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
   permission_id uuid NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
   PRIMARY KEY (role_id, permission_id)
@@ -230,7 +230,7 @@ CREATE TABLE role_permissions (
 -- User-role assignment (scoped per company)
 -- We use a surrogate id and unique indexes because Postgres doesn't allow
 -- expressions (like COALESCE for nullable columns) inside a PRIMARY KEY.
-CREATE TABLE user_roles (
+CREATE TABLE IF NOT EXISTS user_roles (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   role_id     uuid NOT NULL REFERENCES roles(id) ON DELETE RESTRICT,
@@ -239,10 +239,10 @@ CREATE TABLE user_roles (
   created_at  timestamptz NOT NULL DEFAULT now()
 );
 -- Prevent duplicate assignment whether company_id is set or null
-CREATE UNIQUE INDEX user_roles_unique_with_company
+CREATE UNIQUE INDEX IF NOT EXISTS user_roles_unique_with_company
   ON user_roles (user_id, role_id, company_id)
   WHERE company_id IS NOT NULL;
-CREATE UNIQUE INDEX user_roles_unique_no_company
+CREATE UNIQUE INDEX IF NOT EXISTS user_roles_unique_no_company
   ON user_roles (user_id, role_id)
   WHERE company_id IS NULL;
 
@@ -271,7 +271,7 @@ ON CONFLICT DO NOTHING;
 -- General ledger: chart of accounts and journal entries
 
 -- Account types (Asset, Liability, Equity, Revenue, Expense)
-CREATE TABLE account_types (
+CREATE TABLE IF NOT EXISTS account_types (
   code         varchar(20) PRIMARY KEY,
   name         varchar(50) NOT NULL,
   normal_side  varchar(6) NOT NULL CHECK (normal_side IN ('debit','credit')),
@@ -287,7 +287,7 @@ INSERT INTO account_types (code, name, normal_side, is_balance_sheet) VALUES
 ON CONFLICT DO NOTHING;
 
 -- Chart of accounts
-CREATE TABLE accounts (
+CREATE TABLE IF NOT EXISTS accounts (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   code            varchar(20) NOT NULL,             -- e.g. '1010'
@@ -302,11 +302,11 @@ CREATE TABLE accounts (
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, code)
 );
-CREATE TRIGGER accounts_updated BEFORE UPDATE ON accounts FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE INDEX idx_accounts_company_type ON accounts (company_id, account_type, is_active);
+CREATE OR REPLACE TRIGGER accounts_updated BEFORE UPDATE ON accounts FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE INDEX IF NOT EXISTS idx_accounts_company_type ON accounts (company_id, account_type, is_active);
 
 -- Journal entries (header)
-CREATE TABLE journal_entries (
+CREATE TABLE IF NOT EXISTS journal_entries (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE RESTRICT,
   branch_id       uuid REFERENCES branches(id),
@@ -329,13 +329,13 @@ CREATE TABLE journal_entries (
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, entry_no)
 );
-CREATE TRIGGER journal_entries_updated BEFORE UPDATE ON journal_entries FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE INDEX idx_je_company_date ON journal_entries (company_id, entry_date DESC);
-CREATE INDEX idx_je_status ON journal_entries (status);
-CREATE INDEX idx_je_source ON journal_entries (source_module, source_doc_id);
+CREATE OR REPLACE TRIGGER journal_entries_updated BEFORE UPDATE ON journal_entries FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE INDEX IF NOT EXISTS idx_je_company_date ON journal_entries (company_id, entry_date DESC);
+CREATE INDEX IF NOT EXISTS idx_je_status ON journal_entries (status);
+CREATE INDEX IF NOT EXISTS idx_je_source ON journal_entries (source_module, source_doc_id);
 
 -- Journal entry lines (detail)
-CREATE TABLE journal_entry_lines (
+CREATE TABLE IF NOT EXISTS journal_entry_lines (
   id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   entry_id      uuid NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
   line_no       int  NOT NULL,
@@ -351,12 +351,12 @@ CREATE TABLE journal_entry_lines (
   CHECK ((debit > 0 AND credit = 0) OR (debit = 0 AND credit > 0)),
   UNIQUE (entry_id, line_no)
 );
-CREATE INDEX idx_jel_account ON journal_entry_lines (account_id);
-CREATE INDEX idx_jel_entry ON journal_entry_lines (entry_id);
+CREATE INDEX IF NOT EXISTS idx_jel_account ON journal_entry_lines (account_id);
+CREATE INDEX IF NOT EXISTS idx_jel_entry ON journal_entry_lines (entry_id);
 
 -- Posted balances (denormalized for fast reporting)
 -- Updated by trigger on journal_entry_lines when parent entry is posted
-CREATE TABLE account_balances (
+CREATE TABLE IF NOT EXISTS account_balances (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   account_id      uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   fiscal_period_id uuid NOT NULL REFERENCES fiscal_periods(id) ON DELETE CASCADE,
@@ -364,11 +364,11 @@ CREATE TABLE account_balances (
   credit_total    numeric(18, 4) NOT NULL DEFAULT 0,
   UNIQUE (account_id, fiscal_period_id)
 );
-CREATE INDEX idx_balances_account ON account_balances (account_id);
-CREATE INDEX idx_balances_period ON account_balances (fiscal_period_id);
+CREATE INDEX IF NOT EXISTS idx_balances_account ON account_balances (account_id);
+CREATE INDEX IF NOT EXISTS idx_balances_period ON account_balances (fiscal_period_id);
 
 -- Recurring journal entry templates
-CREATE TABLE recurring_entries (
+CREATE TABLE IF NOT EXISTS recurring_entries (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   name            varchar(200) NOT NULL,
@@ -391,7 +391,7 @@ COMMENT ON CONSTRAINT journal_entry_lines_check ON journal_entry_lines IS 'Each 
 -- CUSTOMERS (AR)
 -- ============================================================================
 
-CREATE TABLE customers (
+CREATE TABLE IF NOT EXISTS customers (
   id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id        uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   code              varchar(30) NOT NULL,
@@ -411,10 +411,10 @@ CREATE TABLE customers (
   updated_at        timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, code)
 );
-CREATE TRIGGER customers_updated BEFORE UPDATE ON customers FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE OR REPLACE TRIGGER customers_updated BEFORE UPDATE ON customers FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- Sales invoices
-CREATE TABLE sales_invoices (
+CREATE TABLE IF NOT EXISTS sales_invoices (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE RESTRICT,
   branch_id       uuid REFERENCES branches(id),
@@ -437,11 +437,11 @@ CREATE TABLE sales_invoices (
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, invoice_no)
 );
-CREATE TRIGGER sales_invoices_updated BEFORE UPDATE ON sales_invoices FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE INDEX idx_si_customer_date ON sales_invoices (customer_id, invoice_date DESC);
-CREATE INDEX idx_si_status ON sales_invoices (status);
+CREATE OR REPLACE TRIGGER sales_invoices_updated BEFORE UPDATE ON sales_invoices FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE INDEX IF NOT EXISTS idx_si_customer_date ON sales_invoices (customer_id, invoice_date DESC);
+CREATE INDEX IF NOT EXISTS idx_si_status ON sales_invoices (status);
 
-CREATE TABLE sales_invoice_lines (
+CREATE TABLE IF NOT EXISTS sales_invoice_lines (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   invoice_id      uuid NOT NULL REFERENCES sales_invoices(id) ON DELETE CASCADE,
   line_no         int NOT NULL,
@@ -459,7 +459,7 @@ CREATE TABLE sales_invoice_lines (
 );
 
 -- Customer payments / official receipts
-CREATE TABLE customer_payments (
+CREATE TABLE IF NOT EXISTS customer_payments (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE RESTRICT,
   branch_id       uuid REFERENCES branches(id),
@@ -478,10 +478,10 @@ CREATE TABLE customer_payments (
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, receipt_no)
 );
-CREATE TRIGGER customer_payments_updated BEFORE UPDATE ON customer_payments FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE OR REPLACE TRIGGER customer_payments_updated BEFORE UPDATE ON customer_payments FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- Payment-to-invoice application (one payment can settle many invoices)
-CREATE TABLE payment_applications (
+CREATE TABLE IF NOT EXISTS payment_applications (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   payment_id      uuid NOT NULL REFERENCES customer_payments(id) ON DELETE CASCADE,
   invoice_id      uuid NOT NULL REFERENCES sales_invoices(id) ON DELETE RESTRICT,
@@ -492,7 +492,7 @@ CREATE TABLE payment_applications (
 -- SUPPLIERS (AP)
 -- ============================================================================
 
-CREATE TABLE suppliers (
+CREATE TABLE IF NOT EXISTS suppliers (
   id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id        uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   code              varchar(30) NOT NULL,
@@ -512,10 +512,10 @@ CREATE TABLE suppliers (
   updated_at        timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, code)
 );
-CREATE TRIGGER suppliers_updated BEFORE UPDATE ON suppliers FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE OR REPLACE TRIGGER suppliers_updated BEFORE UPDATE ON suppliers FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- Vendor bills
-CREATE TABLE bills (
+CREATE TABLE IF NOT EXISTS bills (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE RESTRICT,
   branch_id       uuid REFERENCES branches(id),
@@ -542,11 +542,11 @@ CREATE TABLE bills (
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, internal_no)
 );
-CREATE TRIGGER bills_updated BEFORE UPDATE ON bills FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE INDEX idx_bills_supplier_date ON bills (supplier_id, bill_date DESC);
-CREATE INDEX idx_bills_status ON bills (status);
+CREATE OR REPLACE TRIGGER bills_updated BEFORE UPDATE ON bills FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE INDEX IF NOT EXISTS idx_bills_supplier_date ON bills (supplier_id, bill_date DESC);
+CREATE INDEX IF NOT EXISTS idx_bills_status ON bills (status);
 
-CREATE TABLE bill_lines (
+CREATE TABLE IF NOT EXISTS bill_lines (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   bill_id         uuid NOT NULL REFERENCES bills(id) ON DELETE CASCADE,
   line_no         int NOT NULL,
@@ -563,7 +563,7 @@ CREATE TABLE bill_lines (
 );
 
 -- Supplier payments / vouchers
-CREATE TABLE supplier_payments (
+CREATE TABLE IF NOT EXISTS supplier_payments (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE RESTRICT,
   voucher_no      varchar(30) NOT NULL,                  -- CV-2026-000124
@@ -581,9 +581,9 @@ CREATE TABLE supplier_payments (
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, voucher_no)
 );
-CREATE TRIGGER supplier_payments_updated BEFORE UPDATE ON supplier_payments FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE OR REPLACE TRIGGER supplier_payments_updated BEFORE UPDATE ON supplier_payments FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TABLE bill_payment_applications (
+CREATE TABLE IF NOT EXISTS bill_payment_applications (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   payment_id      uuid NOT NULL REFERENCES supplier_payments(id) ON DELETE CASCADE,
   bill_id         uuid NOT NULL REFERENCES bills(id) ON DELETE RESTRICT,
@@ -597,7 +597,7 @@ CREATE TABLE bill_payment_applications (
 -- Inventory items, warehouses, stock movements, sales orders, purchase orders
 
 -- Item categories
-CREATE TABLE item_categories (
+CREATE TABLE IF NOT EXISTS item_categories (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id  uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   code        varchar(20) NOT NULL,
@@ -607,7 +607,7 @@ CREATE TABLE item_categories (
 );
 
 -- Items / SKUs
-CREATE TABLE items (
+CREATE TABLE IF NOT EXISTS items (
   id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id          uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   sku                 varchar(50) NOT NULL,
@@ -632,12 +632,12 @@ CREATE TABLE items (
   updated_at          timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, sku)
 );
-CREATE TRIGGER items_updated BEFORE UPDATE ON items FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE INDEX idx_items_company_active ON items (company_id, is_active);
-CREATE INDEX idx_items_fuel ON items (is_fuel) WHERE is_fuel = true;
+CREATE OR REPLACE TRIGGER items_updated BEFORE UPDATE ON items FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE INDEX IF NOT EXISTS idx_items_company_active ON items (company_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_items_fuel ON items (is_fuel) WHERE is_fuel = true;
 
 -- Warehouses (depot, retail station tank farm, etc.)
-CREATE TABLE warehouses (
+CREATE TABLE IF NOT EXISTS warehouses (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   branch_id       uuid REFERENCES branches(id),
@@ -650,7 +650,7 @@ CREATE TABLE warehouses (
 );
 
 -- Stock balances (per item per warehouse)
-CREATE TABLE stock_balances (
+CREATE TABLE IF NOT EXISTS stock_balances (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   item_id         uuid NOT NULL REFERENCES items(id) ON DELETE CASCADE,
   warehouse_id    uuid NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
@@ -661,7 +661,7 @@ CREATE TABLE stock_balances (
 );
 
 -- Stock movements (immutable transaction log)
-CREATE TABLE stock_movements (
+CREATE TABLE IF NOT EXISTS stock_movements (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id),
   item_id         uuid NOT NULL REFERENCES items(id),
@@ -678,14 +678,14 @@ CREATE TABLE stock_movements (
   created_by      uuid NOT NULL REFERENCES users(id),
   created_at      timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_sm_item_warehouse_date ON stock_movements (item_id, warehouse_id, movement_date DESC);
-CREATE INDEX idx_sm_reference ON stock_movements (reference_type, reference_id);
+CREATE INDEX IF NOT EXISTS idx_sm_item_warehouse_date ON stock_movements (item_id, warehouse_id, movement_date DESC);
+CREATE INDEX IF NOT EXISTS idx_sm_reference ON stock_movements (reference_type, reference_id);
 
 -- ============================================================================
 -- SALES ORDERS
 -- ============================================================================
 
-CREATE TABLE sales_orders (
+CREATE TABLE IF NOT EXISTS sales_orders (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id),
   branch_id       uuid REFERENCES branches(id),
@@ -703,9 +703,9 @@ CREATE TABLE sales_orders (
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, order_no)
 );
-CREATE TRIGGER sales_orders_updated BEFORE UPDATE ON sales_orders FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE OR REPLACE TRIGGER sales_orders_updated BEFORE UPDATE ON sales_orders FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TABLE sales_order_lines (
+CREATE TABLE IF NOT EXISTS sales_order_lines (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   order_id        uuid NOT NULL REFERENCES sales_orders(id) ON DELETE CASCADE,
   line_no         int NOT NULL,
@@ -723,7 +723,7 @@ CREATE TABLE sales_order_lines (
 -- PURCHASE ORDERS
 -- ============================================================================
 
-CREATE TABLE purchase_orders (
+CREATE TABLE IF NOT EXISTS purchase_orders (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id),
   branch_id       uuid REFERENCES branches(id),
@@ -743,9 +743,9 @@ CREATE TABLE purchase_orders (
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, po_no)
 );
-CREATE TRIGGER purchase_orders_updated BEFORE UPDATE ON purchase_orders FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE OR REPLACE TRIGGER purchase_orders_updated BEFORE UPDATE ON purchase_orders FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TABLE purchase_order_lines (
+CREATE TABLE IF NOT EXISTS purchase_order_lines (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   po_id           uuid NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
   line_no         int NOT NULL,
@@ -760,7 +760,7 @@ CREATE TABLE purchase_order_lines (
 );
 
 -- Goods receipt (receiving against PO)
-CREATE TABLE goods_receipts (
+CREATE TABLE IF NOT EXISTS goods_receipts (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id),
   grn_no          varchar(30) NOT NULL,
@@ -776,7 +776,7 @@ CREATE TABLE goods_receipts (
   UNIQUE (company_id, grn_no)
 );
 
-CREATE TABLE goods_receipt_lines (
+CREATE TABLE IF NOT EXISTS goods_receipt_lines (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   grn_id          uuid NOT NULL REFERENCES goods_receipts(id) ON DELETE CASCADE,
   po_line_id      uuid NOT NULL REFERENCES purchase_order_lines(id),
@@ -787,7 +787,14 @@ CREATE TABLE goods_receipt_lines (
 );
 
 -- Add the FK from bills.po_id now that purchase_orders exists
-ALTER TABLE bills ADD CONSTRAINT bills_po_id_fk FOREIGN KEY (po_id) REFERENCES purchase_orders(id);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'bills_po_id_fk' AND table_name = 'bills'
+  ) THEN
+    ALTER TABLE bills ADD CONSTRAINT bills_po_id_fk FOREIGN KEY (po_id) REFERENCES purchase_orders(id);
+  END IF;
+END $$;
 
 -- ============================================================================
 -- 006_fuel.sql
@@ -807,7 +814,7 @@ ALTER TABLE bills ADD CONSTRAINT bills_po_id_fk FOREIGN KEY (po_id) REFERENCES p
 -- STORAGE TANKS
 -- ============================================================================
 
-CREATE TABLE fuel_tanks (
+CREATE TABLE IF NOT EXISTS fuel_tanks (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   warehouse_id    uuid NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
@@ -822,10 +829,10 @@ CREATE TABLE fuel_tanks (
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, tank_no)
 );
-CREATE TRIGGER fuel_tanks_updated BEFORE UPDATE ON fuel_tanks FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE OR REPLACE TRIGGER fuel_tanks_updated BEFORE UPDATE ON fuel_tanks FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- Tank dip / gauge readings (operator records physical level)
-CREATE TABLE tank_readings (
+CREATE TABLE IF NOT EXISTS tank_readings (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   tank_id         uuid NOT NULL REFERENCES fuel_tanks(id) ON DELETE CASCADE,
   reading_at      timestamptz NOT NULL DEFAULT now(),
@@ -840,13 +847,13 @@ CREATE TABLE tank_readings (
   recorded_by     uuid NOT NULL REFERENCES users(id),
   created_at      timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_tank_readings_tank_time ON tank_readings (tank_id, reading_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tank_readings_tank_time ON tank_readings (tank_id, reading_at DESC);
 
 -- ============================================================================
 -- FUEL DELIVERIES (inbound from refinery / supplier)
 -- ============================================================================
 
-CREATE TABLE fuel_deliveries (
+CREATE TABLE IF NOT EXISTS fuel_deliveries (
   id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id        uuid NOT NULL REFERENCES companies(id) ON DELETE RESTRICT,
   delivery_no       varchar(30) NOT NULL,                  -- FD-2026-000123
@@ -889,9 +896,9 @@ CREATE TABLE fuel_deliveries (
   updated_at        timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, delivery_no)
 );
-CREATE TRIGGER fuel_deliveries_updated BEFORE UPDATE ON fuel_deliveries FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE INDEX idx_fd_supplier_date ON fuel_deliveries (supplier_id, delivery_date DESC);
-CREATE INDEX idx_fd_tank ON fuel_deliveries (tank_id);
+CREATE OR REPLACE TRIGGER fuel_deliveries_updated BEFORE UPDATE ON fuel_deliveries FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE INDEX IF NOT EXISTS idx_fd_supplier_date ON fuel_deliveries (supplier_id, delivery_date DESC);
+CREATE INDEX IF NOT EXISTS idx_fd_tank ON fuel_deliveries (tank_id);
 
 COMMENT ON COLUMN fuel_deliveries.received_litres_15c IS 'Trade-recognised volume in litres at 15°C. This is the quantity that posts to inventory.';
 
@@ -899,7 +906,7 @@ COMMENT ON COLUMN fuel_deliveries.received_litres_15c IS 'Trade-recognised volum
 -- DISPENSING PUMPS (retail stations)
 -- ============================================================================
 
-CREATE TABLE pumps (
+CREATE TABLE IF NOT EXISTS pumps (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   warehouse_id    uuid NOT NULL REFERENCES warehouses(id),
@@ -913,7 +920,7 @@ CREATE TABLE pumps (
 
 -- Pump totaliser readings (cumulative odometer-style counter)
 -- Sale qty = current_totaliser - previous_totaliser
-CREATE TABLE pump_readings (
+CREATE TABLE IF NOT EXISTS pump_readings (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   pump_id         uuid NOT NULL REFERENCES pumps(id) ON DELETE CASCADE,
   reading_at      timestamptz NOT NULL DEFAULT now(),
@@ -924,10 +931,10 @@ CREATE TABLE pump_readings (
   notes           text,
   created_at      timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_pump_readings_pump_time ON pump_readings (pump_id, reading_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pump_readings_pump_time ON pump_readings (pump_id, reading_at DESC);
 
 -- Retail shifts (operator on-duty period)
-CREATE TABLE retail_shifts (
+CREATE TABLE IF NOT EXISTS retail_shifts (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id),
   warehouse_id    uuid NOT NULL REFERENCES warehouses(id),
@@ -947,13 +954,13 @@ CREATE TABLE retail_shifts (
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, shift_no)
 );
-CREATE TRIGGER retail_shifts_updated BEFORE UPDATE ON retail_shifts FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE OR REPLACE TRIGGER retail_shifts_updated BEFORE UPDATE ON retail_shifts FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ============================================================================
 -- FUEL RECONCILIATION (tank book vs measured)
 -- ============================================================================
 
-CREATE TABLE fuel_reconciliations (
+CREATE TABLE IF NOT EXISTS fuel_reconciliations (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id),
   tank_id         uuid NOT NULL REFERENCES fuel_tanks(id),
@@ -975,7 +982,7 @@ CREATE TABLE fuel_reconciliations (
   created_at            timestamptz NOT NULL DEFAULT now(),
   UNIQUE (tank_id, recon_date)
 );
-CREATE INDEX idx_fuel_recon_tank_date ON fuel_reconciliations (tank_id, recon_date DESC);
+CREATE INDEX IF NOT EXISTS idx_fuel_recon_tank_date ON fuel_reconciliations (tank_id, recon_date DESC);
 
 COMMENT ON TABLE fuel_reconciliations IS 'Daily/shift reconciliation of book stock vs physically measured stock. Variances within tolerance go to Inventory Variance expense; variances outside tolerance require review and explanation.';
 
@@ -987,7 +994,7 @@ COMMENT ON TABLE fuel_reconciliations IS 'Daily/shift reconciliation of book sto
 -- Tax codes, withholding tax certificates, VAT relief, filing batches
 
 -- Tax codes (VAT, EWT, etc.)
-CREATE TABLE tax_codes (
+CREATE TABLE IF NOT EXISTS tax_codes (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   code            varchar(20) NOT NULL,
@@ -1005,7 +1012,7 @@ CREATE TABLE tax_codes (
 -- Inserted via seed file rather than here so they tie to a real company_id
 
 -- Withholding tax certificates (BIR Form 2307 generation)
-CREATE TABLE wht_certificates (
+CREATE TABLE IF NOT EXISTS wht_certificates (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id),
   cert_no         varchar(30) NOT NULL,           -- our internal control no
@@ -1027,7 +1034,7 @@ CREATE TABLE wht_certificates (
 
 -- VAT relief detail (data feed for SAWT/SLSP / 2550M attachments)
 -- This is an aggregation view rather than a separate ledger; we materialise periodically.
-CREATE TABLE vat_relief_entries (
+CREATE TABLE IF NOT EXISTS vat_relief_entries (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id),
   entry_type      varchar(10) NOT NULL,  -- sales | purchases
@@ -1044,11 +1051,11 @@ CREATE TABLE vat_relief_entries (
   source_doc_id   uuid,
   created_at      timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_vat_relief_company_date ON vat_relief_entries (company_id, entry_date);
-CREATE INDEX idx_vat_relief_type_period ON vat_relief_entries (company_id, entry_type, entry_date);
+CREATE INDEX IF NOT EXISTS idx_vat_relief_company_date ON vat_relief_entries (company_id, entry_date);
+CREATE INDEX IF NOT EXISTS idx_vat_relief_type_period ON vat_relief_entries (company_id, entry_type, entry_date);
 
 -- BIR filing batches (record of forms filed)
-CREATE TABLE bir_filings (
+CREATE TABLE IF NOT EXISTS bir_filings (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id      uuid NOT NULL REFERENCES companies(id),
   form_code       varchar(20) NOT NULL,           -- 2550M | 2550Q | 1601-EQ | 1601-C | 1604-E | 0619-E
@@ -1068,7 +1075,7 @@ CREATE TABLE bir_filings (
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
-CREATE TRIGGER bir_filings_updated BEFORE UPDATE ON bir_filings FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE OR REPLACE TRIGGER bir_filings_updated BEFORE UPDATE ON bir_filings FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ============================================================================
 -- SEED: 001_demo_company.sql
