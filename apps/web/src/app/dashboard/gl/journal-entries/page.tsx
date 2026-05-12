@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatPHP, formatDate } from '@/lib/format';
 import type { PaginatedResponse } from '@perpet/shared';
+import { Pagination } from '@/components/Pagination';
 
 interface JeListRow {
   id: string;
@@ -22,21 +23,26 @@ export default function JournalEntriesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'posted' | 'voided'>('all');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 15;
 
   useEffect(() => {
     const companyId = localStorage.getItem('company_id');
     if (!companyId) return;
     setLoading(true);
+    setPage(1);
     const url =
       statusFilter === 'all'
-        ? `/gl/journal-entries?company_id=${companyId}&limit=100`
-        : `/gl/journal-entries?company_id=${companyId}&status=${statusFilter}&limit=100`;
+        ? `/gl/journal-entries?company_id=${companyId}&limit=500`
+        : `/gl/journal-entries?company_id=${companyId}&status=${statusFilter}&limit=500`;
     api
       .get<PaginatedResponse<JeListRow>>(url)
       .then((res) => setData(res.data))
       .catch((e) => setError(e.message ?? 'Failed to load entries'))
       .finally(() => setLoading(false));
   }, [statusFilter]);
+
+  const paged = data.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div>
@@ -95,7 +101,7 @@ export default function JournalEntriesPage() {
                 </td>
               </tr>
             ) : (
-              data.map((e) => (
+              paged.map((e) => (
                 <tr key={e.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                   <td className="px-3 py-2">
                     <Link href={`/dashboard/gl/journal-entries/${e.id}`} className="text-brand-700 hover:underline">
@@ -114,6 +120,7 @@ export default function JournalEntriesPage() {
             )}
           </tbody>
         </table>
+        <Pagination page={page} total={data.length} pageSize={PAGE_SIZE} onChange={setPage} />
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatPHP } from '@/lib/format';
+import { Pagination } from '@/components/Pagination';
 
 interface CustomerRow {
   id: string;
@@ -23,19 +24,24 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 15;
 
   useEffect(() => {
     const companyId = localStorage.getItem('company_id');
     if (!companyId) return;
     setLoading(true);
+    setPage(1);
     const q = search
-      ? `/ar/customers?company_id=${companyId}&search=${encodeURIComponent(search)}&limit=100`
-      : `/ar/customers?company_id=${companyId}&limit=100`;
+      ? `/ar/customers?company_id=${companyId}&search=${encodeURIComponent(search)}&limit=500`
+      : `/ar/customers?company_id=${companyId}&limit=500`;
     api.get<{ data: CustomerRow[] }>(q)
       .then((r) => setRows(r.data))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [search]);
+
+  const paged = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div>
@@ -86,7 +92,7 @@ export default function CustomersPage() {
                   No customers found.
                 </td>
               </tr>
-            ) : rows.map((r) => (
+            ) : paged.map((r) => (
               <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                 <td className="px-3 py-2 font-mono text-xs text-slate-700">{r.code}</td>
                 <td className="px-3 py-2">
@@ -114,6 +120,7 @@ export default function CustomersPage() {
             ))}
           </tbody>
         </table>
+        <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onChange={setPage} />
       </div>
     </div>
   );

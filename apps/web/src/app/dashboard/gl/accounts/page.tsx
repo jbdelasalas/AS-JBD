@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import type { Account, AccountTypeCode } from '@perpet/shared';
+import { Pagination } from '@/components/Pagination';
 
 const TYPES: AccountTypeCode[] = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'];
 
@@ -12,6 +13,8 @@ export default function AccountsPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 15;
 
   useEffect(() => {
     const companyId = localStorage.getItem('company_id');
@@ -24,6 +27,8 @@ export default function AccountsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => { setPage(1); }, [filter, search]);
+
   const filtered = accounts.filter((a) => {
     if (filter !== 'ALL' && a.account_type !== filter) return false;
     if (search) {
@@ -32,6 +37,8 @@ export default function AccountsPage() {
     }
     return true;
   });
+
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div>
@@ -85,7 +92,7 @@ export default function AccountsPage() {
             ) : filtered.length === 0 ? (
               <tr><td colSpan={5} className="px-3 py-6 text-center text-xs text-slate-500">No accounts match the filters.</td></tr>
             ) : (
-              filtered.map((a) => (
+              paged.map((a) => (
                 <tr key={a.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                   <td className="px-3 py-2 font-mono text-xs text-slate-700">{a.code}</td>
                   <td className="px-3 py-2 text-slate-900">{a.name}</td>
@@ -99,6 +106,7 @@ export default function AccountsPage() {
             )}
           </tbody>
         </table>
+        <Pagination page={page} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} />
       </div>
     </div>
   );

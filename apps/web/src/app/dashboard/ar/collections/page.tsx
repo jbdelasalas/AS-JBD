@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatPHP, formatDate } from '@/lib/format';
+import { Pagination } from '@/components/Pagination';
 
 interface PaymentRow {
   id: string;
@@ -37,19 +38,24 @@ export default function CollectionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('all');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 15;
 
   useEffect(() => {
     const companyId = localStorage.getItem('company_id');
     if (!companyId) return;
     setLoading(true);
+    setPage(1);
     const q = status === 'all'
-      ? `/ar/collections?company_id=${companyId}&limit=100`
-      : `/ar/collections?company_id=${companyId}&status=${status}&limit=100`;
+      ? `/ar/collections?company_id=${companyId}&limit=500`
+      : `/ar/collections?company_id=${companyId}&status=${status}&limit=500`;
     api.get<{ data: PaymentRow[] }>(q)
       .then((r) => setRows(r.data))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [status]);
+
+  const paged = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div>
@@ -97,7 +103,7 @@ export default function CollectionsPage() {
               <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-slate-500">Loading…</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={7} className="px-3 py-8 text-center text-xs text-slate-500">No collections found.</td></tr>
-            ) : rows.map((r) => (
+            ) : paged.map((r) => (
               <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                 <td className="px-3 py-2">
                   <Link href={`/dashboard/ar/collections/${r.id}`} className="font-mono text-xs text-brand-700 hover:underline">
@@ -128,6 +134,7 @@ export default function CollectionsPage() {
             ))}
           </tbody>
         </table>
+        <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onChange={setPage} />
       </div>
     </div>
   );
