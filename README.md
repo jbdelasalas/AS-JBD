@@ -34,9 +34,9 @@ perpet-erp/
 | Auth + RBAC | ✅ Functional | ✅ Functional | JWT, roles, permissions |
 | Companies / branches | ✅ Functional | 🟡 Stub | Multi-entity foundation |
 | General Ledger | ✅ Functional | ✅ Functional | CoA, journal entries, trial balance |
-| Accounts Receivable | 🟡 Stub | 🟡 Stub | Skeleton ready |
+| Accounts Receivable | ✅ Functional | ✅ Functional | Customers, invoices, credit memos, collections, aging |
 | Accounts Payable | 🟡 Stub | 🟡 Stub | Skeleton ready |
-| Sales / CRM | 🟡 Stub | 🟡 Stub | Skeleton ready |
+| Sales / CRM | ✅ Functional | ✅ Functional | Sales orders, delivery receipts, 7-status lifecycle |
 | Purchasing | 🟡 Stub | 🟡 Stub | Skeleton ready |
 | Inventory | 🟡 Stub | 🟡 Stub | Skeleton ready |
 | Fuel ops (Perpet-specific) | 🟡 Stub | 🟡 Stub | Tank readings, deliveries |
