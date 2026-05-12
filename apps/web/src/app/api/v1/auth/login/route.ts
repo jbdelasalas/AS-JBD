@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { type NextRequest } from 'next/server';
-import * as bcrypt from 'bcryptjs';
+import { compare } from '@node-rs/bcrypt';
 import * as crypto from 'crypto';
 import { query, getPool } from '@/lib/db';
 import { signAccess } from '@/lib/auth-helpers';
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
 
   if (!user || !user.is_active) return err('Invalid credentials', 401);
 
-  const passwordOk = await bcrypt.compare(password, user.password_hash);
+  const passwordOk = await compare(password, user.password_hash);
   if (!passwordOk) return err('Invalid credentials', 401);
 
   const permissions = await getPermissions(user.id);
