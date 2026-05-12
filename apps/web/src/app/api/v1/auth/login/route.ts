@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { type NextRequest } from 'next/server';
-import { compare } from '@node-rs/bcrypt';
+import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { query, getPool } from '@/lib/db';
 import { signAccess } from '@/lib/auth-helpers';
@@ -60,7 +60,11 @@ export async function POST(request: NextRequest) {
 
   if (!email || !password) return err('email and password are required', 400);
 
+  const t = Date.now();
+  const log = (msg: string) => console.log(`[login] ${msg} +${Date.now()-t}ms`);
+
   try {
+  log('start query user');
   const rows = await query<{
     id: string;
     email: string;
@@ -74,14 +78,19 @@ export async function POST(request: NextRequest) {
        FROM users WHERE lower(email) = lower($1) LIMIT 1`,
     [email],
   );
+  log('user query done');
   const user = rows[0];
 
   if (!user || !user.is_active) return err('Invalid credentials', 401);
 
-  const passwordOk = await compare(password, user.password_hash);
+  log('start bcrypt');
+  const passwordOk = await bcrypt.compare(password, user.password_hash);
+  log('bcrypt done');
   if (!passwordOk) return err('Invalid credentials', 401);
 
+  log('start permissions');
   const permissions = await getPermissions(user.id);
+  log('permissions done');
 
   const companies = await query<{ id: string; code: string; name: string }>(
     `SELECT DISTINCT c.id, c.code, c.name
