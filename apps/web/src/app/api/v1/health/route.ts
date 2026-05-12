@@ -1,6 +1,12 @@
 export const dynamic = 'force-dynamic';
-import { ok } from '@/lib/api-response';
+import { query } from '@/lib/db';
+import { ok, err } from '@/lib/api-response';
 
-export function GET() {
-  return ok({ status: 'ok' });
+export async function GET() {
+  try {
+    await query('SELECT 1');
+    return ok({ status: 'ok', db: 'connected' });
+  } catch (e) {
+    return err(`db error: ${(e as Error).message}`, 503);
+  }
 }

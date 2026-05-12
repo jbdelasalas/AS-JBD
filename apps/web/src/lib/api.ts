@@ -31,7 +31,18 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, { ...init, headers, signal: controller.signal });
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') throw new ApiError(0, null, 'Request timed out');
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (res.status === 401) {
     // For now: just clear and redirect. A real app would attempt refresh first.
