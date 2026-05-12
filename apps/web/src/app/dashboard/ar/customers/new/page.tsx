@@ -10,7 +10,6 @@ export default function NewCustomerPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
-    code: '',
     name: '',
     customer_type: 'wholesale',
     tin: '',
@@ -58,15 +57,7 @@ export default function NewCustomerPage() {
       <form onSubmit={handleSubmit}>
         <div className="rounded-lg border border-slate-200 bg-white p-5">
           <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Customer Code *</label>
-              <input required type="text" value={form.code}
-                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                placeholder="CUST-001"
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
-            </div>
-
-            <div className="col-span-2">
+            <div className="col-span-3">
               <label className="mb-1 block text-xs font-medium text-slate-600">Customer Name *</label>
               <input required type="text" value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}

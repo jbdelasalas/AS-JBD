@@ -2,7 +2,6 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
-  BadRequestException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import type { Customer, CreateCustomerDto, UpdateCustomerDto } from '@perpet/shared';
@@ -77,12 +76,23 @@ export class CustomersService {
     return { ...r, credit_limit: Number(r.credit_limit), open_ar_balance: Number(r.open_ar_balance) };
   }
 
+  private async nextCustomerCode(companyId: string): Promise<string> {
+    const rows = await this.ds.query(
+      `SELECT COUNT(*)::int AS c FROM customers WHERE company_id = $1`,
+      [companyId],
+    ) as Array<{ c: number }>;
+    const seq = rows[0].c + 1;
+    return `CUST-${String(seq).padStart(6, '0')}`;
+  }
+
   async create(dto: CreateCustomerDto, userId: string): Promise<Customer> {
+    const code = await this.nextCustomerCode(dto.company_id);
+
     const existing = await this.ds.query(
       `SELECT id FROM customers WHERE company_id = $1 AND code = $2`,
-      [dto.company_id, dto.code],
+      [dto.company_id, code],
     );
-    if (existing.length) throw new ConflictException(`Customer code ${dto.code} already exists`);
+    if (existing.length) throw new ConflictException(`Customer code ${code} already exists`);
 
     const rows = await this.ds.query(
       `INSERT INTO customers
@@ -92,7 +102,7 @@ export class CustomersService {
        RETURNING *`,
       [
         dto.company_id,
-        dto.code,
+        code,
         dto.name,
         dto.customer_type ?? 'wholesale',
         dto.tin ?? null,
