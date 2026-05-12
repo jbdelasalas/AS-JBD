@@ -1528,3 +1528,4 @@ ALTER TABLE companies
   ADD COLUMN IF NOT EXISTS email   varchar(200),
   ADD COLUMN IF NOT EXISTS website varchar(200),
   ADD COLUMN IF NOT EXISTS logo    text;
+INSERT INTO app_settings (key, value) VALUES ('company_name', '') ON CONFLICT DO NOTHING;

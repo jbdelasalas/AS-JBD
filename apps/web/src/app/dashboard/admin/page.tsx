@@ -58,6 +58,14 @@ export default function AdminHomePage() {
   async function handleSaveCompany() {
     if (!companyId) return;
     await api.put(`/companies/${companyId}`, company);
+    // Sync company name to app_settings so login page can read it without auth
+    const token = localStorage.getItem('access_token');
+    await fetch('/api/v1/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ company_name: company.name }),
+    });
+    localStorage.setItem('company_name', company.name);
     setCompanySaved(true);
     setTimeout(() => setCompanySaved(false), 2000);
   }

@@ -13,10 +13,15 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loginBg, setLoginBg] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState('');
 
   useEffect(() => {
     loadBranding();
     setLoginBg(getBrandingBg());
+    fetch('/api/v1/settings')
+      .then((r) => r.json())
+      .then((d) => { if (d?.company_name) setCompanyName(d.company_name); })
+      .catch(() => {});
   }, []);
 
   async function onSubmit(e: React.FormEvent) {
@@ -57,7 +62,7 @@ export default function LoginPage() {
       <div className="relative z-10 w-full max-w-sm rounded-lg border border-white/10 bg-white/10 p-8 shadow-xl backdrop-blur-md">
         <div className="mb-6 text-center">
           <h1 className="text-xl font-semibold text-white">ERP System</h1>
-          <p className="mt-1 text-xs text-white/60">Perpet Pilipinas Corp.</p>
+          {companyName && <p className="mt-1 text-xs text-white/60">{companyName}</p>}
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4">
