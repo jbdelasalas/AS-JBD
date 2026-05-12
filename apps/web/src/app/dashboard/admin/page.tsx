@@ -2,144 +2,197 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  COLOR_THEMES,
-  THEME_LABELS,
-  THEME_SWATCH,
-  ThemeKey,
-  applyTheme,
-  getBrandingBg,
-  getBrandingTheme,
-  saveBranding,
+  COLOR_THEMES, THEME_LABELS, THEME_SWATCH, ThemeKey,
+  applyTheme, getBrandingBg, getBrandingTheme, saveBranding,
 } from "@/lib/branding";
+import { api } from "@/lib/api";
+
+interface CompanyForm {
+  name: string; legal_name: string; tin: string; rdo_code: string;
+  address: string; phone: string; email: string; website: string; logo: string | null;
+}
+
+const EMPTY: CompanyForm = { name: '', legal_name: '', tin: '', rdo_code: '', address: '', phone: '', email: '', website: '', logo: null };
+
 export default function AdminHomePage() {
   const [theme, setTheme] = useState<ThemeKey>("blue");
   const [bgPreview, setBgPreview] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [brandSaved, setBrandSaved] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const [company, setCompany] = useState<CompanyForm>(EMPTY);
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const logoRef = useRef<HTMLInputElement>(null);
+  const [companySaved, setCompanySaved] = useState(false);
+  const [companyLoading, setCompanyLoading] = useState(true);
 
   useEffect(() => {
     setTheme(getBrandingTheme());
     setBgPreview(getBrandingBg());
+
+    const id = localStorage.getItem('company_id');
+    if (!id) { setCompanyLoading(false); return; }
+    setCompanyId(id);
+    api.get<CompanyForm & { id: string }>(`/companies/${id}`)
+      .then((d) => {
+        setCompany({ name: d.name, legal_name: d.legal_name ?? '', tin: d.tin ?? '', rdo_code: d.rdo_code ?? '', address: d.address ?? '', phone: d.phone ?? '', email: d.email ?? '', website: d.website ?? '', logo: d.logo ?? null });
+        setLogoPreview(d.logo ?? null);
+      })
+      .catch(() => {})
+      .finally(() => setCompanyLoading(false));
   }, []);
 
-  function handleThemeSelect(t: ThemeKey) {
-    setTheme(t);
-    applyTheme(t);
-  }
-
-  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => setBgPreview(ev.target?.result as string);
+    reader.onload = (ev) => {
+      const data = ev.target?.result as string;
+      setLogoPreview(data);
+      setCompany((c) => ({ ...c, logo: data }));
+    };
     reader.readAsDataURL(file);
   }
 
-  function handleClearImage() {
-    setBgPreview(null);
-    if (fileRef.current) fileRef.current.value = "";
+  async function handleSaveCompany() {
+    if (!companyId) return;
+    await api.put(`/companies/${companyId}`, company);
+    setCompanySaved(true);
+    setTimeout(() => setCompanySaved(false), 2000);
   }
 
-  async function handleSave() {
+  async function handleSaveBranding() {
     await saveBranding(theme, bgPreview);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setBrandSaved(true);
+    setTimeout(() => setBrandSaved(false), 2000);
   }
+
+  const field = (label: string, key: keyof CompanyForm, type = 'text', placeholder = '') => (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">{label}</label>
+      <input
+        type={type}
+        value={(company[key] as string) ?? ''}
+        onChange={(e) => setCompany((c) => ({ ...c, [key]: e.target.value }))}
+        placeholder={placeholder}
+        className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+      />
+    </div>
+  );
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="mb-1 text-lg font-semibold text-slate-900">Administration</h1>
-      <p className="mb-6 text-sm text-slate-600">Users, roles, audit log, companies and branches, fiscal periods.</p>
+    <div className="max-w-2xl space-y-6">
+      <div>
+        <h1 className="mb-1 text-lg font-semibold text-slate-900">Administration</h1>
+        <p className="text-sm text-slate-600">Manage company details, branding, users, and roles.</p>
+      </div>
+
+      {/* ── Company Setup ── */}
+      <div className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900">
+        <h2 className="mb-5 text-sm font-semibold text-slate-800 dark:text-slate-200">Company Setup</h2>
+
+        {companyLoading ? (
+          <p className="text-xs text-slate-400">Loading…</p>
+        ) : (
+          <div className="space-y-4">
+            {/* Logo */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">Company logo</label>
+              <div className="flex items-center gap-4">
+                {logoPreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={logoPreview} alt="Logo" className="h-16 w-auto max-w-[160px] rounded border border-slate-200 object-contain p-1 dark:border-slate-600" />
+                ) : (
+                  <div className="flex h-16 w-32 items-center justify-center rounded border-2 border-dashed border-slate-200 text-[11px] text-slate-400 dark:border-slate-600">No logo</div>
+                )}
+                <div className="flex flex-col gap-1.5">
+                  <button onClick={() => logoRef.current?.click()} className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                    {logoPreview ? 'Replace' : 'Upload logo'}
+                  </button>
+                  {logoPreview && (
+                    <button onClick={() => { setLogoPreview(null); setCompany((c) => ({ ...c, logo: null })); }} className="rounded border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100">
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+              <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {field('Company name', 'name', 'text', 'e.g. Perpet Pilipinas Corp.')}
+              {field('Legal name', 'legal_name', 'text', 'Registered legal name')}
+              {field('TIN', 'tin', 'text', '000-000-000-000')}
+              {field('BIR RDO code', 'rdo_code', 'text', 'e.g. 040')}
+              {field('Phone', 'phone', 'tel', '+63 2 8xxx xxxx')}
+              {field('Email', 'email', 'email', 'info@company.com')}
+              {field('Website', 'website', 'url', 'https://www.company.com')}
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">Address</label>
+              <textarea
+                value={company.address}
+                onChange={(e) => setCompany((c) => ({ ...c, address: e.target.value }))}
+                rows={3}
+                placeholder="Complete business address"
+                className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+              />
+            </div>
+
+            <button onClick={handleSaveCompany} className="rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+              {companySaved ? 'Saved!' : 'Save company'}
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* ── Login Page Branding ── */}
-      <div className="rounded-lg border border-slate-200 bg-white p-6">
-        <h2 className="mb-4 text-sm font-semibold text-slate-800">Login Page Branding</h2>
+      <div className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900">
+        <h2 className="mb-4 text-sm font-semibold text-slate-800 dark:text-slate-200">Login Page Branding</h2>
 
-        {/* Background image */}
         <div className="mb-6">
-          <p className="mb-2 text-xs font-medium text-slate-700">Background image</p>
-
+          <p className="mb-2 text-xs font-medium text-slate-700 dark:text-slate-300">Background image</p>
           {bgPreview ? (
             <div className="mb-3 overflow-hidden rounded-lg border border-slate-200">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={bgPreview}
-                alt="Login background preview"
-                className="h-40 w-full object-cover"
-              />
+              <img src={bgPreview} alt="Login background preview" className="h-40 w-full object-cover" />
             </div>
           ) : (
-            <div className="mb-3 flex h-40 items-center justify-center rounded-lg border-2 border-dashed border-slate-200 text-xs text-slate-400">
+            <div className="mb-3 flex h-40 items-center justify-center rounded-lg border-2 border-dashed border-slate-200 text-xs text-slate-400 dark:border-slate-600">
               No image — default background will be used
             </div>
           )}
-
           <div className="flex gap-2">
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-            >
-              {bgPreview ? "Replace image" : "Upload image"}
+            <button onClick={() => fileRef.current?.click()} className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">
+              {bgPreview ? 'Replace image' : 'Upload image'}
             </button>
             {bgPreview && (
-              <button
-                onClick={handleClearImage}
-                className="rounded border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
-              >
+              <button onClick={() => { setBgPreview(null); if (fileRef.current) fileRef.current.value = ''; }} className="rounded border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100">
                 Remove
               </button>
             )}
           </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleImageUpload}
-          />
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = (ev) => setBgPreview(ev.target?.result as string); r.readAsDataURL(f); }} />
         </div>
 
-        {/* Theme color */}
         <div className="mb-6">
-          <p className="mb-2 text-xs font-medium text-slate-700">Theme color</p>
+          <p className="mb-2 text-xs font-medium text-slate-700 dark:text-slate-300">Theme color</p>
           <div className="flex flex-wrap gap-3">
             {(Object.keys(COLOR_THEMES) as ThemeKey[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => handleThemeSelect(t)}
-                title={THEME_LABELS[t]}
-                className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
-                  theme === t
-                    ? "border-slate-900 bg-slate-900 text-white shadow"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-400"
-                }`}
-              >
-                <span
-                  className="h-3 w-3 rounded-full"
-                  style={{ backgroundColor: THEME_SWATCH[t] }}
-                />
+              <button key={t} onClick={() => { setTheme(t); applyTheme(t); }} title={THEME_LABELS[t]}
+                className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${theme === t ? 'border-slate-900 bg-slate-900 text-white shadow dark:border-white dark:bg-white dark:text-slate-900' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>
+                <span className="h-3 w-3 rounded-full" style={{ backgroundColor: THEME_SWATCH[t] }} />
                 {THEME_LABELS[t]}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Save */}
-        <button
-          onClick={handleSave}
-          className="rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-        >
-          {saved ? "Saved!" : "Save branding"}
+        <button onClick={handleSaveBranding} className="rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+          {brandSaved ? 'Saved!' : 'Save branding'}
         </button>
-      </div>
-
-      <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-        <div className="font-medium">Other modules not implemented yet</div>
-        <p className="mt-1 text-xs leading-relaxed">
-          The database schema and backend stub are in place. See{" "}
-          <code className="rounded bg-white px-1 py-0.5 font-mono text-[11px]">apps/api/src/modules/admin/README.md</code>{" "}
-          for what to build next.
-        </p>
       </div>
     </div>
   );
