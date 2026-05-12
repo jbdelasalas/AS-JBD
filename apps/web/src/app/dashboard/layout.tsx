@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/Sidebar';
 import { TopBar } from '@/components/TopBar';
+import { loadBranding } from '@/lib/branding';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -11,6 +12,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    loadBranding();
     const token = localStorage.getItem('access_token');
     if (!token) {
       router.replace('/login');

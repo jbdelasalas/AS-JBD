@@ -5,12 +5,13 @@ module.exports = {
     extend: {
       colors: {
         brand: {
-          50:  '#eff6ff',
-          100: '#dbeafe',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          900: '#1e3a8a',
+          50:  'rgb(var(--brand-50)  / <alpha-value>)',
+          100: 'rgb(var(--brand-100) / <alpha-value>)',
+          400: 'rgb(var(--brand-400) / <alpha-value>)',
+          500: 'rgb(var(--brand-500) / <alpha-value>)',
+          600: 'rgb(var(--brand-600) / <alpha-value>)',
+          700: 'rgb(var(--brand-700) / <alpha-value>)',
+          900: 'rgb(var(--brand-900) / <alpha-value>)',
         },
       },
     },
