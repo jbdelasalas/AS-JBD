@@ -16,7 +16,7 @@ export default function DashboardHome() {
     <div>
       <h1 className="mb-1 text-lg font-semibold text-slate-900">Dashboard</h1>
       <p className="mb-6 text-sm text-slate-600">
-        Welcome to Perpet ERP. Most modules are scaffolds — General Ledger is fully
+        Welcome to ERP System. Most modules are scaffolds — General Ledger is fully
         functional. See <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">README.md</code> in
         each module folder for what to build next.
       </p>

@@ -56,7 +56,7 @@ export default function LoginPage() {
 
       <div className="relative z-10 w-full max-w-sm rounded-lg border border-white/10 bg-white/10 p-8 shadow-xl backdrop-blur-md">
         <div className="mb-6 text-center">
-          <h1 className="text-xl font-semibold text-white">Perpet ERP</h1>
+          <h1 className="text-xl font-semibold text-white">ERP System</h1>
           <p className="mt-1 text-xs text-white/60">Perpet Pilipinas Corp.</p>
         </div>
 

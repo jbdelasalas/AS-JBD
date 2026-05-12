@@ -30,7 +30,7 @@ export function Sidebar() {
   return (
     <aside className="flex h-screen w-56 flex-col border-r border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
       <div className="border-b border-slate-200 px-4 py-4 dark:border-slate-700">
-        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Perpet ERP</div>
+        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">ERP System</div>
         <div className="text-[11px] text-slate-500 dark:text-slate-400">Perpet Pilipinas Corp.</div>
       </div>
 

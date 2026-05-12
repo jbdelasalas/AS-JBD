@@ -11,7 +11,7 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: 'Perpet ERP',
+  title: 'ERP System',
   description: 'ERP for Perpet Pilipinas Corp.',
 };
 
