@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
 
   if (!email || !password) return err('email and password are required', 400);
 
+  try {
   const rows = await query<{
     id: string;
     email: string;
@@ -125,4 +126,8 @@ export async function POST(request: NextRequest) {
     permissions,
     companies,
   });
+  } catch (e) {
+    console.error('Login error:', e);
+    return err('Service unavailable — database connection failed', 503);
+  }
 }
