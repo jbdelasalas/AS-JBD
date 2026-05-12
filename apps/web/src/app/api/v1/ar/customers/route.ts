@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
   const search = searchParams.get('search');
   const isActiveStr = searchParams.get('is_active');
-  const limit = Math.min(parseInt(searchParams.get('limit') ?? '50'), 200);
+  const limit = Math.min(parseInt(searchParams.get('limit') ?? '50'), 500);
   const offset = parseInt(searchParams.get('offset') ?? '0');
 
   const params: unknown[] = [companyId];
@@ -100,8 +100,8 @@ export async function POST(request: NextRequest) {
   const rows = await query(
     `INSERT INTO customers
        (company_id, code, name, customer_type, tin, address, contact_person,
-        email, phone, payment_terms_days, credit_limit, is_vat_exempt, ar_account_id, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+        email, phone, payment_terms_days, credit_limit, is_vat_exempt, ar_account_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
      RETURNING *`,
     [
       companyId, code, dto.name,
@@ -115,7 +115,6 @@ export async function POST(request: NextRequest) {
       dto.credit_limit ?? 0,
       dto.is_vat_exempt ?? false,
       dto.ar_account_id ?? null,
-      auth.userId,
     ],
   );
   const customer = rows[0] as Record<string, unknown>;
