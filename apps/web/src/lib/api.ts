@@ -1,7 +1,7 @@
 // Minimal fetch wrapper. Handles auth token, JSON, and basic error normalisation.
 // In a production app you'd replace this with TanStack Query + a typed client (orval, openapi-typescript-codegen, etc.).
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api/v1';
 
 export class ApiError extends Error {
   constructor(public status: number, public detail: unknown, message: string) {
