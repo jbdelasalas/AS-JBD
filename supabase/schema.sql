@@ -1507,3 +1507,15 @@ INSERT INTO user_roles (user_id, role_id, company_id)
 SELECT '99999999-9999-9999-9999-999999999999', r.id, '11111111-1111-1111-1111-111111111111'
 FROM roles r WHERE r.code = 'superadmin'
 ON CONFLICT DO NOTHING;
+
+-- ================================================================
+-- APP SETTINGS (global key-value, admin-managed)
+-- ================================================================
+CREATE TABLE IF NOT EXISTS app_settings (
+  key         text PRIMARY KEY,
+  value       text NOT NULL,
+  updated_by  uuid REFERENCES users(id),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+INSERT INTO app_settings (key, value) VALUES ('dark_mode', 'false') ON CONFLICT DO NOTHING;

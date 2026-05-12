@@ -12,12 +12,14 @@ import {
   saveBrandingBg,
   saveBrandingTheme,
 } from "@/lib/branding";
+import { useTheme } from "@/lib/theme";
 
 export default function AdminHomePage() {
   const [theme, setTheme] = useState<ThemeKey>("blue");
   const [bgPreview, setBgPreview] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { theme: darkMode, setTheme: setDarkMode } = useTheme();
 
   useEffect(() => {
     setTheme(getBrandingTheme());
@@ -100,6 +102,27 @@ export default function AdminHomePage() {
             className="hidden"
             onChange={handleImageUpload}
           />
+        </div>
+
+        {/* Dark / Light mode */}
+        <div className="mb-6">
+          <p className="mb-2 text-xs font-medium text-slate-700">Display mode</p>
+          <div className="flex gap-3">
+            {(['light', 'dark'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setDarkMode(m)}
+                className={`flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-medium capitalize transition-all ${
+                  darkMode === m
+                    ? 'border-slate-900 bg-slate-900 text-white shadow dark:border-white dark:bg-white dark:text-slate-900'
+                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                }`}
+              >
+                {m === 'light' ? '☀ Light' : '☾ Dark'}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[11px] text-slate-400">Applies globally to all users.</p>
         </div>
 
         {/* Theme color */}
