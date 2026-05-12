@@ -13,7 +13,7 @@ import { PermissionsGuard, RequirePermissions } from '../common/permissions.guar
 
 class CreateCustomerDto {
   @IsUUID() company_id!: string;
-  @IsString() code!: string;
+  @IsOptional() @IsString() code?: string;
   @IsString() name!: string;
   @IsOptional() @IsIn(['wholesale','retail','fleet','gov']) customer_type?: string;
   @IsOptional() @IsString() tin?: string;

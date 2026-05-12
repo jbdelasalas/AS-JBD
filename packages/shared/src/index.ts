@@ -129,7 +129,7 @@ export interface Customer {
 
 export interface CreateCustomerDto {
   company_id: string;
-  code: string;
+  code?: string;
   name: string;
   customer_type?: CustomerType;
   tin?: string;
