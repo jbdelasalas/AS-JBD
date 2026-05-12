@@ -23,7 +23,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!ready) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-slate-500">
+      <div className="flex min-h-screen items-center justify-center text-slate-500 dark:text-slate-400">
         Loading...
       </div>
     );
@@ -34,7 +34,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar />
-        <main className="flex-1 overflow-y-auto bg-slate-50 p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto bg-slate-50 p-6 dark:bg-slate-800">{children}</main>
       </div>
     </div>
   );

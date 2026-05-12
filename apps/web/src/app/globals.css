@@ -16,6 +16,11 @@
   --brand-900:  30  58 138;
 }
 
+.dark {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+}
+
 html, body {
   background: var(--background);
   color: var(--foreground);
