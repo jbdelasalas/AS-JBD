@@ -12,21 +12,11 @@ export const COLOR_THEMES: Record<ThemeKey, Scale> = {
 };
 
 export const THEME_LABELS: Record<ThemeKey, string> = {
-  blue:   'Blue',
-  red:    'Red',
-  green:  'Green',
-  purple: 'Purple',
-  orange: 'Orange',
-  teal:   'Teal',
+  blue: 'Blue', red: 'Red', green: 'Green', purple: 'Purple', orange: 'Orange', teal: 'Teal',
 };
 
 export const THEME_SWATCH: Record<ThemeKey, string> = {
-  blue:   '#2563eb',
-  red:    '#dc2626',
-  green:  '#16a34a',
-  purple: '#9333ea',
-  orange: '#ea580c',
-  teal:   '#0d9488',
+  blue: '#2563eb', red: '#dc2626', green: '#16a34a', purple: '#9333ea', orange: '#ea580c', teal: '#0d9488',
 };
 
 export function applyTheme(theme: ThemeKey) {
@@ -37,15 +27,26 @@ export function applyTheme(theme: ThemeKey) {
   });
 }
 
+// Apply from localStorage cache immediately (no flash), then sync from API
 export function loadBranding() {
   if (typeof window === 'undefined') return;
-  const theme = (localStorage.getItem('branding_theme') ?? 'blue') as ThemeKey;
-  applyTheme(theme);
-}
+  const cached = localStorage.getItem('branding_theme') as ThemeKey | null;
+  if (cached && COLOR_THEMES[cached]) applyTheme(cached);
 
-export function saveBrandingTheme(theme: ThemeKey) {
-  localStorage.setItem('branding_theme', theme);
-  applyTheme(theme);
+  fetch('/api/v1/settings')
+    .then((r) => r.json())
+    .then((data) => {
+      if (data?.brand_theme && COLOR_THEMES[data.brand_theme as ThemeKey]) {
+        const t = data.brand_theme as ThemeKey;
+        applyTheme(t);
+        localStorage.setItem('branding_theme', t);
+      }
+      if ('login_bg' in data) {
+        if (data.login_bg) localStorage.setItem('branding_login_bg', data.login_bg);
+        else localStorage.removeItem('branding_login_bg');
+      }
+    })
+    .catch(() => {});
 }
 
 export function getBrandingTheme(): ThemeKey {
@@ -56,10 +57,16 @@ export function getBrandingBg(): string | null {
   return localStorage.getItem('branding_login_bg');
 }
 
-export function saveBrandingBg(dataUrl: string | null) {
-  if (dataUrl) {
-    localStorage.setItem('branding_login_bg', dataUrl);
-  } else {
-    localStorage.removeItem('branding_login_bg');
-  }
+export async function saveBranding(theme: ThemeKey, loginBg: string | null): Promise<void> {
+  const token = localStorage.getItem('access_token');
+  await fetch('/api/v1/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ brand_theme: theme, login_bg: loginBg ?? '' }),
+  });
+  // Update local cache immediately
+  applyTheme(theme);
+  localStorage.setItem('branding_theme', theme);
+  if (loginBg) localStorage.setItem('branding_login_bg', loginBg);
+  else localStorage.removeItem('branding_login_bg');
 }

@@ -9,8 +9,7 @@ import {
   applyTheme,
   getBrandingBg,
   getBrandingTheme,
-  saveBrandingBg,
-  saveBrandingTheme,
+  saveBranding,
 } from "@/lib/branding";
 import { useTheme } from "@/lib/theme";
 
@@ -44,9 +43,8 @@ export default function AdminHomePage() {
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  function handleSave() {
-    saveBrandingTheme(theme);
-    saveBrandingBg(bgPreview);
+  async function handleSave() {
+    await saveBranding(theme, bgPreview);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }

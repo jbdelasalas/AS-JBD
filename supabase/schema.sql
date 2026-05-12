@@ -1519,3 +1519,5 @@ CREATE TABLE IF NOT EXISTS app_settings (
 );
 
 INSERT INTO app_settings (key, value) VALUES ('dark_mode', 'false') ON CONFLICT DO NOTHING;
+INSERT INTO app_settings (key, value) VALUES ('brand_theme', 'blue') ON CONFLICT DO NOTHING;
+INSERT INTO app_settings (key, value) VALUES ('login_bg', '') ON CONFLICT DO NOTHING;
