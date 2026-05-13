@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   const companyId = searchParams.get('company_id');
   if (!companyId) return err('company_id is required', 400);
 
-  const limit = Math.min(parseInt(searchParams.get('limit') ?? '50'), 200);
+  const limit = Math.min(parseInt(searchParams.get('limit') ?? '50'), 500);
   const offset = parseInt(searchParams.get('offset') ?? '0');
   const params: unknown[] = [companyId];
   let where = `dr.company_id = $1`;
