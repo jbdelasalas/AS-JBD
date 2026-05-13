@@ -98,67 +98,67 @@ export default function NewInvoicePage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-lg font-semibold text-slate-900">New Sales Invoice</h1>
-      <p className="mb-5 text-sm text-slate-600">Create a draft invoice — post it to generate the GL entry and AR.</p>
+      <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">New Sales Invoice</h1>
+      <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">Create a draft invoice — post it to generate the GL entry and AR.</p>
 
       {error && (
         <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="rounded-lg border border-slate-200 bg-white p-5">
-          <div className="mb-4 text-sm font-medium text-slate-700">Invoice Details</div>
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+          <div className="mb-4 text-sm font-medium text-slate-700 dark:text-slate-300">Invoice Details</div>
           <div className="grid grid-cols-3 gap-4">
             <div className="col-span-2">
-              <label className="mb-1 block text-xs font-medium text-slate-600">Customer *</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Customer *</label>
               <select required value={form.customer_id}
                 onChange={(e) => {
                   const c = customers.find((x) => x.id === e.target.value);
                   setForm((f) => ({ ...f, customer_id: e.target.value, payment_terms_days: c?.payment_terms_days ?? 30 }));
                 }}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm">
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                 <option value="">Select customer…</option>
                 {customers.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
               </select>
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Invoice Date *</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Invoice Date *</label>
               <input required type="date" value={form.invoice_date}
                 onChange={(e) => setForm((f) => ({ ...f, invoice_date: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Payment Terms (days)</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Payment Terms (days)</label>
               <input type="number" min={0} value={form.payment_terms_days}
                 onChange={(e) => setForm((f) => ({ ...f, payment_terms_days: parseInt(e.target.value) }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Reference / SO no.</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Reference / SO no.</label>
               <input type="text" value={form.reference}
                 onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 
             <div className="col-span-3">
-              <label className="mb-1 block text-xs font-medium text-slate-600">Notes</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Notes</label>
               <textarea rows={2} value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
           </div>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-5">
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
           <div className="mb-3 flex items-center justify-between">
-            <div className="text-sm font-medium text-slate-700">Line Items</div>
+            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Line Items</div>
             <button type="button" onClick={addLine} className="text-xs text-brand-600 hover:underline">+ Add line</button>
           </div>
           <table className="min-w-full text-xs">
-            <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
+            <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
               <tr>
                 <th className="px-2 py-1.5 text-left font-medium w-48">Item</th>
                 <th className="px-2 py-1.5 text-left font-medium">Description *</th>
@@ -172,7 +172,7 @@ export default function NewInvoicePage() {
             </thead>
             <tbody>
               {lines.map((l, idx) => (
-                <tr key={idx} className="border-b border-slate-100">
+                <tr key={idx} className="border-b border-slate-100 dark:border-slate-700">
                   <td className="px-2 py-1">
                     <select value={l.item_id} onChange={(e) => updateLine(idx, 'item_id', e.target.value)}
                       className="w-full rounded border border-slate-300 px-1 py-1">
@@ -218,9 +218,9 @@ export default function NewInvoicePage() {
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t border-slate-200 bg-slate-50">
-                <td colSpan={6} className="px-2 py-2 text-right text-xs font-medium text-slate-600">Grand Total (incl. VAT)</td>
-                <td className="px-2 py-2 text-right font-mono text-sm font-semibold text-slate-900">
+              <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                <td colSpan={6} className="px-2 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Grand Total (incl. VAT)</td>
+                <td className="px-2 py-2 text-right font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">
                   ₱{grandTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </td>
                 <td />
@@ -235,7 +235,7 @@ export default function NewInvoicePage() {
             {saving ? 'Saving…' : 'Save as Draft'}
           </button>
           <button type="button" onClick={() => router.back()}
-            className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 hover:bg-slate-50">
+            className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800">
             Cancel
           </button>
         </div>

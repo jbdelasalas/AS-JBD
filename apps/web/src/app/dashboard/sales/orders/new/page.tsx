@@ -112,8 +112,8 @@ export default function NewSalesOrderPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-lg font-semibold text-slate-900">New Sales Order</h1>
-      <p className="mb-5 text-sm text-slate-600">Fill in the order details and line items.</p>
+      <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">New Sales Order</h1>
+      <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">Fill in the order details and line items.</p>
 
       {error && (
         <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
@@ -121,11 +121,11 @@ export default function NewSalesOrderPage() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Header */}
-        <div className="rounded-lg border border-slate-200 bg-white p-5">
-          <div className="mb-4 text-sm font-medium text-slate-700">Order Details</div>
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+          <div className="mb-4 text-sm font-medium text-slate-700 dark:text-slate-300">Order Details</div>
           <div className="grid grid-cols-3 gap-4">
             <div className="col-span-2">
-              <label className="mb-1 block text-xs font-medium text-slate-600">Customer *</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Customer *</label>
               <select
                 required
                 value={form.customer_id}
@@ -137,7 +137,7 @@ export default function NewSalesOrderPage() {
                     payment_terms_days: cust?.payment_terms_days ?? 30,
                   }));
                 }}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               >
                 <option value="">Select customer…</option>
                 {customers.map((c) => (
@@ -147,32 +147,32 @@ export default function NewSalesOrderPage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Order Date *</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Order Date *</label>
               <input
                 required
                 type="date"
                 value={form.order_date}
                 onChange={(e) => setForm((f) => ({ ...f, order_date: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Delivery Date</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Delivery Date</label>
               <input
                 type="date"
                 value={form.delivery_date}
                 onChange={(e) => setForm((f) => ({ ...f, delivery_date: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Warehouse</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Warehouse</label>
               <select
                 value={form.warehouse_id}
                 onChange={(e) => setForm((f) => ({ ...f, warehouse_id: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               >
                 <option value="">— any —</option>
                 {warehouses.map((w) => (
@@ -182,50 +182,50 @@ export default function NewSalesOrderPage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Payment Terms (days)</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Payment Terms (days)</label>
               <input
                 type="number"
                 min={0}
                 value={form.payment_terms_days}
                 onChange={(e) => setForm((f) => ({ ...f, payment_terms_days: parseInt(e.target.value) }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Reference</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Reference</label>
               <input
                 type="text"
                 value={form.reference}
                 onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))}
                 placeholder="PO no., contract ref…"
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               />
             </div>
 
             <div className="col-span-3">
-              <label className="mb-1 block text-xs font-medium text-slate-600">Notes</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Notes</label>
               <textarea
                 rows={2}
                 value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               />
             </div>
           </div>
         </div>
 
         {/* Lines */}
-        <div className="rounded-lg border border-slate-200 bg-white p-5">
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
           <div className="mb-3 flex items-center justify-between">
-            <div className="text-sm font-medium text-slate-700">Line Items</div>
+            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Line Items</div>
             <button type="button" onClick={addLine} className="text-xs text-brand-600 hover:underline">
               + Add line
             </button>
           </div>
 
           <table className="min-w-full text-xs">
-            <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
+            <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
               <tr>
                 <th className="px-2 py-1.5 text-left font-medium w-48">Item</th>
                 <th className="px-2 py-1.5 text-left font-medium">Description</th>
@@ -239,7 +239,7 @@ export default function NewSalesOrderPage() {
             </thead>
             <tbody>
               {lines.map((l, idx) => (
-                <tr key={idx} className="border-b border-slate-100">
+                <tr key={idx} className="border-b border-slate-100 dark:border-slate-700">
                   <td className="px-2 py-1">
                     <select
                       value={l.item_id}
@@ -319,9 +319,9 @@ export default function NewSalesOrderPage() {
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t border-slate-200 bg-slate-50">
-                <td colSpan={6} className="px-2 py-2 text-right text-xs font-medium text-slate-600">Grand Total</td>
-                <td className="px-2 py-2 text-right font-mono text-sm font-semibold text-slate-900">
+              <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                <td colSpan={6} className="px-2 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Grand Total</td>
+                <td className="px-2 py-2 text-right font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">
                   ₱{grandTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </td>
                 <td />
@@ -341,7 +341,7 @@ export default function NewSalesOrderPage() {
           <button
             type="button"
             onClick={() => router.back()}
-            className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800"
           >
             Cancel
           </button>

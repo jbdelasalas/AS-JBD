@@ -61,7 +61,7 @@ export default function JournalEntryDetailPage() {
     }
   }
 
-  if (loading) return <div className="text-sm text-slate-500">Loading...</div>;
+  if (loading) return <div className="text-sm text-slate-500 dark:text-slate-400">Loading...</div>;
   if (!entry) return <div className="text-sm text-red-700">{error ?? 'Entry not found'}</div>;
 
   const totalDebit  = entry.lines.reduce((s, l) => s + Number(l.debit), 0);
@@ -77,14 +77,14 @@ export default function JournalEntryDetailPage() {
 
       <div className="mb-4 flex items-start justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">{entry.entry_no}</h1>
-          <p className="text-sm text-slate-600">
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{entry.entry_no}</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
             {formatDate(entry.entry_date)} ·{' '}
             <span
               className={`inline-block rounded px-2 py-0.5 text-[11px] font-medium ${
                 entry.status === 'posted' ? 'bg-emerald-100 text-emerald-700'
                 : entry.status === 'voided' ? 'bg-red-100 text-red-700'
-                : 'bg-slate-100 text-slate-700'
+                : 'bg-slate-100 text-slate-700 dark:text-slate-300'
               }`}
             >
               {entry.status}
@@ -106,7 +106,7 @@ export default function JournalEntryDetailPage() {
             <button
               onClick={voidEntry}
               disabled={busy}
-              className="rounded border border-red-300 bg-white px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
+              className="rounded border border-red-300 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
             >
               Void
             </button>
@@ -120,28 +120,28 @@ export default function JournalEntryDetailPage() {
         </div>
       )}
 
-      <div className="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-white p-4 text-xs">
+      <div className="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 text-xs">
         <div>
-          <span className="text-slate-500">Reference: </span>
-          <span className="text-slate-900">{entry.reference || '—'}</span>
+          <span className="text-slate-500 dark:text-slate-400">Reference: </span>
+          <span className="text-slate-900 dark:text-slate-100">{entry.reference || '—'}</span>
         </div>
         <div>
-          <span className="text-slate-500">Memo: </span>
-          <span className="text-slate-900">{entry.memo || '—'}</span>
+          <span className="text-slate-500 dark:text-slate-400">Memo: </span>
+          <span className="text-slate-900 dark:text-slate-100">{entry.memo || '—'}</span>
         </div>
         <div>
-          <span className="text-slate-500">Source: </span>
-          <span className="text-slate-900">{entry.source_module}</span>
+          <span className="text-slate-500 dark:text-slate-400">Source: </span>
+          <span className="text-slate-900 dark:text-slate-100">{entry.source_module}</span>
         </div>
         <div>
-          <span className="text-slate-500">Created: </span>
-          <span className="text-slate-900">{formatDate(entry.created_at)}</span>
+          <span className="text-slate-500 dark:text-slate-400">Created: </span>
+          <span className="text-slate-900 dark:text-slate-100">{formatDate(entry.created_at)}</span>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white">
         <table className="min-w-full text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-600">
+          <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
             <tr>
               <th className="px-3 py-2 text-left font-medium">#</th>
               <th className="px-3 py-2 text-left font-medium">Account</th>
@@ -152,21 +152,21 @@ export default function JournalEntryDetailPage() {
           </thead>
           <tbody>
             {entry.lines.map((l) => (
-              <tr key={l.id ?? l.line_no} className="border-b border-slate-100 last:border-0">
-                <td className="px-3 py-2 text-xs text-slate-500">{l.line_no}</td>
+              <tr key={l.id ?? l.line_no} className="border-b border-slate-100 dark:border-slate-700 last:border-0">
+                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.line_no}</td>
                 <td className="px-3 py-2">
-                  <span className="font-mono text-xs text-slate-600">{l.account_code}</span>{' '}
-                  <span className="text-slate-900">{l.account_name}</span>
+                  <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{l.account_code}</span>{' '}
+                  <span className="text-slate-900 dark:text-slate-100">{l.account_name}</span>
                 </td>
-                <td className="px-3 py-2 text-xs text-slate-600">{l.description ?? '—'}</td>
+                <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{l.description ?? '—'}</td>
                 <td className="px-3 py-2 num">{Number(l.debit) > 0 ? formatPHP(Number(l.debit)) : ''}</td>
                 <td className="px-3 py-2 num">{Number(l.credit) > 0 ? formatPHP(Number(l.credit)) : ''}</td>
               </tr>
             ))}
           </tbody>
-          <tfoot className="bg-slate-50 text-sm font-medium">
-            <tr className="border-t border-slate-200">
-              <td colSpan={3} className="px-3 py-2 text-right text-xs text-slate-600">Totals</td>
+          <tfoot className="bg-slate-50 dark:bg-slate-800 text-sm font-medium">
+            <tr className="border-t border-slate-200 dark:border-slate-700">
+              <td colSpan={3} className="px-3 py-2 text-right text-xs text-slate-600 dark:text-slate-400">Totals</td>
               <td className="px-3 py-2 num">{formatPHP(totalDebit)}</td>
               <td className="px-3 py-2 num">{formatPHP(totalCredit)}</td>
             </tr>

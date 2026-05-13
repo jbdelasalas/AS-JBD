@@ -40,17 +40,17 @@ export default function TrialBalancePage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-lg font-semibold text-slate-900">Trial balance</h1>
-      <p className="mb-4 text-sm text-slate-600">All posted entries up to and including the as-of date.</p>
+      <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">Trial balance</h1>
+      <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">All posted entries up to and including the as-of date.</p>
 
       <div className="mb-4 flex items-end gap-2">
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-700">As of date</label>
+          <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">As of date</label>
           <input
             type="date"
             value={asOf}
             onChange={(e) => setAsOf(e.target.value)}
-            className="rounded border border-slate-300 px-3 py-1.5 text-sm"
+            className="rounded border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           />
         </div>
         <button
@@ -72,12 +72,12 @@ export default function TrialBalancePage() {
             <span className={`rounded px-2 py-0.5 font-medium ${data.is_balanced ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
               {data.is_balanced ? '✓ Balanced' : '✗ Out of balance'}
             </span>
-            <span className="text-slate-600">{data.rows.length} accounts with movement</span>
+            <span className="text-slate-600 dark:text-slate-400">{data.rows.length} accounts with movement</span>
           </div>
 
-          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white">
             <table className="min-w-full text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-600">
+              <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
                 <tr>
                   <th className="px-3 py-2 text-left font-medium">Code</th>
                   <th className="px-3 py-2 text-left font-medium">Account</th>
@@ -88,7 +88,7 @@ export default function TrialBalancePage() {
               </thead>
               <tbody>
                 {data.rows.length === 0 ? (
-                  <tr><td colSpan={5} className="px-3 py-8 text-center text-xs text-slate-500">No posted entries yet.</td></tr>
+                  <tr><td colSpan={5} className="px-3 py-8 text-center text-xs text-slate-500 dark:text-slate-400">No posted entries yet.</td></tr>
                 ) : (
                   data.rows.map((r) => {
                     // Show net balance on the normal side
@@ -97,10 +97,10 @@ export default function TrialBalancePage() {
                     const dr = isDr ? Math.max(net, 0)  : Math.max(-net, 0);
                     const cr = isDr ? Math.max(-net, 0) : Math.max(net, 0);
                     return (
-                      <tr key={r.account_code} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                        <td className="px-3 py-2 font-mono text-xs text-slate-700">{r.account_code}</td>
-                        <td className="px-3 py-2 text-slate-900">{r.account_name}</td>
-                        <td className="px-3 py-2 text-xs text-slate-600">{r.account_type}</td>
+                      <tr key={r.account_code} className="border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:bg-slate-800">
+                        <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">{r.account_code}</td>
+                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.account_name}</td>
+                        <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{r.account_type}</td>
                         <td className="px-3 py-2 num">{dr > 0 ? formatPHP(dr) : ''}</td>
                         <td className="px-3 py-2 num">{cr > 0 ? formatPHP(cr) : ''}</td>
                       </tr>
@@ -108,9 +108,9 @@ export default function TrialBalancePage() {
                   })
                 )}
               </tbody>
-              <tfoot className="bg-slate-50 text-sm font-medium">
-                <tr className="border-t border-slate-200">
-                  <td colSpan={3} className="px-3 py-2 text-right text-xs text-slate-600">Totals</td>
+              <tfoot className="bg-slate-50 dark:bg-slate-800 text-sm font-medium">
+                <tr className="border-t border-slate-200 dark:border-slate-700">
+                  <td colSpan={3} className="px-3 py-2 text-right text-xs text-slate-600 dark:text-slate-400">Totals</td>
                   <td className="px-3 py-2 num">{formatPHP(data.total_debit)}</td>
                   <td className="px-3 py-2 num">{formatPHP(data.total_credit)}</td>
                 </tr>

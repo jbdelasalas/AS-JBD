@@ -8,7 +8,7 @@ import { formatPHP, formatDate } from '@/lib/format';
 import type { SalesOrder } from '@perpet/shared';
 
 const STATUS_STYLES: Record<string, string> = {
-  draft:                'bg-slate-100 text-slate-700',
+  draft:                'bg-slate-100 text-slate-700 dark:text-slate-300',
   pending_approval:     'bg-amber-100 text-amber-700',
   approved:             'bg-blue-100 text-blue-700',
   partially_delivered:  'bg-orange-100 text-orange-700',
@@ -53,7 +53,7 @@ export default function SalesOrderDetailPage() {
     }
   }
 
-  if (loading) return <div className="py-10 text-center text-sm text-slate-500">Loading…</div>;
+  if (loading) return <div className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">Loading…</div>;
   if (!order) return <div className="py-10 text-center text-sm text-red-600">{error ?? 'Not found'}</div>;
 
   return (
@@ -62,12 +62,12 @@ export default function SalesOrderDetailPage() {
       <div className="mb-5 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold text-slate-900">{order.order_no}</h1>
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{order.order_no}</h1>
             <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[order.status] ?? STATUS_STYLES.draft}`}>
               {order.status.replace(/_/g, ' ')}
             </span>
           </div>
-          <p className="text-sm text-slate-600 mt-0.5">{order.customer_name}</p>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">{order.customer_name}</p>
         </div>
         <div className="flex gap-2">
           {order.status === 'draft' && (
@@ -119,18 +119,18 @@ export default function SalesOrderDetailPage() {
           { label: 'Payment Terms', value: `${order.payment_terms_days} days` },
           { label: 'Credit Checked', value: order.credit_checked ? '✓ Passed' : 'Not yet' },
         ].map((f) => (
-          <div key={f.label} className="rounded-lg border border-slate-200 bg-white p-3">
-            <div className="text-xs text-slate-500">{f.label}</div>
-            <div className="mt-0.5 font-medium text-slate-900">{f.value}</div>
+          <div key={f.label} className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3">
+            <div className="text-xs text-slate-500 dark:text-slate-400">{f.label}</div>
+            <div className="mt-0.5 font-medium text-slate-900 dark:text-slate-100">{f.value}</div>
           </div>
         ))}
       </div>
 
       {/* Lines table */}
-      <div className="mb-5 overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-4 py-2 text-sm font-medium text-slate-700">Line Items</div>
+      <div className="mb-5 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white">
+        <div className="border-b border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300">Line Items</div>
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-xs text-slate-600">
+          <thead className="bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
             <tr>
               <th className="px-3 py-2 text-left font-medium">#</th>
               <th className="px-3 py-2 text-left font-medium">Item</th>
@@ -143,13 +143,13 @@ export default function SalesOrderDetailPage() {
           </thead>
           <tbody>
             {order.lines?.map((l) => (
-              <tr key={l.id} className="border-t border-slate-100">
-                <td className="px-3 py-2 text-xs text-slate-500">{l.line_no}</td>
-                <td className="px-3 py-2 font-mono text-xs text-slate-700">{l.item_sku}</td>
+              <tr key={l.id} className="border-t border-slate-100 dark:border-slate-700">
+                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.line_no}</td>
+                <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">{l.item_sku}</td>
                 <td className="px-3 py-2">{l.description}</td>
                 <td className="px-3 py-2 text-right font-mono">{l.quantity}</td>
                 <td className="px-3 py-2 text-right font-mono">
-                  <span className={l.qty_delivered >= l.quantity ? 'text-emerald-600' : 'text-slate-600'}>
+                  <span className={l.qty_delivered >= l.quantity ? 'text-emerald-600' : 'text-slate-600 dark:text-slate-400'}>
                     {l.qty_delivered}
                   </span>
                 </td>
@@ -159,17 +159,17 @@ export default function SalesOrderDetailPage() {
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t border-slate-200 bg-slate-50">
-              <td colSpan={5} className="px-3 py-2 text-right text-xs text-slate-600">Subtotal</td>
+            <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+              <td colSpan={5} className="px-3 py-2 text-right text-xs text-slate-600 dark:text-slate-400">Subtotal</td>
               <td colSpan={2} className="px-3 py-2 text-right font-mono">{formatPHP(order.subtotal)}</td>
             </tr>
-            <tr className="bg-slate-50">
-              <td colSpan={5} className="px-3 py-2 text-right text-xs text-slate-600">VAT (12%)</td>
+            <tr className="bg-slate-50 dark:bg-slate-800">
+              <td colSpan={5} className="px-3 py-2 text-right text-xs text-slate-600 dark:text-slate-400">VAT (12%)</td>
               <td colSpan={2} className="px-3 py-2 text-right font-mono">{formatPHP(order.vat_amount)}</td>
             </tr>
-            <tr className="border-t border-slate-200 bg-slate-50">
-              <td colSpan={5} className="px-3 py-2 text-right text-sm font-semibold text-slate-900">Total</td>
-              <td colSpan={2} className="px-3 py-2 text-right font-mono text-sm font-bold text-slate-900">{formatPHP(order.total)}</td>
+            <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+              <td colSpan={5} className="px-3 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">Total</td>
+              <td colSpan={2} className="px-3 py-2 text-right font-mono text-sm font-bold text-slate-900 dark:text-slate-100">{formatPHP(order.total)}</td>
             </tr>
           </tfoot>
         </table>
@@ -178,14 +178,14 @@ export default function SalesOrderDetailPage() {
       {/* Approve modal */}
       {showApprove && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-96 rounded-lg bg-white p-6 shadow-xl">
-            <h2 className="mb-3 text-base font-semibold text-slate-900">Approve Sales Order</h2>
+          <div className="w-96 rounded-lg bg-white dark:bg-slate-900 p-6 shadow-xl">
+            <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">Approve Sales Order</h2>
             <textarea
               rows={3}
               placeholder="Approval notes (optional)…"
               value={approveNotes}
               onChange={(e) => setApproveNotes(e.target.value)}
-              className="mb-4 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+              className="mb-4 w-full rounded border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
             />
             <div className="flex gap-2">
               <button
@@ -194,7 +194,7 @@ export default function SalesOrderDetailPage() {
               >
                 Confirm Approval
               </button>
-              <button onClick={() => setShowApprove(false)} className="flex-1 rounded border border-slate-300 py-2 text-sm text-slate-700">
+              <button onClick={() => setShowApprove(false)} className="flex-1 rounded border border-slate-300 py-2 text-sm text-slate-700 dark:text-slate-300">
                 Cancel
               </button>
             </div>
@@ -205,14 +205,14 @@ export default function SalesOrderDetailPage() {
       {/* Cancel modal */}
       {showCancel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-96 rounded-lg bg-white p-6 shadow-xl">
-            <h2 className="mb-3 text-base font-semibold text-slate-900">Cancel Sales Order</h2>
+          <div className="w-96 rounded-lg bg-white dark:bg-slate-900 p-6 shadow-xl">
+            <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">Cancel Sales Order</h2>
             <textarea
               rows={3}
               placeholder="Reason for cancellation (required)…"
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
-              className="mb-4 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+              className="mb-4 w-full rounded border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
             />
             <div className="flex gap-2">
               <button
@@ -222,7 +222,7 @@ export default function SalesOrderDetailPage() {
               >
                 Confirm Cancel
               </button>
-              <button onClick={() => setShowCancel(false)} className="flex-1 rounded border border-slate-300 py-2 text-sm text-slate-700">
+              <button onClick={() => setShowCancel(false)} className="flex-1 rounded border border-slate-300 py-2 text-sm text-slate-700 dark:text-slate-300">
                 Back
               </button>
             </div>

@@ -103,70 +103,70 @@ export default function NewCreditMemoPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-lg font-semibold text-slate-900">New AR Credit Memo</h1>
-      <p className="mb-5 text-sm text-slate-600">Issue a credit adjustment — requires approval before applying to invoices.</p>
+      <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">New AR Credit Memo</h1>
+      <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">Issue a credit adjustment — requires approval before applying to invoices.</p>
 
       {error && (
         <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="rounded-lg border border-slate-200 bg-white p-5">
-          <div className="mb-4 text-sm font-medium text-slate-700">Credit Memo Details</div>
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+          <div className="mb-4 text-sm font-medium text-slate-700 dark:text-slate-300">Credit Memo Details</div>
           <div className="grid grid-cols-3 gap-4">
             <div className="col-span-2">
-              <label className="mb-1 block text-xs font-medium text-slate-600">Customer *</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Customer *</label>
               <select required value={form.customer_id}
                 onChange={(e) => setForm((f) => ({ ...f, customer_id: e.target.value, original_invoice_id: '' }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm">
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                 <option value="">Select customer…</option>
                 {customers.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
               </select>
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">CM Date *</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">CM Date *</label>
               <input required type="date" value={form.cm_date}
                 onChange={(e) => setForm((f) => ({ ...f, cm_date: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 
             <div className="col-span-2">
-              <label className="mb-1 block text-xs font-medium text-slate-600">Original Invoice (optional)</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Original Invoice (optional)</label>
               <select value={form.original_invoice_id}
                 onChange={(e) => setForm((f) => ({ ...f, original_invoice_id: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm">
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                 <option value="">— none —</option>
                 {invoices.map((i) => <option key={i.id} value={i.id}>{i.invoice_no}</option>)}
               </select>
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Reason</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Reason</label>
               <input type="text" value={form.reason}
                 onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
                 placeholder="Return, price correction…"
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 
             <div className="col-span-3">
-              <label className="mb-1 block text-xs font-medium text-slate-600">Notes</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Notes</label>
               <textarea rows={2} value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
           </div>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-5">
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
           <div className="mb-3 flex items-center justify-between">
-            <div className="text-sm font-medium text-slate-700">Credit Lines</div>
+            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Credit Lines</div>
             <button type="button"
               onClick={() => setLines((l) => [...l, { item_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12 }])}
               className="text-xs text-brand-600 hover:underline">+ Add line</button>
           </div>
           <table className="min-w-full text-xs">
-            <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
+            <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
               <tr>
                 <th className="px-2 py-1.5 text-left font-medium w-40">Item</th>
                 <th className="px-2 py-1.5 text-left font-medium">Description *</th>
@@ -179,7 +179,7 @@ export default function NewCreditMemoPage() {
             </thead>
             <tbody>
               {lines.map((l, idx) => (
-                <tr key={idx} className="border-b border-slate-100">
+                <tr key={idx} className="border-b border-slate-100 dark:border-slate-700">
                   <td className="px-2 py-1">
                     <select value={l.item_id} onChange={(e) => updateLine(idx, 'item_id', e.target.value)}
                       className="w-full rounded border border-slate-300 px-1 py-1">
@@ -220,9 +220,9 @@ export default function NewCreditMemoPage() {
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t border-slate-200 bg-slate-50">
-                <td colSpan={5} className="px-2 py-2 text-right text-xs font-medium text-slate-600">Total Credit</td>
-                <td className="px-2 py-2 text-right font-mono text-sm font-semibold text-slate-900">
+              <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                <td colSpan={5} className="px-2 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Total Credit</td>
+                <td className="px-2 py-2 text-right font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">
                   ₱{grandTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </td>
                 <td />
@@ -237,7 +237,7 @@ export default function NewCreditMemoPage() {
             {saving ? 'Saving…' : 'Save as Draft'}
           </button>
           <button type="button" onClick={() => router.back()}
-            className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 hover:bg-slate-50">
+            className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800">
             Cancel
           </button>
         </div>

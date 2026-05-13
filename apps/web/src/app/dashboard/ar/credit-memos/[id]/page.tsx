@@ -9,7 +9,7 @@ import type { ARCreditMemo } from '@perpet/shared';
 interface InvoiceRow { id: string; invoice_no: string; due_date: string; balance: number; }
 
 const STATUS_STYLES: Record<string, string> = {
-  draft: 'bg-slate-100 text-slate-700',
+  draft: 'bg-slate-100 text-slate-700 dark:text-slate-300',
   pending_approval: 'bg-amber-100 text-amber-700',
   approved: 'bg-blue-100 text-blue-700',
   applied: 'bg-emerald-100 text-emerald-700',
@@ -66,7 +66,7 @@ export default function CreditMemoDetailPage() {
     finally { setBusy(false); }
   }
 
-  if (loading) return <div className="py-10 text-center text-sm text-slate-500">Loading…</div>;
+  if (loading) return <div className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">Loading…</div>;
   if (!cm) return <div className="py-10 text-center text-sm text-red-600">Credit memo not found</div>;
 
   return (
@@ -74,12 +74,12 @@ export default function CreditMemoDetailPage() {
       <div className="mb-5 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold text-slate-900">{cm.cm_no}</h1>
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{cm.cm_no}</h1>
             <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[cm.status] ?? STATUS_STYLES.draft}`}>
               {cm.status.replace(/_/g, ' ')}
             </span>
           </div>
-          <p className="mt-0.5 text-sm text-slate-500">{cm.customer_name}</p>
+          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{cm.customer_name}</p>
         </div>
         <div className="flex gap-2">
           {cm.status === 'draft' && (
@@ -120,9 +120,9 @@ export default function CreditMemoDetailPage() {
           { label: 'Total Credit', value: formatPHP(cm.total) },
           { label: 'Unapplied', value: formatPHP(cm.unapplied_amount) },
         ].map((f) => (
-          <div key={f.label} className="rounded-lg border border-slate-200 bg-white p-3">
-            <div className="text-xs text-slate-500">{f.label}</div>
-            <div className="mt-0.5 font-medium text-slate-900">{f.value}</div>
+          <div key={f.label} className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3">
+            <div className="text-xs text-slate-500 dark:text-slate-400">{f.label}</div>
+            <div className="mt-0.5 font-medium text-slate-900 dark:text-slate-100">{f.value}</div>
           </div>
         ))}
       </div>
@@ -133,10 +133,10 @@ export default function CreditMemoDetailPage() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-4 py-2 text-sm font-medium text-slate-700">Credit Lines</div>
+      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white">
+        <div className="border-b border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300">Credit Lines</div>
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-xs text-slate-600">
+          <thead className="bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
             <tr>
               <th className="px-3 py-2 text-left font-medium">#</th>
               <th className="px-3 py-2 text-left font-medium">Description</th>
@@ -149,8 +149,8 @@ export default function CreditMemoDetailPage() {
           </thead>
           <tbody>
             {cm.lines?.map((l) => (
-              <tr key={l.id} className="border-t border-slate-100">
-                <td className="px-3 py-2 text-xs text-slate-500">{l.line_no}</td>
+              <tr key={l.id} className="border-t border-slate-100 dark:border-slate-700">
+                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.line_no}</td>
                 <td className="px-3 py-2">{l.description}</td>
                 <td className="px-3 py-2 text-right font-mono text-xs">{l.quantity}</td>
                 <td className="px-3 py-2 text-right font-mono text-xs">{formatPHP(l.unit_price)}</td>
@@ -161,9 +161,9 @@ export default function CreditMemoDetailPage() {
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t border-slate-200 bg-slate-50">
-              <td colSpan={6} className="px-3 py-2 text-right text-sm font-semibold text-slate-900">Total Credit</td>
-              <td className="px-3 py-2 text-right font-mono text-sm font-bold text-slate-900">{formatPHP(cm.total)}</td>
+            <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+              <td colSpan={6} className="px-3 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">Total Credit</td>
+              <td className="px-3 py-2 text-right font-mono text-sm font-bold text-slate-900 dark:text-slate-100">{formatPHP(cm.total)}</td>
             </tr>
           </tfoot>
         </table>
@@ -172,13 +172,13 @@ export default function CreditMemoDetailPage() {
       {/* Apply modal */}
       {showApply && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-[480px] rounded-lg bg-white p-6 shadow-xl">
-            <h2 className="mb-1 text-base font-semibold text-slate-900">Apply Credit Memo</h2>
-            <p className="mb-4 text-xs text-slate-500">
+          <div className="w-[480px] rounded-lg bg-white dark:bg-slate-900 p-6 shadow-xl">
+            <h2 className="mb-1 text-base font-semibold text-slate-900 dark:text-slate-100">Apply Credit Memo</h2>
+            <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
               Available: {formatPHP(cm.unapplied_amount)}. Enter amounts to apply to each invoice.
             </p>
             <table className="mb-4 min-w-full text-xs">
-              <thead className="border-b border-slate-200 text-slate-600">
+              <thead className="border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
                 <tr>
                   <th className="py-1 text-left font-medium">Invoice</th>
                   <th className="py-1 text-right font-medium">Balance</th>
@@ -187,7 +187,7 @@ export default function CreditMemoDetailPage() {
               </thead>
               <tbody>
                 {openInvoices.map((inv) => (
-                  <tr key={inv.id} className="border-b border-slate-100">
+                  <tr key={inv.id} className="border-b border-slate-100 dark:border-slate-700">
                     <td className="py-1 font-mono text-brand-700">{inv.invoice_no}</td>
                     <td className="py-1 text-right">{formatPHP(inv.balance)}</td>
                     <td className="py-1 text-right">
@@ -217,11 +217,11 @@ export default function CreditMemoDetailPage() {
       {/* Cancel modal */}
       {showCancel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-96 rounded-lg bg-white p-6 shadow-xl">
-            <h2 className="mb-3 text-base font-semibold text-slate-900">Cancel Credit Memo</h2>
+          <div className="w-96 rounded-lg bg-white dark:bg-slate-900 p-6 shadow-xl">
+            <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">Cancel Credit Memo</h2>
             <textarea rows={3} placeholder="Reason (required)…" value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
-              className="mb-4 w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+              className="mb-4 w-full rounded border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             <div className="flex gap-2">
               <button disabled={!cancelReason.trim() || busy}
                 onClick={() => { setShowCancel(false); doAction('cancel', { reason: cancelReason }); }}

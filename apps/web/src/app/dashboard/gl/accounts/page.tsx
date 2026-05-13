@@ -44,8 +44,8 @@ export default function AccountsPage() {
     <div>
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Chart of accounts</h1>
-          <p className="text-sm text-slate-600">{accounts.length} accounts loaded</p>
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Chart of accounts</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">{accounts.length} accounts loaded</p>
         </div>
       </div>
 
@@ -60,7 +60,7 @@ export default function AccountsPage() {
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value as AccountTypeCode | 'ALL')}
-          className="rounded border border-slate-300 px-2 py-1.5 text-sm"
+          className="rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
         >
           <option value="ALL">All types</option>
           {TYPES.map((t) => (
@@ -75,9 +75,9 @@ export default function AccountsPage() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white">
         <table className="min-w-full text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-600">
+          <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
             <tr>
               <th className="px-3 py-2 text-left font-medium">Code</th>
               <th className="px-3 py-2 text-left font-medium">Name</th>
@@ -88,16 +88,16 @@ export default function AccountsPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="px-3 py-6 text-center text-xs text-slate-500">Loading...</td></tr>
+              <tr><td colSpan={5} className="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">Loading...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={5} className="px-3 py-6 text-center text-xs text-slate-500">No accounts match the filters.</td></tr>
+              <tr><td colSpan={5} className="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">No accounts match the filters.</td></tr>
             ) : (
               paged.map((a) => (
-                <tr key={a.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                  <td className="px-3 py-2 font-mono text-xs text-slate-700">{a.code}</td>
-                  <td className="px-3 py-2 text-slate-900">{a.name}</td>
-                  <td className="px-3 py-2 text-xs text-slate-600">{a.account_type}</td>
-                  <td className="px-3 py-2 text-xs text-slate-600">{a.currency}</td>
+                <tr key={a.id} className="border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:bg-slate-800">
+                  <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">{a.code}</td>
+                  <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{a.name}</td>
+                  <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{a.account_type}</td>
+                  <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{a.currency}</td>
                   <td className="px-3 py-2 text-xs">
                     {a.is_control ? <span className="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">control</span> : <span className="text-slate-400">—</span>}
                   </td>

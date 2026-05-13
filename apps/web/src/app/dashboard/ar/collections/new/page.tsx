@@ -111,39 +111,39 @@ export default function NewCollectionPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-lg font-semibold text-slate-900">New Collection</h1>
-      <p className="mb-5 text-sm text-slate-600">Record a customer payment and apply it to invoices.</p>
+      <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">New Collection</h1>
+      <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">Record a customer payment and apply it to invoices.</p>
 
       {error && (
         <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="rounded-lg border border-slate-200 bg-white p-5">
-          <div className="mb-4 text-sm font-medium text-slate-700">Payment Details</div>
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+          <div className="mb-4 text-sm font-medium text-slate-700 dark:text-slate-300">Payment Details</div>
           <div className="grid grid-cols-3 gap-4">
             <div className="col-span-2">
-              <label className="mb-1 block text-xs font-medium text-slate-600">Customer *</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Customer *</label>
               <select required value={form.customer_id}
                 onChange={(e) => setForm((f) => ({ ...f, customer_id: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm">
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                 <option value="">Select customer…</option>
                 {customers.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
               </select>
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Payment Date *</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Payment Date *</label>
               <input required type="date" value={form.payment_date}
                 onChange={(e) => setForm((f) => ({ ...f, payment_date: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Payment Method *</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Payment Method *</label>
               <select value={form.payment_method}
                 onChange={(e) => setForm((f) => ({ ...f, payment_method: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm">
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                 {['cash','check','bank_transfer','credit_card','online'].map((m) => (
                   <option key={m} value={m}>{m.replace(/_/g, ' ')}</option>
                 ))}
@@ -151,63 +151,63 @@ export default function NewCollectionPage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Amount Received *</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Amount Received *</label>
               <input required type="number" min={0.01} step="any" value={form.amount || ''}
                 onChange={(e) => setForm((f) => ({ ...f, amount: parseFloat(e.target.value) || 0 }))}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm text-right" />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Reference / Check no.</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Reference / Check no.</label>
               <input type="text" value={form.reference}
                 onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 
             {['check','bank_transfer'].includes(form.payment_method) && (
               <>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">Bank Ref / Trx ID</label>
+                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Bank Ref / Trx ID</label>
                   <input type="text" value={form.bank_ref}
                     onChange={(e) => setForm((f) => ({ ...f, bank_ref: e.target.value }))}
-                    className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                    className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
                 </div>
                 {form.payment_method === 'check' && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600">Check Date</label>
+                    <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Check Date</label>
                     <input type="date" value={form.check_date}
                       onChange={(e) => setForm((f) => ({ ...f, check_date: e.target.value }))}
-                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
                   </div>
                 )}
               </>
             )}
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Bank / Cash Account</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Bank / Cash Account</label>
               <select value={form.bank_account_id}
                 onChange={(e) => setForm((f) => ({ ...f, bank_account_id: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm">
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                 <option value="">— auto-resolve —</option>
                 {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
               </select>
             </div>
 
             <div className="col-span-3">
-              <label className="mb-1 block text-xs font-medium text-slate-600">Notes</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Notes</label>
               <textarea rows={2} value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
           </div>
         </div>
 
         {/* Apply to invoices */}
         {openInvoices.length > 0 && (
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
+          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
             <div className="mb-3 flex items-center justify-between">
-              <div className="text-sm font-medium text-slate-700">Apply to Invoices</div>
-              <div className="text-xs text-slate-500">
+              <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Apply to Invoices</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">
                 Applied: {formatPHP(totalApplied)} ·
                 <span className={unapplied < -0.001 ? 'text-red-600 font-semibold ml-1' : 'ml-1'}>
                   Unapplied: {formatPHP(Math.max(unapplied, 0))}
@@ -216,7 +216,7 @@ export default function NewCollectionPage() {
             </div>
 
             <table className="min-w-full text-xs">
-              <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
+              <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                 <tr>
                   <th className="w-8 px-2 py-1.5" />
                   <th className="px-2 py-1.5 text-left font-medium">Invoice</th>
@@ -229,13 +229,13 @@ export default function NewCollectionPage() {
                 {openInvoices.map((inv) => {
                   const app = apps.find((a) => a.invoice_id === inv.id);
                   return (
-                    <tr key={inv.id} className="border-b border-slate-100">
+                    <tr key={inv.id} className="border-b border-slate-100 dark:border-slate-700">
                       <td className="px-2 py-1 text-center">
                         <input type="checkbox" checked={!!app}
                           onChange={() => toggleInvoice(inv)} />
                       </td>
                       <td className="px-2 py-1 font-mono text-brand-700">{inv.invoice_no}</td>
-                      <td className="px-2 py-1 text-slate-600">{inv.due_date}</td>
+                      <td className="px-2 py-1 text-slate-600 dark:text-slate-400">{inv.due_date}</td>
                       <td className="px-2 py-1 text-right font-mono font-semibold">{formatPHP(inv.balance)}</td>
                       <td className="px-2 py-1 text-right">
                         {app ? (
@@ -259,7 +259,7 @@ export default function NewCollectionPage() {
             {saving ? 'Saving…' : 'Save Collection'}
           </button>
           <button type="button" onClick={() => router.back()}
-            className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 hover:bg-slate-50">
+            className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800">
             Cancel
           </button>
         </div>

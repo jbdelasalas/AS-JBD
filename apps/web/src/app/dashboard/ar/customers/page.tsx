@@ -47,8 +47,8 @@ export default function CustomersPage() {
     <div>
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Customers</h1>
-          <p className="text-sm text-slate-600">Manage customer master records and credit limits.</p>
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Customers</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">Manage customer master records and credit limits.</p>
         </div>
         <Link href="/dashboard/ar/customers/new"
           className="rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
@@ -62,7 +62,7 @@ export default function CustomersPage() {
           placeholder="Search by name or code…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-64 rounded border border-slate-300 px-3 py-1.5 text-sm"
+          className="w-64 rounded border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
         />
       </div>
 
@@ -70,9 +70,9 @@ export default function CustomersPage() {
         <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white">
         <table className="min-w-full text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-600">
+          <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
             <tr>
               <th className="px-3 py-2 text-left font-medium">Code</th>
               <th className="px-3 py-2 text-left font-medium">Name</th>
@@ -85,29 +85,29 @@ export default function CustomersPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-slate-500">Loading…</td></tr>
+              <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">Loading…</td></tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-xs text-slate-500">
+                <td colSpan={7} className="px-3 py-8 text-center text-xs text-slate-500 dark:text-slate-400">
                   No customers found.
                 </td>
               </tr>
             ) : paged.map((r) => (
-              <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                <td className="px-3 py-2 font-mono text-xs text-slate-700">{r.code}</td>
+              <tr key={r.id} className="border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:bg-slate-800">
+                <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">{r.code}</td>
                 <td className="px-3 py-2">
                   <Link href={`/dashboard/ar/customers/${r.id}`} className="font-medium text-brand-700 hover:underline">
                     {r.name}
                   </Link>
-                  {r.email && <div className="text-xs text-slate-500">{r.email}</div>}
+                  {r.email && <div className="text-xs text-slate-500 dark:text-slate-400">{r.email}</div>}
                 </td>
-                <td className="px-3 py-2 text-xs capitalize text-slate-600">{r.customer_type}</td>
-                <td className="px-3 py-2 text-xs text-slate-600">{r.payment_terms_days}d</td>
+                <td className="px-3 py-2 text-xs capitalize text-slate-600 dark:text-slate-400">{r.customer_type}</td>
+                <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{r.payment_terms_days}d</td>
                 <td className="px-3 py-2 text-right font-mono text-xs">
                   {r.credit_limit > 0 ? formatPHP(r.credit_limit) : '—'}
                 </td>
                 <td className="px-3 py-2 text-right font-mono text-xs">
-                  <span className={r.open_ar_balance > 0 ? 'text-amber-700 font-medium' : 'text-slate-600'}>
+                  <span className={r.open_ar_balance > 0 ? 'text-amber-700 font-medium' : 'text-slate-600 dark:text-slate-400'}>
                     {formatPHP(r.open_ar_balance)}
                   </span>
                 </td>

@@ -20,8 +20,8 @@ const cards = [
 export default function SalesPage() {
   return (
     <div>
-      <h1 className="mb-1 text-lg font-semibold text-slate-900">Sales &amp; CRM</h1>
-      <p className="mb-6 text-sm text-slate-600">Quotes, sales orders and customer fulfilment.</p>
+      <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">Sales &amp; CRM</h1>
+      <p className="mb-6 text-sm text-slate-600 dark:text-slate-400">Quotes, sales orders and customer fulfilment.</p>
 
       <div className="grid grid-cols-2 gap-4">
         {cards.map((c) => (

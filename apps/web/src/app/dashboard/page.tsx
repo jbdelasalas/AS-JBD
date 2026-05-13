@@ -14,8 +14,8 @@ const QUICK_LINKS = [
 export default function DashboardHome() {
   return (
     <div>
-      <h1 className="mb-1 text-lg font-semibold text-slate-900">Dashboard</h1>
-      <p className="mb-6 text-sm text-slate-600">
+      <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">Dashboard</h1>
+      <p className="mb-6 text-sm text-slate-600 dark:text-slate-400">
         Welcome to ERP System. Most modules are scaffolds — General Ledger is fully
         functional. See <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">README.md</code> in
         each module folder for what to build next.
@@ -26,10 +26,10 @@ export default function DashboardHome() {
           <Link
             key={q.href}
             href={q.href}
-            className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-brand-300 hover:shadow-sm"
+            className="block rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 hover:border-brand-300 hover:shadow-sm"
           >
-            <div className="text-sm font-medium text-slate-900">{q.label}</div>
-            <div className="mt-1 text-xs text-slate-500">{q.desc}</div>
+            <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{q.label}</div>
+            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{q.desc}</div>
           </Link>
         ))}
       </div>

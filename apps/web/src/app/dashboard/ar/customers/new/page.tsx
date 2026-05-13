@@ -47,28 +47,28 @@ export default function NewCustomerPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-lg font-semibold text-slate-900">New Customer</h1>
-      <p className="mb-5 text-sm text-slate-600">Create a new customer account.</p>
+      <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">New Customer</h1>
+      <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">Create a new customer account.</p>
 
       {error && (
         <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
       )}
 
       <form onSubmit={handleSubmit}>
-        <div className="rounded-lg border border-slate-200 bg-white p-5">
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
           <div className="grid grid-cols-3 gap-4">
             <div className="col-span-3">
-              <label className="mb-1 block text-xs font-medium text-slate-600">Customer Name *</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Customer Name *</label>
               <input required type="text" value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Type</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Type</label>
               <select value={form.customer_type}
                 onChange={(e) => setForm((f) => ({ ...f, customer_type: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm">
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                 {['wholesale','retail','fleet','gov'].map((t) => (
                   <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
                 ))}
@@ -76,60 +76,60 @@ export default function NewCustomerPage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">TIN</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">TIN</label>
               <input type="text" value={form.tin}
                 onChange={(e) => setForm((f) => ({ ...f, tin: e.target.value }))}
                 placeholder="123-456-789-000"
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Contact Person</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Contact Person</label>
               <input type="text" value={form.contact_person}
                 onChange={(e) => setForm((f) => ({ ...f, contact_person: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Email</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Email</label>
               <input type="email" value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Phone</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Phone</label>
               <input type="text" value={form.phone}
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Payment Terms (days)</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Payment Terms (days)</label>
               <input type="number" min={0} value={form.payment_terms_days}
                 onChange={(e) => setForm((f) => ({ ...f, payment_terms_days: parseInt(e.target.value) }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Credit Limit (₱)</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Credit Limit (₱)</label>
               <input type="number" min={0} step="any" value={form.credit_limit}
                 onChange={(e) => setForm((f) => ({ ...f, credit_limit: parseFloat(e.target.value) || 0 }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
-              <p className="mt-0.5 text-[11px] text-slate-500">Set 0 for unlimited</p>
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+              <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Set 0 for unlimited</p>
             </div>
 
             <div className="col-span-3">
-              <label className="mb-1 block text-xs font-medium text-slate-600">Address</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Address</label>
               <textarea rows={2} value={form.address}
                 onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 
             <div className="flex items-center gap-2">
               <input type="checkbox" id="vat_exempt" checked={form.is_vat_exempt}
                 onChange={(e) => setForm((f) => ({ ...f, is_vat_exempt: e.target.checked }))} />
-              <label htmlFor="vat_exempt" className="text-sm text-slate-700">VAT Exempt Customer</label>
+              <label htmlFor="vat_exempt" className="text-sm text-slate-700 dark:text-slate-300">VAT Exempt Customer</label>
             </div>
           </div>
         </div>
@@ -140,7 +140,7 @@ export default function NewCustomerPage() {
             {saving ? 'Saving…' : 'Save Customer'}
           </button>
           <button type="button" onClick={() => router.back()}
-            className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 hover:bg-slate-50">
+            className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800">
             Cancel
           </button>
         </div>

@@ -84,7 +84,7 @@ export default function AdminHomePage() {
         value={(company[key] as string) ?? ''}
         onChange={(e) => setCompany((c) => ({ ...c, [key]: e.target.value }))}
         placeholder={placeholder}
-        className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+        className="w-full rounded border border-slate-300 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
       />
     </div>
   );
@@ -92,12 +92,12 @@ export default function AdminHomePage() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="mb-1 text-lg font-semibold text-slate-900">Administration</h1>
-        <p className="text-sm text-slate-600">Manage company details, branding, users, and roles.</p>
+        <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">Administration</h1>
+        <p className="text-sm text-slate-600 dark:text-slate-400">Manage company details, branding, users, and roles.</p>
       </div>
 
       {/* ── Company Setup ── */}
-      <div className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 dark:border-slate-700 dark:bg-slate-900">
         <h2 className="mb-5 text-sm font-semibold text-slate-800 dark:text-slate-200">Company Setup</h2>
 
         {companyLoading ? (
@@ -110,12 +110,12 @@ export default function AdminHomePage() {
               <div className="flex items-center gap-4">
                 {logoPreview ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={logoPreview} alt="Logo" className="h-16 w-auto max-w-[160px] rounded border border-slate-200 object-contain p-1 dark:border-slate-600" />
+                  <img src={logoPreview} alt="Logo" className="h-16 w-auto max-w-[160px] rounded border border-slate-200 dark:border-slate-700 object-contain p-1 dark:border-slate-600" />
                 ) : (
-                  <div className="flex h-16 w-32 items-center justify-center rounded border-2 border-dashed border-slate-200 text-[11px] text-slate-400 dark:border-slate-600">No logo</div>
+                  <div className="flex h-16 w-32 items-center justify-center rounded border-2 border-dashed border-slate-200 dark:border-slate-700 text-[11px] text-slate-400 dark:border-slate-600">No logo</div>
                 )}
                 <div className="flex flex-col gap-1.5">
-                  <button onClick={() => logoRef.current?.click()} className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                  <button onClick={() => logoRef.current?.click()} className="rounded border border-slate-300 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">
                     {logoPreview ? 'Replace' : 'Upload logo'}
                   </button>
                   {logoPreview && (
@@ -145,7 +145,7 @@ export default function AdminHomePage() {
                 onChange={(e) => setCompany((c) => ({ ...c, address: e.target.value }))}
                 rows={3}
                 placeholder="Complete business address"
-                className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                className="w-full rounded border border-slate-300 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
               />
             </div>
 
@@ -157,23 +157,23 @@ export default function AdminHomePage() {
       </div>
 
       {/* ── Login Page Branding ── */}
-      <div className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 dark:border-slate-700 dark:bg-slate-900">
         <h2 className="mb-4 text-sm font-semibold text-slate-800 dark:text-slate-200">Login Page Branding</h2>
 
         <div className="mb-6">
           <p className="mb-2 text-xs font-medium text-slate-700 dark:text-slate-300">Background image</p>
           {bgPreview ? (
-            <div className="mb-3 overflow-hidden rounded-lg border border-slate-200">
+            <div className="mb-3 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={bgPreview} alt="Login background preview" className="h-40 w-full object-cover" />
             </div>
           ) : (
-            <div className="mb-3 flex h-40 items-center justify-center rounded-lg border-2 border-dashed border-slate-200 text-xs text-slate-400 dark:border-slate-600">
+            <div className="mb-3 flex h-40 items-center justify-center rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 text-xs text-slate-400 dark:border-slate-600">
               No image — default background will be used
             </div>
           )}
           <div className="flex gap-2">
-            <button onClick={() => fileRef.current?.click()} className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">
+            <button onClick={() => fileRef.current?.click()} className="rounded border border-slate-300 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">
               {bgPreview ? 'Replace image' : 'Upload image'}
             </button>
             {bgPreview && (
@@ -190,7 +190,7 @@ export default function AdminHomePage() {
           <div className="flex flex-wrap gap-3">
             {(Object.keys(COLOR_THEMES) as ThemeKey[]).map((t) => (
               <button key={t} onClick={() => { setTheme(t); applyTheme(t); }} title={THEME_LABELS[t]}
-                className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${theme === t ? 'border-slate-900 bg-slate-900 text-white shadow dark:border-white dark:bg-white dark:text-slate-900' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>
+                className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${theme === t ? 'border-slate-900 bg-slate-900 text-white shadow dark:border-white dark:bg-white dark:bg-slate-900 dark:text-slate-900 dark:text-slate-100' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-slate-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>
                 <span className="h-3 w-3 rounded-full" style={{ backgroundColor: THEME_SWATCH[t] }} />
                 {THEME_LABELS[t]}
               </button>

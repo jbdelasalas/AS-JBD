@@ -101,46 +101,46 @@ export default function NewJournalEntryPage() {
 
   return (
     <div className="max-w-5xl">
-      <h1 className="mb-1 text-lg font-semibold text-slate-900">New journal entry</h1>
-      <p className="mb-6 text-sm text-slate-600">
+      <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">New journal entry</h1>
+      <p className="mb-6 text-sm text-slate-600 dark:text-slate-400">
         Each line must have either a debit or a credit. Total debits must equal total credits to post.
       </p>
 
-      <div className="mb-4 grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:grid-cols-3">
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-700">Entry date</label>
+          <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">Entry date</label>
           <input
             type="date"
             value={entryDate}
             onChange={(e) => setEntryDate(e.target.value)}
-            className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm"
+            className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-700">Reference</label>
+          <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">Reference</label>
           <input
             type="text"
             value={reference}
             onChange={(e) => setReference(e.target.value)}
             placeholder="e.g. Bill #12345"
-            className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm"
+            className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-700">Memo</label>
+          <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">Memo</label>
           <input
             type="text"
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
             placeholder="Description of the entry"
-            className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm"
+            className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           />
         </div>
       </div>
 
-      <div className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="mb-4 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white">
         <table className="min-w-full text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-600">
+          <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
             <tr>
               <th className="px-3 py-2 text-left font-medium" style={{ width: 60 }}>#</th>
               <th className="px-3 py-2 text-left font-medium">Account</th>
@@ -152,13 +152,13 @@ export default function NewJournalEntryPage() {
           </thead>
           <tbody>
             {lines.map((line, idx) => (
-              <tr key={idx} className="border-b border-slate-100 last:border-0">
-                <td className="px-3 py-2 text-xs text-slate-500">{idx + 1}</td>
+              <tr key={idx} className="border-b border-slate-100 dark:border-slate-700 last:border-0">
+                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{idx + 1}</td>
                 <td className="px-3 py-1">
                   <select
                     value={line.account_id}
                     onChange={(e) => updateLine(idx, { account_id: e.target.value })}
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                    className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   >
                     <option value="">— Select account —</option>
                     {accounts.map((a) => (
@@ -171,7 +171,7 @@ export default function NewJournalEntryPage() {
                     type="text"
                     value={line.description}
                     onChange={(e) => updateLine(idx, { description: e.target.value })}
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                    className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   />
                 </td>
                 <td className="px-3 py-1">
@@ -206,15 +206,15 @@ export default function NewJournalEntryPage() {
               </tr>
             ))}
           </tbody>
-          <tfoot className="bg-slate-50 text-sm font-medium">
-            <tr className="border-t border-slate-200">
-              <td colSpan={3} className="px-3 py-2 text-right text-xs text-slate-600">Totals</td>
+          <tfoot className="bg-slate-50 dark:bg-slate-800 text-sm font-medium">
+            <tr className="border-t border-slate-200 dark:border-slate-700">
+              <td colSpan={3} className="px-3 py-2 text-right text-xs text-slate-600 dark:text-slate-400">Totals</td>
               <td className="px-3 py-2 num">{formatPHP(totals.debit)}</td>
               <td className="px-3 py-2 num">{formatPHP(totals.credit)}</td>
               <td />
             </tr>
-            <tr className="border-t border-slate-100">
-              <td colSpan={3} className="px-3 py-2 text-right text-xs text-slate-600">Difference</td>
+            <tr className="border-t border-slate-100 dark:border-slate-700">
+              <td colSpan={3} className="px-3 py-2 text-right text-xs text-slate-600 dark:text-slate-400">Difference</td>
               <td colSpan={2} className={`px-3 py-2 num ${totals.balanced ? 'text-emerald-700' : 'text-red-700'}`}>
                 {totals.balanced ? '✓ balanced' : formatPHP(totals.diff)}
               </td>
@@ -223,7 +223,7 @@ export default function NewJournalEntryPage() {
           </tfoot>
         </table>
 
-        <div className="border-t border-slate-200 px-3 py-2">
+        <div className="border-t border-slate-200 dark:border-slate-700 px-3 py-2">
           <button
             onClick={addLine}
             className="text-xs text-brand-700 hover:underline"
@@ -241,14 +241,14 @@ export default function NewJournalEntryPage() {
         <button
           onClick={() => router.back()}
           disabled={submitting}
-          className="rounded border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          className="rounded border border-slate-300 bg-white dark:bg-slate-900 px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800 disabled:opacity-50"
         >
           Cancel
         </button>
         <button
           onClick={() => submit('save')}
           disabled={submitting}
-          className="rounded border border-brand-600 bg-white px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+          className="rounded border border-brand-600 bg-white dark:bg-slate-900 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
         >
           Save as draft
         </button>

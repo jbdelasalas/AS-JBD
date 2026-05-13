@@ -26,8 +26,8 @@ export default function ARPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-lg font-semibold text-slate-900">Accounts Receivable</h1>
-      <p className="mb-5 text-sm text-slate-600">Customers, invoices, collections and aging.</p>
+      <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">Accounts Receivable</h1>
+      <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">Customers, invoices, collections and aging.</p>
 
       {/* KPI Cards */}
       {summary && (
@@ -57,12 +57,12 @@ function KPI({ label, value, sub, danger, good }: {
   label: string; value: string; sub: string; danger?: boolean; good?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className={`mt-1 text-xl font-bold ${danger ? 'text-red-600' : good ? 'text-emerald-600' : 'text-slate-900'}`}>
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+      <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
+      <div className={`mt-1 text-xl font-bold ${danger ? 'text-red-600' : good ? 'text-emerald-600' : 'text-slate-900 dark:text-slate-100'}`}>
         {value}
       </div>
-      <div className="text-xs text-slate-500">{sub}</div>
+      <div className="text-xs text-slate-500 dark:text-slate-400">{sub}</div>
     </div>
   );
 }
