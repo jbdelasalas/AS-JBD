@@ -1,0 +1,63 @@
+export const dynamic = 'force-dynamic';
+import { type NextRequest } from 'next/server';
+import { query } from '@/lib/db';
+import { requireAuth } from '@/lib/auth-helpers';
+import { ok, err } from '@/lib/api-response';
+
+function mapRow(r: Record<string, unknown>) {
+  return {
+    ...r,
+    subtotal: Number(r.subtotal),
+    vat_amount: Number(r.vat_amount),
+    ewt_amount: Number(r.ewt_amount ?? 0),
+    total: Number(r.total),
+    amount_paid: Number(r.amount_paid),
+    balance: Number(r.balance),
+  };
+}
+
+function mapLine(l: Record<string, unknown>) {
+  return {
+    ...l,
+    quantity: Number(l.quantity),
+    unit_price: Number(l.unit_price),
+    vat_rate: Number(l.vat_rate),
+    line_subtotal: Number(l.line_subtotal),
+    line_vat: Number(l.line_vat),
+    line_total: Number(l.line_total),
+  };
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  try {
+    await requireAuth(request);
+  } catch (e) {
+    return e as Response;
+  }
+
+  const rows = await query(
+    `SELECT b.*, s.name AS supplier_name, s.code AS supplier_code
+       FROM bills b
+       JOIN suppliers s ON s.id = b.supplier_id
+      WHERE b.id = $1 LIMIT 1`,
+    [params.id],
+  );
+  if (!rows[0]) return err(`Bill ${params.id} not found`, 404);
+
+  const lines = await query(
+    `SELECT bl.*, a.name AS account_name, a.code AS account_code
+       FROM bill_lines bl
+       LEFT JOIN accounts a ON a.id = bl.expense_account_id
+      WHERE bl.bill_id = $1
+      ORDER BY bl.line_no`,
+    [params.id],
+  );
+
+  return ok({
+    ...mapRow(rows[0] as Record<string, unknown>),
+    lines: lines.map((l) => mapLine(l as Record<string, unknown>)),
+  });
+}
