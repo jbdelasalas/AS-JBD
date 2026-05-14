@@ -783,3 +783,189 @@ export interface AuditLogEntry {
   ip_address: string | null;
   created_at: string;
 }
+
+// --- BIR Compliance ---
+
+export interface TaxCode {
+  id: string;
+  company_id: string;
+  code: string;
+  name: string;
+  tax_type: 'vat_output' | 'vat_input' | 'ewt' | 'excise' | 'percentage';
+  rate_pct: number;
+  account_id: string | null;
+  bir_atc_code: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface IssuedDocument {
+  id: string;
+  company_id: string;
+  branch_id: string | null;
+  document_type: 'OR' | 'SI' | 'AR' | 'DR' | 'CI' | 'CR';
+  series_id: string | null;
+  document_no: string;
+  transaction_date: string;
+  customer_id: string | null;
+  customer_tin: string | null;
+  customer_name: string;
+  customer_address: string | null;
+  is_vat_registered: boolean;
+  sc_pwd_id: string | null;
+  total_amount: number;
+  vatable_amount: number;
+  vat_exempt_amount: number;
+  zero_rated_amount: number;
+  vat_amount: number;
+  sc_discount: number;
+  pwd_discount: number;
+  total_discount: number;
+  net_amount: number;
+  status: 'active' | 'void' | 'cancelled';
+  void_reason: string | null;
+  voided_at: string | null;
+  created_by: string;
+  created_at: string;
+  lines?: IssuedDocumentLine[];
+}
+
+export interface IssuedDocumentLine {
+  id: string;
+  document_id: string;
+  line_no: number;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  discount_amount: number;
+  vatable_amount: number;
+  vat_exempt_amount: number;
+  zero_rated_amount: number;
+  vat_amount: number;
+  line_total: number;
+  item_id: string | null;
+  tax_code_id: string | null;
+}
+
+export interface ScPwdTransaction {
+  id: string;
+  company_id: string;
+  branch_id: string | null;
+  document_id: string;
+  sc_pwd_type: 'SC' | 'PWD';
+  id_number: string;
+  beneficiary_name: string;
+  osca_number: string | null;
+  gross_amount: number;
+  discount_rate: number;
+  discount_amount: number;
+  vat_exemption_amount: number;
+  net_amount: number;
+  transaction_date: string;
+  created_at: string;
+}
+
+export interface BookGeneration {
+  id: string;
+  company_id: string;
+  branch_id: string | null;
+  book_type: 'SB' | 'PB' | 'GJ' | 'CVB' | 'CRB' | 'CDB';
+  period_year: number;
+  period_month: number | null;
+  period_quarter: number | null;
+  row_count: number;
+  total_amount: number;
+  status: 'draft' | 'final';
+  storage_path: string | null;
+  generated_by: string;
+  generated_at: string;
+  finalized_at: string | null;
+}
+
+export interface BirFiling {
+  id: string;
+  company_id: string;
+  form_code: string;
+  form_name: string;
+  period_type: 'monthly' | 'quarterly' | 'annual';
+  period_year: number;
+  period_month: number | null;
+  period_quarter: number | null;
+  due_date: string;
+  filed_date: string | null;
+  status: 'draft' | 'ready' | 'filed' | 'amended';
+  total_due: number;
+  total_paid: number;
+  reference_no: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  validations?: FilingValidation[];
+}
+
+export interface FilingValidation {
+  id: string;
+  filing_id: string;
+  validation_type: 'error' | 'warning' | 'info';
+  field_name: string | null;
+  message: string;
+  created_at: string;
+}
+
+export interface WhtCertificate {
+  id: string;
+  company_id: string;
+  cert_no: string;
+  bill_id: string;
+  supplier_id: string;
+  supplier_name?: string;
+  bir_atc_code: string;
+  taxable_amount: number;
+  rate_pct: number;
+  amount_withheld: number;
+  period_year: number;
+  period_quarter: number;
+  status: 'draft' | 'issued' | 'filed';
+  issued_at: string | null;
+  filed_at: string | null;
+  created_at: string;
+}
+
+export interface ExciseRate {
+  id: string;
+  company_id: string;
+  product_type: string;
+  description: string;
+  rate_per_unit: number;
+  unit_of_measure: string;
+  effective_date: string;
+  end_date: string | null;
+  bir_classification: string | null;
+  created_at: string;
+}
+
+export interface VatReturn2550Q {
+  period_year: number;
+  period_quarter: number;
+  start_date: string;
+  end_date: string;
+  sales: {
+    vatable: number;
+    zero_rated: number;
+    exempt: number;
+    vat_output: number;
+    gross_sales: number;
+    doc_count: number;
+  };
+  purchases: {
+    vatable: number;
+    zero_rated: number;
+    exempt: number;
+    vat_input: number;
+    doc_count: number;
+  };
+  output_vat: number;
+  input_vat: number;
+  vat_payable: number;
+  excess_input: number;
+}

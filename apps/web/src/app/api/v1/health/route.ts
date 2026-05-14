@@ -11,6 +11,10 @@ const REQUIRED_TABLES = [
   'stock_transfers', 'stock_counts',
   'cost_centers', 'fiscal_years', 'uoms', 'payment_methods',
   'approval_workflows', 'feature_flags',
+  // BIR compliance
+  'tax_codes', 'wht_certificates', 'vat_relief_entries', 'bir_filings',
+  'issued_documents', 'issued_document_lines', 'sc_pwd_transactions',
+  'book_generations', 'filing_validations', 'excise_rates', 'excise_pass_through',
 ];
 
 export async function GET() {
