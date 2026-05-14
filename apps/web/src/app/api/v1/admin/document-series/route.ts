@@ -1,0 +1,30 @@
+import { NextRequest } from 'next/server';
+import { query } from '@/lib/db';
+import { requireAuth } from '@/lib/auth-helpers';
+import { ok, err } from '@/lib/api-response';
+
+export async function GET(req: NextRequest) {
+  try {
+    const auth = await requireAuth(req);
+    if (!auth) return err('Unauthorized', 401);
+
+    const { searchParams } = new URL(req.url);
+    const companyId = searchParams.get('company_id');
+    if (!companyId) return err('company_id required', 400);
+
+    const rows = await query<{
+      id: string; doc_type: string; prefix: string; last_no: number;
+      branch_id: string | null; updated_at: string;
+    }>(
+      `SELECT id, doc_type, prefix, last_no, branch_id, updated_at
+         FROM document_series
+        WHERE company_id = $1
+        ORDER BY doc_type`,
+      [companyId]
+    );
+
+    return ok(rows);
+  } catch (e: unknown) {
+    return err((e as Error).message, 500);
+  }
+}

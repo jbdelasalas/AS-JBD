@@ -556,3 +556,230 @@ export interface ApiError {
   message: string | string[];
   error?: string;
 }
+
+// ================================================================
+// ADMINISTRATION MODULE
+// ================================================================
+
+// --- Roles & Permissions ---
+export interface Permission {
+  id: string;
+  module: string;
+  action: string;
+  description: string | null;
+}
+
+export interface Role {
+  id: string;
+  company_id: string | null;
+  name: string;
+  description: string | null;
+  is_system: boolean;
+  is_active: boolean;
+  created_at: string;
+  permissions?: Permission[];
+}
+
+export interface UserPermissionOverride {
+  id: string;
+  user_id: string;
+  company_id: string | null;
+  permission_id: string;
+  is_granted: boolean;
+  reason: string | null;
+  created_at: string;
+}
+
+// --- Company (extended) ---
+export interface Company {
+  id: string;
+  code: string;
+  name: string;
+  trade_name: string | null;
+  tin: string | null;
+  vat_status: 'VAT_REGISTERED' | 'NON_VAT' | 'EXEMPT' | null;
+  rdo_code: string | null;
+  business_style: string | null;
+  registered_address: string | null;
+  registration_date: string | null;
+  books_start_date: string | null;
+  accounting_method: 'ACCRUAL' | 'CASH';
+  fiscal_year_start_month: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Branch (extended) ---
+export interface Branch {
+  id: string;
+  company_id: string;
+  code: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  bir_atp_number: string | null;
+  bir_atp_valid_from: string | null;
+  bir_atp_valid_to: string | null;
+  ptu_number: string | null;
+  man_number: string | null;
+  manager_user_id: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+// --- Fiscal Years & Periods ---
+export interface FiscalYear {
+  id: string;
+  company_id: string;
+  year: number;
+  start_date: string;
+  end_date: string;
+  is_closed: boolean;
+  closed_at: string | null;
+  closed_by: string | null;
+  created_at: string;
+  periods?: FiscalPeriod[];
+}
+
+export interface FiscalPeriod {
+  id: string;
+  company_id: string;
+  fiscal_year_id: string | null;
+  period_name: string;
+  start_date: string;
+  end_date: string;
+  status: 'OPEN' | 'CLOSED' | 'ADJUSTING';
+  locked_at: string | null;
+  locked_by: string | null;
+}
+
+// --- Cost Centers ---
+export interface CostCenter {
+  id: string;
+  company_id: string;
+  code: string;
+  name: string;
+  parent_id: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Units of Measure ---
+export interface Uom {
+  id: string;
+  company_id: string;
+  code: string;
+  name: string;
+  type: 'COUNT' | 'WEIGHT' | 'VOLUME' | 'LENGTH' | 'TIME';
+  is_base: boolean;
+  created_at: string;
+}
+
+export interface UomConversion {
+  id: string;
+  company_id: string;
+  from_uom_id: string;
+  to_uom_id: string;
+  factor: number;
+}
+
+// --- Payment Methods ---
+export interface AdminPaymentMethod {
+  id: string;
+  company_id: string;
+  code: string;
+  name: string;
+  account_id: string | null;
+  requires_reference: boolean;
+  is_active: boolean;
+  created_at: string;
+}
+
+// --- Banks ---
+export interface Bank {
+  id: string;
+  company_id: string;
+  bank_name: string;
+  account_number_last4: string | null;
+  account_type: string | null;
+  gl_account_id: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+// --- Document Series ---
+export interface DocumentSeries {
+  id: string;
+  company_id: string;
+  branch_id: string | null;
+  doc_type: string;
+  prefix: string;
+  last_no: number;
+  updated_at: string;
+}
+
+// --- Approval Workflows ---
+export interface ApprovalWorkflow {
+  id: string;
+  company_id: string;
+  name: string;
+  document_type: string;
+  is_active: boolean;
+  created_at: string;
+  steps?: ApprovalWorkflowStep[];
+}
+
+export interface ApprovalWorkflowStep {
+  id: string;
+  workflow_id: string;
+  step_no: number;
+  approver_type: 'ROLE' | 'USER' | 'BRANCH_MANAGER';
+  approver_ref: string | null;
+  threshold_amount: number | null;
+  sla_hours: number | null;
+}
+
+// --- BIR Setup ---
+export interface BirSetup {
+  id: string;
+  branch_id: string;
+  atp_number: string | null;
+  atp_valid_from: string | null;
+  atp_valid_to: string | null;
+  ptu_number: string | null;
+  man_number: string | null;
+  signatory_name: string | null;
+  signatory_tin: string | null;
+  signatory_position: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Feature Flags ---
+export interface FeatureFlag {
+  id: string;
+  name: string;
+  enabled: boolean;
+  rollout_companies: string[];
+  rollout_users: string[];
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Audit Log ---
+export interface AuditLogEntry {
+  id: string;
+  company_id: string | null;
+  user_id: string | null;
+  user_email?: string;
+  action: string;
+  table_name: string;
+  record_id: string | null;
+  old_values: Record<string, unknown> | null;
+  new_values: Record<string, unknown> | null;
+  ip_address: string | null;
+  created_at: string;
+}

@@ -89,11 +89,35 @@ export default function AdminHomePage() {
     </div>
   );
 
+  const MODULES = [
+    { href: '/dashboard/admin/users', title: 'Users', desc: 'Manage system users, passwords, and roles' },
+    { href: '/dashboard/admin/roles', title: 'Roles & Permissions', desc: 'Define roles and assign permissions per module' },
+    { href: '/dashboard/admin/companies', title: 'Companies', desc: 'Company profile and BIR registration' },
+    { href: '/dashboard/admin/fiscal-years', title: 'Fiscal Years', desc: 'Set up and close accounting periods' },
+    { href: '/dashboard/admin/uoms', title: 'Units of Measure', desc: 'Manage units and conversion factors' },
+    { href: '/dashboard/admin/payment-methods', title: 'Payment Methods', desc: 'Cash, check, bank, GCash, and card setups' },
+    { href: '/dashboard/admin/document-series', title: 'Document Series', desc: 'Configure document numbering and prefixes' },
+    { href: '/dashboard/admin/cost-centers', title: 'Cost Centers', desc: 'Departments and cost allocation centers' },
+    { href: '/dashboard/admin/feature-flags', title: 'Feature Flags', desc: 'Enable or disable features per company' },
+    { href: '/dashboard/admin/audit-log', title: 'Audit Log', desc: 'View all user activity and data changes' },
+  ];
+
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <div>
         <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">Administration</h1>
         <p className="text-sm text-slate-600 dark:text-slate-400">Manage company details, branding, users, and roles.</p>
+      </div>
+
+      {/* Module navigation */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {MODULES.map((m) => (
+          <a key={m.href} href={m.href}
+            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 hover:border-brand-300 dark:hover:border-brand-600 hover:shadow-sm transition-all">
+            <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{m.title}</div>
+            <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{m.desc}</div>
+          </a>
+        ))}
       </div>
 
       {/* ── Company Setup ── */}
