@@ -8,8 +8,8 @@ type Ctx = { params: { id: string } };
 // GET — list permissions assigned to this role
 export async function GET(req: NextRequest, { params }: Ctx) {
   try {
-    const auth = await requireAuth(req);
-    if (!auth) return err('Unauthorized', 401);
+    let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try { auth = await requireAuth(req); } catch (e) { return e as Response; }
 
     const pool = getPool();
     const { rows } = await pool.query(
@@ -30,8 +30,8 @@ export async function GET(req: NextRequest, { params }: Ctx) {
 // PUT — replace all permissions for this role (full replace)
 export async function PUT(req: NextRequest, { params }: Ctx) {
   try {
-    const auth = await requireAuth(req);
-    if (!auth) return err('Unauthorized', 401);
+    let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try { auth = await requireAuth(req); } catch (e) { return e as Response; }
     if (!auth.isSuperadmin) return err('Forbidden', 403);
 
     const { permission_ids }: { permission_ids: string[] } = await req.json();

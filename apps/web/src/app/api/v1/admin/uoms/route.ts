@@ -5,8 +5,8 @@ import { ok, err } from '@/lib/api-response';
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await requireAuth(req);
-    if (!auth) return err('Unauthorized', 401);
+    let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try { auth = await requireAuth(req); } catch (e) { return e as Response; }
 
     const { searchParams } = new URL(req.url);
     const companyId = searchParams.get('company_id');
@@ -27,8 +27,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await requireAuth(req);
-    if (!auth) return err('Unauthorized', 401);
+    let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try { auth = await requireAuth(req); } catch (e) { return e as Response; }
 
     const body = await req.json();
     const { company_id, code, name, type, is_base = false } = body;

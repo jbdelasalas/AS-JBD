@@ -31,33 +31,37 @@ export async function GET(request: NextRequest) {
 
   params.push(limit, offset);
 
-  const rows = await query(
-    `SELECT s.*,
-            COALESCE(SUM(b.balance), 0) AS open_ap_balance
-       FROM suppliers s
-       LEFT JOIN bills b ON b.supplier_id = s.id
-         AND b.status IN ('approved','partial')
-      WHERE ${where}
-      GROUP BY s.id
-      ORDER BY s.name ASC
-      LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params,
-  );
+  try {
+    const rows = await query(
+      `SELECT s.*,
+              COALESCE(SUM(b.balance), 0) AS open_ap_balance
+         FROM suppliers s
+         LEFT JOIN bills b ON b.supplier_id = s.id
+           AND b.status IN ('approved','partial')
+        WHERE ${where}
+        GROUP BY s.id
+        ORDER BY s.name ASC
+        LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params,
+    );
 
-  const countRows = await query<{ c: number }>(
-    `SELECT count(*)::int AS c FROM suppliers s WHERE ${where}`,
-    params.slice(0, params.length - 2),
-  );
+    const countRows = await query<{ c: number }>(
+      `SELECT count(*)::int AS c FROM suppliers s WHERE ${where}`,
+      params.slice(0, params.length - 2),
+    );
 
-  return ok({
-    data: rows.map((r) => ({
-      ...r,
-      open_ap_balance: Number((r as Record<string, unknown>).open_ap_balance),
-    })),
-    total: countRows[0].c,
-    page: Math.floor(offset / limit) + 1,
-    page_size: limit,
-  });
+    return ok({
+      data: rows.map((r) => ({
+        ...r,
+        open_ap_balance: Number((r as Record<string, unknown>).open_ap_balance),
+      })),
+      total: countRows[0].c,
+      page: Math.floor(offset / limit) + 1,
+      page_size: limit,
+    });
+  } catch (e: unknown) {
+    return err((e as Error).message, 500);
+  }
 }
 
 export async function POST(request: NextRequest) {

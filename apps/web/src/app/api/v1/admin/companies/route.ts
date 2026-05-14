@@ -5,8 +5,8 @@ import { ok, err } from '@/lib/api-response';
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await requireAuth(req);
-    if (!auth) return err('Unauthorized', 401);
+    let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try { auth = await requireAuth(req); } catch (e) { return e as Response; }
 
     const rows = await query<{
       id: string; code: string; name: string; trade_name: string | null;
@@ -27,8 +27,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await requireAuth(req);
-    if (!auth) return err('Unauthorized', 401);
+    let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try { auth = await requireAuth(req); } catch (e) { return e as Response; }
     if (!auth.isSuperadmin) return err('Forbidden', 403);
 
     const body = await req.json();

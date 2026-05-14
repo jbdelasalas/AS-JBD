@@ -7,8 +7,8 @@ type Ctx = { params: { id: string } };
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
   try {
-    const auth = await requireAuth(req);
-    if (!auth) return err('Unauthorized', 401);
+    let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try { auth = await requireAuth(req); } catch (e) { return e as Response; }
     if (!auth.isSuperadmin) return err('Forbidden', 403);
 
     const body = await req.json();
@@ -40,8 +40,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
 export async function DELETE(req: NextRequest, { params }: Ctx) {
   try {
-    const auth = await requireAuth(req);
-    if (!auth) return err('Unauthorized', 401);
+    let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try { auth = await requireAuth(req); } catch (e) { return e as Response; }
     if (!auth.isSuperadmin) return err('Forbidden', 403);
 
     await query(`DELETE FROM feature_flags WHERE id = $1`, [params.id]);

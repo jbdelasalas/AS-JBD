@@ -5,8 +5,8 @@ import { ok, err } from '@/lib/api-response';
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await requireAuth(req);
-    if (!auth) return err('Unauthorized', 401);
+    let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try { auth = await requireAuth(req); } catch (e) { return e as Response; }
 
     const rows = await query<{
       id: string; module: string; action: string; description: string | null;

@@ -28,29 +28,33 @@ export async function GET(request: NextRequest) {
 
   params.push(limit, offset);
 
-  const rows = await query(
-    `SELECT sp.id, sp.voucher_no, sp.payment_date, sp.payment_method, sp.reference,
-            sp.amount, sp.status,
-            s.name AS supplier_name, s.code AS supplier_code
-       FROM supplier_payments sp
-       JOIN suppliers s ON s.id = sp.supplier_id
-      WHERE ${where}
-      ORDER BY sp.payment_date DESC, sp.voucher_no DESC
-      LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params,
-  );
+  try {
+    const rows = await query(
+      `SELECT sp.id, sp.voucher_no, sp.payment_date, sp.payment_method, sp.reference,
+              sp.amount, sp.status,
+              s.name AS supplier_name, s.code AS supplier_code
+         FROM supplier_payments sp
+         JOIN suppliers s ON s.id = sp.supplier_id
+        WHERE ${where}
+        ORDER BY sp.payment_date DESC, sp.voucher_no DESC
+        LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params,
+    );
 
-  const countRows = await query<{ c: number }>(
-    `SELECT count(*)::int AS c FROM supplier_payments sp WHERE ${where}`,
-    params.slice(0, params.length - 2),
-  );
+    const countRows = await query<{ c: number }>(
+      `SELECT count(*)::int AS c FROM supplier_payments sp WHERE ${where}`,
+      params.slice(0, params.length - 2),
+    );
 
-  return ok({
-    data: rows.map((r) => ({ ...r, amount: Number((r as Record<string, unknown>).amount) })),
-    total: countRows[0].c,
-    page: Math.floor(offset / limit) + 1,
-    page_size: limit,
-  });
+    return ok({
+      data: rows.map((r) => ({ ...r, amount: Number((r as Record<string, unknown>).amount) })),
+      total: countRows[0].c,
+      page: Math.floor(offset / limit) + 1,
+      page_size: limit,
+    });
+  } catch (e: unknown) {
+    return err((e as Error).message, 500);
+  }
 }
 
 export async function POST(request: NextRequest) {

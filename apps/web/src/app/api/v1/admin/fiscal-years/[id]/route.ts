@@ -7,8 +7,8 @@ type Ctx = { params: { id: string } };
 
 export async function GET(req: NextRequest, { params }: Ctx) {
   try {
-    const auth = await requireAuth(req);
-    if (!auth) return err('Unauthorized', 401);
+    let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try { auth = await requireAuth(req); } catch (e) { return e as Response; }
 
     const [fy] = await query<Record<string, unknown>>(
       `SELECT id, company_id, year, start_date, end_date, is_closed, closed_at, created_at
