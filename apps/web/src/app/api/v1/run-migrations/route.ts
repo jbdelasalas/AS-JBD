@@ -52,6 +52,268 @@ export async function POST(request: NextRequest) {
     } catch (e) { results.push(`companies.${col}: ${(e as Error).message}`); }
   }
 
+  // --- 013: BIR extended tables ---
+  const client013 = await getPool().connect();
+  try {
+    await client013.query('BEGIN');
+
+    await client013.query(`
+      CREATE TABLE IF NOT EXISTS issued_documents (
+        id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id          uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        branch_id           uuid REFERENCES branches(id),
+        document_type       varchar(10) NOT NULL,
+        series_id           uuid REFERENCES document_series(id),
+        document_no         varchar(50) NOT NULL,
+        transaction_date    date NOT NULL,
+        customer_id         uuid REFERENCES customers(id),
+        customer_tin        varchar(20),
+        customer_name       varchar(200) NOT NULL,
+        customer_address    text,
+        is_vat_registered   boolean NOT NULL DEFAULT false,
+        sc_pwd_id           varchar(30),
+        total_amount        numeric(18,2) NOT NULL DEFAULT 0,
+        vatable_amount      numeric(18,2) NOT NULL DEFAULT 0,
+        vat_exempt_amount   numeric(18,2) NOT NULL DEFAULT 0,
+        zero_rated_amount   numeric(18,2) NOT NULL DEFAULT 0,
+        vat_amount          numeric(18,2) NOT NULL DEFAULT 0,
+        sc_discount         numeric(18,2) NOT NULL DEFAULT 0,
+        pwd_discount        numeric(18,2) NOT NULL DEFAULT 0,
+        total_discount      numeric(18,2) NOT NULL DEFAULT 0,
+        net_amount          numeric(18,2) NOT NULL DEFAULT 0,
+        status              varchar(20) NOT NULL DEFAULT 'active',
+        void_reason         text,
+        voided_at           timestamptz,
+        voided_by           uuid REFERENCES users(id),
+        ar_invoice_id       uuid REFERENCES customers(id),
+        created_by          uuid NOT NULL REFERENCES users(id),
+        created_at          timestamptz NOT NULL DEFAULT now(),
+        updated_at          timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, document_no)
+      )
+    `);
+    await client013.query(`CREATE INDEX IF NOT EXISTS idx_issued_documents_company_date ON issued_documents (company_id, transaction_date)`);
+    await client013.query(`CREATE INDEX IF NOT EXISTS idx_issued_documents_type ON issued_documents (company_id, document_type)`);
+    await client013.query(`CREATE INDEX IF NOT EXISTS idx_issued_documents_status ON issued_documents (company_id, status)`);
+    await client013.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'issued_documents_updated') THEN
+          CREATE TRIGGER issued_documents_updated BEFORE UPDATE ON issued_documents
+            FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+        END IF;
+      END $$
+    `);
+
+    await client013.query(`
+      CREATE OR REPLACE FUNCTION prevent_issued_document_modification()
+      RETURNS trigger LANGUAGE plpgsql AS $fn$
+      BEGIN
+        IF OLD.status = 'active' AND NEW.status = 'active' THEN
+          IF OLD.document_no <> NEW.document_no
+          OR OLD.transaction_date <> NEW.transaction_date
+          OR OLD.total_amount <> NEW.total_amount
+          OR OLD.net_amount <> NEW.net_amount THEN
+            RAISE EXCEPTION 'Active BIR-issued documents cannot be modified.';
+          END IF;
+        END IF;
+        RETURN NEW;
+      END; $fn$
+    `);
+    await client013.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'issued_documents_immutable') THEN
+          CREATE TRIGGER issued_documents_immutable
+            BEFORE UPDATE ON issued_documents
+            FOR EACH ROW EXECUTE FUNCTION prevent_issued_document_modification();
+        END IF;
+      END $$
+    `);
+
+    await client013.query(`
+      CREATE TABLE IF NOT EXISTS issued_document_lines (
+        id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        document_id         uuid NOT NULL REFERENCES issued_documents(id) ON DELETE CASCADE,
+        line_no             int NOT NULL,
+        description         text NOT NULL,
+        quantity            numeric(18,4) NOT NULL DEFAULT 1,
+        unit_price          numeric(18,4) NOT NULL DEFAULT 0,
+        discount_amount     numeric(18,2) NOT NULL DEFAULT 0,
+        vatable_amount      numeric(18,2) NOT NULL DEFAULT 0,
+        vat_exempt_amount   numeric(18,2) NOT NULL DEFAULT 0,
+        zero_rated_amount   numeric(18,2) NOT NULL DEFAULT 0,
+        vat_amount          numeric(18,2) NOT NULL DEFAULT 0,
+        line_total          numeric(18,2) NOT NULL DEFAULT 0,
+        item_id             uuid REFERENCES items(id),
+        tax_code_id         uuid REFERENCES tax_codes(id)
+      )
+    `);
+    await client013.query(`CREATE INDEX IF NOT EXISTS idx_issued_doc_lines_document ON issued_document_lines (document_id)`);
+
+    await client013.query(`
+      CREATE TABLE IF NOT EXISTS sc_pwd_transactions (
+        id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id          uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        branch_id           uuid REFERENCES branches(id),
+        document_id         uuid NOT NULL REFERENCES issued_documents(id),
+        sc_pwd_type         varchar(10) NOT NULL,
+        id_number           varchar(50) NOT NULL,
+        beneficiary_name    varchar(200) NOT NULL,
+        osca_number         varchar(50),
+        gross_amount        numeric(18,2) NOT NULL,
+        discount_rate       numeric(6,4) NOT NULL DEFAULT 0.20,
+        discount_amount     numeric(18,2) NOT NULL,
+        vat_exemption_amount numeric(18,2) NOT NULL DEFAULT 0,
+        net_amount          numeric(18,2) NOT NULL,
+        transaction_date    date NOT NULL,
+        created_by          uuid NOT NULL REFERENCES users(id),
+        created_at          timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client013.query(`CREATE INDEX IF NOT EXISTS idx_sc_pwd_company_date ON sc_pwd_transactions (company_id, transaction_date)`);
+
+    await client013.query(`
+      CREATE TABLE IF NOT EXISTS book_generations (
+        id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id          uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        branch_id           uuid REFERENCES branches(id),
+        book_type           varchar(10) NOT NULL,
+        period_year         int NOT NULL,
+        period_month        int CHECK (period_month BETWEEN 1 AND 12),
+        period_quarter      int CHECK (period_quarter BETWEEN 1 AND 4),
+        row_count           int NOT NULL DEFAULT 0,
+        total_amount        numeric(18,2) NOT NULL DEFAULT 0,
+        status              varchar(20) NOT NULL DEFAULT 'draft',
+        storage_path        text,
+        generated_by        uuid NOT NULL REFERENCES users(id),
+        generated_at        timestamptz NOT NULL DEFAULT now(),
+        finalized_at        timestamptz,
+        finalized_by        uuid REFERENCES users(id)
+      )
+    `);
+    await client013.query(`CREATE INDEX IF NOT EXISTS idx_book_generations_company_period ON book_generations (company_id, period_year, period_month)`);
+    await client013.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_book_gen_unique ON book_generations (company_id, book_type, period_year, COALESCE(period_month, 0))`);
+
+    await client013.query(`
+      CREATE TABLE IF NOT EXISTS filing_validations (
+        id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        filing_id           uuid NOT NULL REFERENCES bir_filings(id) ON DELETE CASCADE,
+        validation_type     varchar(10) NOT NULL,
+        field_name          varchar(100),
+        message             text NOT NULL,
+        created_at          timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client013.query(`CREATE INDEX IF NOT EXISTS idx_filing_validations_filing ON filing_validations (filing_id)`);
+
+    await client013.query(`
+      CREATE TABLE IF NOT EXISTS excise_rates (
+        id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id          uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        product_type        varchar(50) NOT NULL,
+        description         varchar(200) NOT NULL,
+        rate_per_unit       numeric(10,4) NOT NULL,
+        unit_of_measure     varchar(20) NOT NULL DEFAULT 'liter',
+        effective_date      date NOT NULL,
+        end_date            date,
+        bir_classification  varchar(50),
+        created_at          timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client013.query(`CREATE INDEX IF NOT EXISTS idx_excise_rates_company ON excise_rates (company_id, product_type, effective_date)`);
+
+    await client013.query(`
+      CREATE TABLE IF NOT EXISTS excise_pass_through (
+        id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        document_id         uuid NOT NULL REFERENCES issued_documents(id) ON DELETE CASCADE,
+        excise_rate_id      uuid NOT NULL REFERENCES excise_rates(id),
+        quantity            numeric(18,4) NOT NULL,
+        rate_per_unit       numeric(10,4) NOT NULL,
+        amount              numeric(18,2) NOT NULL,
+        created_at          timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client013.query(`CREATE INDEX IF NOT EXISTS idx_excise_pass_through_doc ON excise_pass_through (document_id)`);
+
+    await client013.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS bir_tin varchar(20)`);
+    await client013.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS bir_rdo_code varchar(10)`);
+    await client013.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS bir_taxpayer_type varchar(20) DEFAULT 'corporation'`);
+    await client013.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS bir_line_of_business text`);
+
+    await client013.query(`
+      CREATE OR REPLACE FUNCTION bootstrap_bir_defaults(p_company_id uuid)
+      RETURNS void LANGUAGE plpgsql AS $fn$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM excise_rates WHERE company_id = p_company_id LIMIT 1) THEN RETURN; END IF;
+        INSERT INTO excise_rates (company_id, product_type, description, rate_per_unit, unit_of_measure, effective_date, bir_classification) VALUES
+          (p_company_id, 'diesel',   'Diesel (RR 2-2018)',         6.00, 'liter', '2020-01-01', 'petroleum'),
+          (p_company_id, 'gasoline', 'Gasoline (RR 2-2018)',      10.00, 'liter', '2020-01-01', 'petroleum'),
+          (p_company_id, 'jet_fuel', 'Aviation Turbo Jet Fuel',    4.00, 'liter', '2020-01-01', 'petroleum'),
+          (p_company_id, 'bunker',   'Bunker Fuel Oil',            2.50, 'liter', '2020-01-01', 'petroleum'),
+          (p_company_id, 'kerosene', 'Kerosene',                   3.00, 'liter', '2020-01-01', 'petroleum'),
+          (p_company_id, 'lpg',      'LPG (per kg)',               3.00, 'kg',    '2020-01-01', 'petroleum'),
+          (p_company_id, 'other',    'Other Petroleum Products',   0.00, 'liter', '2020-01-01', 'petroleum');
+      END; $fn$
+    `);
+
+    await client013.query('COMMIT');
+    results.push('013 issued_documents: ok');
+    results.push('013 issued_document_lines: ok');
+    results.push('013 sc_pwd_transactions: ok');
+    results.push('013 book_generations: ok');
+    results.push('013 filing_validations: ok');
+    results.push('013 excise_rates: ok');
+    results.push('013 excise_pass_through: ok');
+  } catch (e) {
+    await client013.query('ROLLBACK');
+    results.push(`013 FAILED: ${(e as Error).message}`);
+  } finally { client013.release(); }
+
+  // --- 014: BIR functions ---
+  try {
+    await query(`
+      CREATE OR REPLACE FUNCTION generate_book_sales(p_company_id uuid, p_year int, p_month int)
+      RETURNS TABLE (
+        transaction_date date, document_no varchar, document_type varchar,
+        customer_name varchar, customer_tin varchar, gross_amount numeric,
+        exempt_amount numeric, zero_rated_amount numeric, vatable_amount numeric,
+        vat_amount numeric, net_amount numeric
+      ) LANGUAGE plpgsql AS $fn$
+      DECLARE v_start date := make_date(p_year, p_month, 1); v_end date := (v_start + interval '1 month - 1 day')::date;
+      BEGIN
+        RETURN QUERY SELECT id.transaction_date, id.document_no, id.document_type,
+          id.customer_name, id.customer_tin, id.total_amount, id.vat_exempt_amount,
+          id.zero_rated_amount, id.vatable_amount, id.vat_amount, id.net_amount
+        FROM issued_documents id
+        WHERE id.company_id = p_company_id AND id.transaction_date BETWEEN v_start AND v_end
+          AND id.status = 'active' AND id.document_type IN ('OR','SI','CI','AR')
+        ORDER BY id.transaction_date, id.document_no;
+      END; $fn$
+    `);
+    results.push('014 generate_book_sales(): ok');
+  } catch (e) { results.push(`014 generate_book_sales FAILED: ${(e as Error).message}`); }
+
+  try {
+    await query(`
+      CREATE OR REPLACE FUNCTION generate_book_general_journal(p_company_id uuid, p_year int, p_month int)
+      RETURNS TABLE (
+        entry_date date, reference_no varchar, description text,
+        account_code varchar, account_name varchar, debit numeric, credit numeric
+      ) LANGUAGE plpgsql AS $fn$
+      DECLARE v_start date := make_date(p_year, p_month, 1); v_end date := (v_start + interval '1 month - 1 day')::date;
+      BEGIN
+        RETURN QUERY
+        SELECT je.entry_date, je.reference_no, je.description,
+          a.code AS account_code, a.name AS account_name, jel.debit, jel.credit
+        FROM journal_entries je
+        JOIN journal_entry_lines jel ON jel.entry_id = je.id
+        JOIN accounts a ON a.id = jel.account_id
+        WHERE je.company_id = p_company_id AND je.entry_date BETWEEN v_start AND v_end AND je.status = 'posted'
+        ORDER BY je.entry_date, je.reference_no, jel.line_no;
+      END; $fn$
+    `);
+    results.push('014 generate_book_general_journal(): ok');
+  } catch (e) { results.push(`014 generate_book_general_journal FAILED: ${(e as Error).message}`); }
+
   // --- 015: Report metadata tables ---
   const client = await getPool().connect();
   try {
