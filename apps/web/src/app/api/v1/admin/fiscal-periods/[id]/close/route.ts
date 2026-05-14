@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest } from 'next/server';
 import { getPool } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
