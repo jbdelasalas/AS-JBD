@@ -52,6 +52,286 @@ export async function POST(request: NextRequest) {
     } catch (e) { results.push(`companies.${col}: ${(e as Error).message}`); }
   }
 
+  // --- 009: Stock adjustments, transfers, counts ---
+  const client009 = await getPool().connect();
+  try {
+    await client009.query('BEGIN');
+    await client009.query(`
+      CREATE TABLE IF NOT EXISTS stock_adjustments (
+        id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id   uuid NOT NULL REFERENCES companies(id),
+        adj_no       varchar(30) NOT NULL,
+        warehouse_id uuid NOT NULL REFERENCES warehouses(id),
+        reason_code  varchar(30) NOT NULL CHECK (reason_code IN ('DAMAGE','SPOILAGE','THEFT','FOUND','COUNT_CORRECTION','RECLASSIFICATION','OTHER')),
+        notes        text,
+        status       varchar(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','posted','voided')),
+        created_by   uuid NOT NULL REFERENCES users(id),
+        posted_by    uuid REFERENCES users(id),
+        posted_at    timestamptz,
+        created_at   timestamptz NOT NULL DEFAULT now(),
+        updated_at   timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, adj_no)
+      )
+    `);
+    await client009.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='stock_adjustments_updated') THEN CREATE TRIGGER stock_adjustments_updated BEFORE UPDATE ON stock_adjustments FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+    await client009.query(`
+      CREATE TABLE IF NOT EXISTS stock_adjustment_lines (
+        id         uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        adj_id     uuid NOT NULL REFERENCES stock_adjustments(id) ON DELETE CASCADE,
+        line_no    int NOT NULL,
+        item_id    uuid NOT NULL REFERENCES items(id),
+        qty_change numeric(18,4) NOT NULL,
+        unit_cost  numeric(18,4) NOT NULL,
+        line_total numeric(18,4) NOT NULL,
+        notes      text,
+        UNIQUE (adj_id, line_no)
+      )
+    `);
+    await client009.query(`CREATE INDEX IF NOT EXISTS idx_stock_adj_company_status ON stock_adjustments(company_id, status)`);
+    await client009.query(`CREATE INDEX IF NOT EXISTS idx_stock_adj_warehouse ON stock_adjustments(warehouse_id)`);
+
+    await client009.query(`
+      CREATE TABLE IF NOT EXISTS stock_transfers (
+        id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id        uuid NOT NULL REFERENCES companies(id),
+        transfer_no       varchar(30) NOT NULL,
+        from_warehouse_id uuid NOT NULL REFERENCES warehouses(id),
+        to_warehouse_id   uuid NOT NULL REFERENCES warehouses(id),
+        status            varchar(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','in_transit','received','cancelled')),
+        notes             text,
+        sent_at           timestamptz,
+        received_at       timestamptz,
+        sent_by           uuid REFERENCES users(id),
+        received_by       uuid REFERENCES users(id),
+        created_by        uuid NOT NULL REFERENCES users(id),
+        created_at        timestamptz NOT NULL DEFAULT now(),
+        updated_at        timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, transfer_no)
+      )
+    `);
+    await client009.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='stock_transfers_updated') THEN CREATE TRIGGER stock_transfers_updated BEFORE UPDATE ON stock_transfers FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+    await client009.query(`
+      CREATE TABLE IF NOT EXISTS stock_transfer_lines (
+        id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        transfer_id       uuid NOT NULL REFERENCES stock_transfers(id) ON DELETE CASCADE,
+        line_no           int NOT NULL,
+        item_id           uuid NOT NULL REFERENCES items(id),
+        qty               numeric(18,4) NOT NULL,
+        unit_cost_at_send numeric(18,4),
+        UNIQUE (transfer_id, line_no)
+      )
+    `);
+    await client009.query(`CREATE INDEX IF NOT EXISTS idx_stock_xfr_company_status ON stock_transfers(company_id, status)`);
+    await client009.query(`CREATE INDEX IF NOT EXISTS idx_stock_xfr_from ON stock_transfers(from_warehouse_id)`);
+    await client009.query(`CREATE INDEX IF NOT EXISTS idx_stock_xfr_to ON stock_transfers(to_warehouse_id)`);
+
+    await client009.query(`
+      CREATE TABLE IF NOT EXISTS stock_counts (
+        id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id   uuid NOT NULL REFERENCES companies(id),
+        count_no     varchar(30) NOT NULL,
+        warehouse_id uuid NOT NULL REFERENCES warehouses(id),
+        count_type   varchar(20) NOT NULL DEFAULT 'FULL' CHECK (count_type IN ('FULL','CYCLE','SPOT')),
+        status       varchar(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','in_progress','posted','voided')),
+        notes        text,
+        started_at   timestamptz,
+        posted_at    timestamptz,
+        started_by   uuid REFERENCES users(id),
+        posted_by    uuid REFERENCES users(id),
+        created_by   uuid NOT NULL REFERENCES users(id),
+        created_at   timestamptz NOT NULL DEFAULT now(),
+        updated_at   timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, count_no)
+      )
+    `);
+    await client009.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='stock_counts_updated') THEN CREATE TRIGGER stock_counts_updated BEFORE UPDATE ON stock_counts FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+    await client009.query(`
+      CREATE TABLE IF NOT EXISTS stock_count_lines (
+        id             uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        count_id       uuid NOT NULL REFERENCES stock_counts(id) ON DELETE CASCADE,
+        item_id        uuid NOT NULL REFERENCES items(id),
+        system_qty     numeric(18,4) NOT NULL DEFAULT 0,
+        counted_qty    numeric(18,4) NOT NULL DEFAULT 0,
+        variance       numeric(18,4) NOT NULL DEFAULT 0,
+        unit_cost      numeric(18,4) NOT NULL DEFAULT 0,
+        variance_value numeric(18,4) NOT NULL DEFAULT 0,
+        UNIQUE (count_id, item_id)
+      )
+    `);
+    await client009.query(`CREATE INDEX IF NOT EXISTS idx_stock_count_company_status ON stock_counts(company_id, status)`);
+    await client009.query(`CREATE INDEX IF NOT EXISTS idx_stock_count_warehouse ON stock_counts(warehouse_id)`);
+
+    await client009.query('COMMIT');
+    results.push('009 stock_adjustments: ok');
+    results.push('009 stock_transfers: ok');
+    results.push('009 stock_counts: ok');
+  } catch (e) {
+    await client009.query('ROLLBACK');
+    results.push(`009 FAILED: ${(e as Error).message}`);
+  } finally { client009.release(); }
+
+  // --- 010: Admin module tables ---
+  const client010 = await getPool().connect();
+  try {
+    await client010.query('BEGIN');
+    // Extend existing tables
+    await client010.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS trade_name varchar(200)`);
+    await client010.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS vat_status varchar(20) CHECK (vat_status IN ('VAT_REGISTERED','NON_VAT','EXEMPT'))`);
+    await client010.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS rdo_code varchar(10)`);
+    await client010.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS registered_address text`);
+    await client010.query(`ALTER TABLE fiscal_periods ADD COLUMN IF NOT EXISTS fiscal_year_id uuid`);
+    await client010.query(`ALTER TABLE fiscal_periods ADD COLUMN IF NOT EXISTS locked_at timestamptz`);
+    await client010.query(`ALTER TABLE fiscal_periods ADD COLUMN IF NOT EXISTS locked_by uuid REFERENCES users(id)`);
+
+    await client010.query(`
+      CREATE TABLE IF NOT EXISTS cost_centers (
+        id         uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        code       varchar(20) NOT NULL,
+        name       varchar(100) NOT NULL,
+        parent_id  uuid REFERENCES cost_centers(id),
+        is_active  boolean NOT NULL DEFAULT true,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        created_by uuid REFERENCES users(id),
+        updated_by uuid REFERENCES users(id),
+        UNIQUE (company_id, code)
+      )
+    `);
+    await client010.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='cost_centers_updated') THEN CREATE TRIGGER cost_centers_updated BEFORE UPDATE ON cost_centers FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+
+    await client010.query(`
+      CREATE TABLE IF NOT EXISTS fiscal_years (
+        id         uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        year       int NOT NULL,
+        start_date date NOT NULL,
+        end_date   date NOT NULL,
+        is_closed  boolean NOT NULL DEFAULT false,
+        closed_at  timestamptz,
+        closed_by  uuid REFERENCES users(id),
+        created_at timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, year)
+      )
+    `);
+
+    await client010.query(`
+      CREATE TABLE IF NOT EXISTS uoms (
+        id         uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        code       varchar(20) NOT NULL,
+        name       varchar(50) NOT NULL,
+        type       varchar(10) NOT NULL CHECK (type IN ('COUNT','WEIGHT','VOLUME','LENGTH','TIME')),
+        is_base    boolean NOT NULL DEFAULT false,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, code)
+      )
+    `);
+    await client010.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='uoms_updated') THEN CREATE TRIGGER uoms_updated BEFORE UPDATE ON uoms FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+
+    await client010.query(`
+      CREATE TABLE IF NOT EXISTS payment_methods (
+        id                 uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id         uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        code               varchar(20) NOT NULL,
+        name               varchar(100) NOT NULL,
+        account_id         uuid REFERENCES accounts(id),
+        requires_reference boolean NOT NULL DEFAULT false,
+        is_active          boolean NOT NULL DEFAULT true,
+        created_at         timestamptz NOT NULL DEFAULT now(),
+        updated_at         timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, code)
+      )
+    `);
+    await client010.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='payment_methods_updated') THEN CREATE TRIGGER payment_methods_updated BEFORE UPDATE ON payment_methods FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+
+    await client010.query(`
+      CREATE TABLE IF NOT EXISTS approval_workflows (
+        id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id    uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        name          varchar(100) NOT NULL,
+        document_type varchar(30) NOT NULL,
+        is_active     boolean NOT NULL DEFAULT true,
+        created_at    timestamptz NOT NULL DEFAULT now(),
+        updated_at    timestamptz NOT NULL DEFAULT now(),
+        created_by    uuid REFERENCES users(id)
+      )
+    `);
+    await client010.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='approval_workflows_updated') THEN CREATE TRIGGER approval_workflows_updated BEFORE UPDATE ON approval_workflows FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+    await client010.query(`
+      CREATE TABLE IF NOT EXISTS approval_workflow_steps (
+        id               uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        workflow_id      uuid NOT NULL REFERENCES approval_workflows(id) ON DELETE CASCADE,
+        step_no          int NOT NULL,
+        approver_type    varchar(20) NOT NULL CHECK (approver_type IN ('ROLE','USER','BRANCH_MANAGER')),
+        approver_ref     uuid,
+        threshold_amount numeric(18,4),
+        sla_hours        int,
+        created_at       timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (workflow_id, step_no)
+      )
+    `);
+
+    await client010.query(`
+      CREATE TABLE IF NOT EXISTS feature_flags (
+        id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name              text UNIQUE NOT NULL,
+        enabled           boolean NOT NULL DEFAULT false,
+        rollout_companies uuid[] NOT NULL DEFAULT '{}',
+        rollout_users     uuid[] NOT NULL DEFAULT '{}',
+        description       text,
+        created_at        timestamptz NOT NULL DEFAULT now(),
+        updated_at        timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client010.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='feature_flags_updated') THEN CREATE TRIGGER feature_flags_updated BEFORE UPDATE ON feature_flags FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+
+    await client010.query(`CREATE INDEX IF NOT EXISTS idx_cost_centers_company ON cost_centers(company_id)`);
+    await client010.query(`CREATE INDEX IF NOT EXISTS idx_fiscal_years_company ON fiscal_years(company_id)`);
+    await client010.query(`CREATE INDEX IF NOT EXISTS idx_approval_workflows_company ON approval_workflows(company_id, document_type)`);
+    await client010.query(`CREATE INDEX IF NOT EXISTS idx_uoms_company ON uoms(company_id)`);
+    await client010.query(`CREATE INDEX IF NOT EXISTS idx_payment_methods_company ON payment_methods(company_id)`);
+
+    await client010.query('COMMIT');
+    results.push('010 cost_centers: ok');
+    results.push('010 fiscal_years: ok');
+    results.push('010 uoms: ok');
+    results.push('010 payment_methods: ok');
+    results.push('010 approval_workflows: ok');
+    results.push('010 feature_flags: ok');
+  } catch (e) {
+    await client010.query('ROLLBACK');
+    results.push(`010 FAILED: ${(e as Error).message}`);
+  } finally { client010.release(); }
+
+  // --- 011: Admin functions ---
+  try {
+    await query(`
+      CREATE OR REPLACE FUNCTION close_fiscal_period(p_period_id uuid, p_user_id uuid)
+      RETURNS void LANGUAGE plpgsql AS $fn$
+      BEGIN
+        UPDATE fiscal_periods SET status='CLOSED', locked_at=now(), locked_by=p_user_id
+        WHERE id=p_period_id AND status IN ('OPEN','ADJUSTING');
+        IF NOT FOUND THEN RAISE EXCEPTION 'Fiscal period % not found or not open', p_period_id; END IF;
+      END; $fn$
+    `);
+    results.push('011 close_fiscal_period(): ok');
+  } catch (e) { results.push(`011 close_fiscal_period FAILED: ${(e as Error).message}`); }
+
+  try {
+    await query(`
+      CREATE OR REPLACE FUNCTION open_fiscal_period(p_period_id uuid, p_user_id uuid)
+      RETURNS void LANGUAGE plpgsql AS $fn$
+      BEGIN
+        UPDATE fiscal_periods SET status='OPEN', locked_at=NULL, locked_by=NULL
+        WHERE id=p_period_id AND status='CLOSED';
+        IF NOT FOUND THEN RAISE EXCEPTION 'Fiscal period % not closed', p_period_id; END IF;
+      END; $fn$
+    `);
+    results.push('011 open_fiscal_period(): ok');
+  } catch (e) { results.push(`011 open_fiscal_period FAILED: ${(e as Error).message}`); }
+
   // --- 013: BIR extended tables ---
   const client013 = await getPool().connect();
   try {
