@@ -6,10 +6,9 @@ import { api } from '@/lib/api';
 
 interface RoleRow {
   id: string;
+  code: string;
   name: string;
   description: string | null;
-  is_system: boolean;
-  is_active: boolean;
   permission_count: number;
 }
 
@@ -34,9 +33,8 @@ export default function RolesPage() {
     e.preventDefault();
     if (!newName.trim()) return;
     setCreating(true);
-    const companyId = localStorage.getItem('company_id');
     try {
-      await api.post('/admin/roles', { company_id: companyId, name: newName.trim() });
+      await api.post('/admin/roles', { name: newName.trim() });
       setNewName('');
       load();
     } catch (e: unknown) {
@@ -69,9 +67,9 @@ export default function RolesPage() {
           <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
             <tr>
               <th className="px-3 py-2 text-left font-medium">Name</th>
+              <th className="px-3 py-2 text-left font-medium">Code</th>
               <th className="px-3 py-2 text-left font-medium">Description</th>
               <th className="px-3 py-2 text-right font-medium">Permissions</th>
-              <th className="px-3 py-2 text-left font-medium">Type</th>
             </tr>
           </thead>
           <tbody>
@@ -86,15 +84,9 @@ export default function RolesPage() {
                     {r.name}
                   </Link>
                 </td>
+                <td className="px-3 py-2 font-mono text-xs text-slate-500 dark:text-slate-400">{r.code}</td>
                 <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{r.description ?? '—'}</td>
                 <td className="px-3 py-2 text-right text-xs text-slate-600 dark:text-slate-400">{r.permission_count}</td>
-                <td className="px-3 py-2">
-                  {r.is_system ? (
-                    <span className="rounded bg-purple-100 px-2 py-0.5 text-[11px] font-medium text-purple-700">system</span>
-                  ) : (
-                    <span className="rounded bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] text-slate-600 dark:text-slate-400">custom</span>
-                  )}
-                </td>
               </tr>
             ))}
           </tbody>

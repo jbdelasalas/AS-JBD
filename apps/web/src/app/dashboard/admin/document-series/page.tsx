@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 
 interface SeriesRow {
-  id: string; doc_type: string; prefix: string; last_no: number;
+  id: string; doc_type: string; prefix: string; current_number: number;
   branch_id: string | null; updated_at: string;
 }
 
@@ -14,7 +14,7 @@ export default function DocumentSeriesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ prefix: '', last_no: 0 });
+  const [editForm, setEditForm] = useState({ prefix: '', current_number: 0 });
   const [saving, setSaving] = useState(false);
 
   function load() {
@@ -29,7 +29,7 @@ export default function DocumentSeriesPage() {
 
   function startEdit(r: SeriesRow) {
     setEditing(r.id);
-    setEditForm({ prefix: r.prefix, last_no: r.last_no });
+    setEditForm({ prefix: r.prefix, current_number: r.current_number });
   }
 
   async function saveEdit(id: string) {
@@ -80,11 +80,11 @@ export default function DocumentSeriesPage() {
                         className="w-24 rounded border border-slate-300 dark:border-slate-600 px-1.5 py-1 text-xs dark:bg-slate-800 dark:text-slate-100" />
                     </td>
                     <td className="px-3 py-1">
-                      <input type="number" value={editForm.last_no} onChange={(e) => setEditForm((f) => ({ ...f, last_no: Number(e.target.value) }))}
+                      <input type="number" value={editForm.current_number} onChange={(e) => setEditForm((f) => ({ ...f, current_number: Number(e.target.value) }))}
                         className="w-20 rounded border border-slate-300 dark:border-slate-600 px-1.5 py-1 text-xs text-right dark:bg-slate-800 dark:text-slate-100" />
                     </td>
                     <td className="px-3 py-2 font-mono text-xs text-slate-500 dark:text-slate-400">
-                      {editForm.prefix}{new Date().getFullYear()}-{String(editForm.last_no + 1).padStart(6, '0')}
+                      {editForm.prefix}{new Date().getFullYear()}-{String(editForm.current_number + 1).padStart(6, '0')}
                     </td>
                     <td className="px-3 py-2 text-xs text-slate-400" />
                     <td className="px-3 py-2 flex gap-1">
@@ -101,9 +101,9 @@ export default function DocumentSeriesPage() {
                 ) : (
                   <>
                     <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">{r.prefix}</td>
-                    <td className="px-3 py-2 text-right font-mono text-xs text-slate-600 dark:text-slate-400">{r.last_no.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right font-mono text-xs text-slate-600 dark:text-slate-400">{r.current_number.toLocaleString()}</td>
                     <td className="px-3 py-2 font-mono text-xs text-slate-500 dark:text-slate-400">
-                      {r.prefix}{new Date().getFullYear()}-{String(r.last_no + 1).padStart(6, '0')}
+                      {r.prefix}{new Date().getFullYear()}-{String(r.current_number + 1).padStart(6, '0')}
                     </td>
                     <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{formatDate(r.updated_at)}</td>
                     <td className="px-3 py-2">
