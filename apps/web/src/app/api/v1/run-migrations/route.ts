@@ -1287,7 +1287,7 @@ export async function POST(request: NextRequest) {
         ('dddd0001-0000-0000-0000-000000000003', $1, 'TEST-C003', 'Dela Cruz Construction', 'wholesale', '111-222-333-000', 'Pasig City',  'Pedro Reyes',    'pedro@dc.com',   '09391234567', 45, 750000, true),
         ('dddd0001-0000-0000-0000-000000000004', $1, 'TEST-C004', 'Metro Bus Lines',        'fleet',     '444-555-666-000', 'Manila',      'Ana Villanueva', 'ana@mbl.com',    '09451234567', 30, 2000000, true),
         ('dddd0001-0000-0000-0000-000000000005', $1, 'TEST-C005', 'Govt Infra Dept.',       'gov',       '777-888-999-000', 'Intramuros',  'Dir. Ramos',     'ramos@gov.ph',   '09561234567', 60, 5000000, true)
-      ON CONFLICT (company_id, code) DO NOTHING`, [CO]);
+      ON CONFLICT (id) DO UPDATE SET code = EXCLUDED.code, name = EXCLUDED.name`, [CO]);
     results.push('seed customers: ok');
   } catch (e) { results.push(`seed customers: ${(e as Error).message}`); }
 
@@ -1332,14 +1332,14 @@ export async function POST(request: NextRequest) {
     await query(`
       INSERT INTO sales_invoice_lines
         (invoice_id, line_no, item_id, description, quantity, unit_price, discount_pct, vat_rate, line_subtotal, line_vat, line_total)
-      SELECT v.inv_id::uuid, v.line_no::int, v.item_id::uuid, v.desc, v.qty::numeric, v.price::numeric, 0, 12, v.sub::numeric, v.vat::numeric, v.tot::numeric
+      SELECT v.inv_id::uuid, v.line_no::int, v.item_id::uuid, v.dsc, v.qty::numeric, v.price::numeric, 0, 12, v.sub::numeric, v.vat::numeric, v.tot::numeric
       FROM (VALUES
         ('ffff0001-0000-0000-0000-000000000001',1,'cccc0001-0000-0000-0000-000000000001','Diesel Fuel',   1373.66,65.00, 89285.71,10714.29,100000.00),
         ('ffff0001-0000-0000-0000-000000000002',1,'cccc0001-0000-0000-0000-000000000002','Gasoline 91',   2625.66,68.00,178571.43,21428.57,200000.00),
         ('ffff0001-0000-0000-0000-000000000003',1,'cccc0001-0000-0000-0000-000000000001','Diesel Fuel',   4122.45,65.00,267857.14,32142.86,300000.00),
         ('ffff0001-0000-0000-0000-000000000004',1,'cccc0001-0000-0000-0000-000000000001','Diesel Fuel',   6868.91,65.00,446428.57,53571.43,500000.00),
         ('ffff0001-0000-0000-0000-000000000005',1,'cccc0001-0000-0000-0000-000000000002','Gasoline 91',    735.29,68.00, 44642.86, 5357.14, 50000.00)
-      ) AS v(inv_id, line_no, item_id, desc, qty, price, sub, vat, tot)
+      ) AS v(inv_id, line_no, item_id, dsc, qty, price, sub, vat, tot)
       WHERE EXISTS (SELECT 1 FROM sales_invoices WHERE id = v.inv_id::uuid)
       ON CONFLICT DO NOTHING`);
     results.push('seed sales_invoice_lines: ok');
@@ -1371,13 +1371,13 @@ export async function POST(request: NextRequest) {
   try {
     await query(`
       INSERT INTO bill_lines (bill_id, line_no, item_id, description, quantity, unit_price, vat_rate, line_subtotal, line_vat, line_total)
-      SELECT v.bill_id::uuid, v.ln::int, v.item_id::uuid, v.desc, v.qty::numeric, v.price::numeric, 12, v.sub::numeric, v.vat::numeric, v.tot::numeric
+      SELECT v.bill_id::uuid, v.ln::int, v.item_id::uuid, v.dsc, v.qty::numeric, v.price::numeric, 12, v.sub::numeric, v.vat::numeric, v.tot::numeric
       FROM (VALUES
         ('a1b20001-0000-0000-0000-000000000001',1,'cccc0001-0000-0000-0000-000000000001','Diesel Fuel',     40000,55.00,2200000.00,264000.00,2464000.00),
         ('a1b20001-0000-0000-0000-000000000001',2,'cccc0001-0000-0000-0000-000000000002','Gasoline 91',       600,55.00,  33000.00,  3960.00,  36960.00),
         ('a1b20001-0000-0000-0000-000000000002',1,'cccc0001-0000-0000-0000-000000000002','Gasoline 91',     15000,58.00, 870000.00,104400.00, 974400.00),
         ('a1b20001-0000-0000-0000-000000000003',1,'cccc0001-0000-0000-0000-000000000004','Engine Oil 10W-40', 500,350.00,175000.00, 21000.00, 196000.00)
-      ) AS v(bill_id, ln, item_id, desc, qty, price, sub, vat, tot)
+      ) AS v(bill_id, ln, item_id, dsc, qty, price, sub, vat, tot)
       WHERE EXISTS (SELECT 1 FROM bills WHERE id = v.bill_id::uuid)
       ON CONFLICT DO NOTHING`);
     results.push('seed bill_lines: ok');
