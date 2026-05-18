@@ -1223,5 +1223,181 @@ export async function POST(request: NextRequest) {
     results.push('customers.payment_terms_days: ok');
   } catch (e) { results.push(`customers.payment_terms_days: ${(e as Error).message}`); }
 
+  // ================================================================
+  // TEST DATA SEED — idempotent (ON CONFLICT DO NOTHING)
+  // ================================================================
+  const CO  = '11111111-1111-1111-1111-111111111111';
+  const USR = '99999999-9999-9999-9999-999999999999';
+  const HO  = '22222222-2222-2222-2222-222222222201';
+
+  // Item categories
+  try {
+    await query(`
+      INSERT INTO item_categories (id, company_id, code, name) VALUES
+        ('aaaa0001-0000-0000-0000-000000000001', $1, 'FUEL',  'Fuel Products'),
+        ('aaaa0001-0000-0000-0000-000000000002', $1, 'LUBE',  'Lubricants'),
+        ('aaaa0001-0000-0000-0000-000000000003', $1, 'PARTS', 'Spare Parts')
+      ON CONFLICT DO NOTHING`, [CO]);
+    results.push('seed item_categories: ok');
+  } catch (e) { results.push(`seed item_categories: ${(e as Error).message}`); }
+
+  // Warehouse
+  try {
+    await query(`
+      INSERT INTO warehouses (id, company_id, code, name, address, is_active) VALUES
+        ('bbbb0001-0000-0000-0000-000000000001', $1, 'WH-MAIN', 'Main Warehouse', 'Manila', true)
+      ON CONFLICT DO NOTHING`, [CO]);
+    results.push('seed warehouse: ok');
+  } catch (e) { results.push(`seed warehouse: ${(e as Error).message}`); }
+
+  // Items
+  try {
+    await query(`
+      INSERT INTO items (id, company_id, category_id, sku, name, uom, item_type, costing_method, standard_cost, selling_price, is_active) VALUES
+        ('cccc0001-0000-0000-0000-000000000001', $1, 'aaaa0001-0000-0000-0000-000000000001', 'DIESEL',    'Diesel Fuel',         'liter', 'product', 'AVERAGE', 55.00, 65.00, true),
+        ('cccc0001-0000-0000-0000-000000000002', $1, 'aaaa0001-0000-0000-0000-000000000001', 'GAS91',     'Gasoline 91',         'liter', 'product', 'AVERAGE', 58.00, 68.00, true),
+        ('cccc0001-0000-0000-0000-000000000003', $1, 'aaaa0001-0000-0000-0000-000000000001', 'GAS95',     'Gasoline 95',         'liter', 'product', 'AVERAGE', 62.00, 72.00, true),
+        ('cccc0001-0000-0000-0000-000000000004', $1, 'aaaa0001-0000-0000-0000-000000000002', 'OIL-10W40', 'Engine Oil 10W-40',   'liter', 'product', 'FIFO',    350.00, 450.00, true),
+        ('cccc0001-0000-0000-0000-000000000005', $1, 'aaaa0001-0000-0000-0000-000000000002', 'OIL-20W50', 'Engine Oil 20W-50',   'liter', 'product', 'FIFO',    320.00, 420.00, true),
+        ('cccc0001-0000-0000-0000-000000000006', $1, 'aaaa0001-0000-0000-0000-000000000003', 'FILTER-OIL','Oil Filter',          'pcs',   'product', 'FIFO',    85.00,  120.00, true)
+      ON CONFLICT DO NOTHING`, [CO]);
+    results.push('seed items: ok');
+  } catch (e) { results.push(`seed items: ${(e as Error).message}`); }
+
+  // Stock balances
+  try {
+    await query(`
+      INSERT INTO stock_balances (company_id, item_id, warehouse_id, qty_on_hand, avg_cost) VALUES
+        ($1, 'cccc0001-0000-0000-0000-000000000001', 'bbbb0001-0000-0000-0000-000000000001', 50000, 55.00),
+        ($1, 'cccc0001-0000-0000-0000-000000000002', 'bbbb0001-0000-0000-0000-000000000001', 20000, 58.00),
+        ($1, 'cccc0001-0000-0000-0000-000000000003', 'bbbb0001-0000-0000-0000-000000000001', 15000, 62.00),
+        ($1, 'cccc0001-0000-0000-0000-000000000004', 'bbbb0001-0000-0000-0000-000000000001', 500,   350.00),
+        ($1, 'cccc0001-0000-0000-0000-000000000005', 'bbbb0001-0000-0000-0000-000000000001', 300,   320.00),
+        ($1, 'cccc0001-0000-0000-0000-000000000006', 'bbbb0001-0000-0000-0000-000000000001', 200,   85.00)
+      ON CONFLICT (company_id, item_id, warehouse_id) DO NOTHING`, [CO]);
+    results.push('seed stock_balances: ok');
+  } catch (e) { results.push(`seed stock_balances: ${(e as Error).message}`); }
+
+  // Customers
+  try {
+    await query(`
+      INSERT INTO customers (id, company_id, code, name, customer_type, tin, address, contact_person, email, phone, payment_terms_days, credit_limit, is_active) VALUES
+        ('dddd0001-0000-0000-0000-000000000001', $1, 'CUST-000001', 'ABC Transport Corp.',       'fleet',     '123-456-789-000', 'Quezon City',  'Juan Dela Cruz',  'juan@abc.com',    '09171234567', 30, 500000, true),
+        ('dddd0001-0000-0000-0000-000000000002', $1, 'CUST-000002', 'XYZ Logistics Inc.',        'wholesale', '987-654-321-000', 'Makati City',  'Maria Santos',    'maria@xyz.com',   '09281234567', 15, 1000000, true),
+        ('dddd0001-0000-0000-0000-000000000003', $1, 'CUST-000003', 'Dela Cruz Construction',    'wholesale', '111-222-333-000', 'Pasig City',   'Pedro Reyes',     'pedro@dc.com',    '09391234567', 45, 750000, true),
+        ('dddd0001-0000-0000-0000-000000000004', $1, 'CUST-000004', 'Metro Bus Lines',           'fleet',     '444-555-666-000', 'Manila',       'Ana Villanueva',  'ana@mbl.com',     '09451234567', 30, 2000000, true),
+        ('dddd0001-0000-0000-0000-000000000005', $1, 'CUST-000005', 'Gov''t Infra Dept.',        'gov',       '777-888-999-000', 'Intramuros',   'Dir. Ramos',      'ramos@gov.ph',    '09561234567', 60, 5000000, true)
+      ON CONFLICT DO NOTHING`, [CO]);
+    results.push('seed customers: ok');
+  } catch (e) { results.push(`seed customers: ${(e as Error).message}`); }
+
+  // Suppliers
+  try {
+    await query(`
+      INSERT INTO suppliers (id, company_id, code, name, supplier_type, tin, address, contact_person, email, phone, payment_terms_days, credit_limit, is_active) VALUES
+        ('eeee0001-0000-0000-0000-000000000001', $1, 'SUPP-000001', 'Petron Corp.',              'refinery',  '000-111-222-000', 'Bonifacio Global City', 'Sales Team',     'sales@petron.com',   '025551001', 30,  5000000, true),
+        ('eeee0001-0000-0000-0000-000000000002', $1, 'SUPP-000002', 'Shell Philippines',          'refinery',  '000-222-333-000', 'Makati City',           'Key Accounts',   'keyaccts@shell.com', '025551002', 30,  5000000, true),
+        ('eeee0001-0000-0000-0000-000000000003', $1, 'SUPP-000003', 'Castrol Philippines',        'supplier',  '000-333-444-000', 'Mandaluyong',           'Lube Sales',     'sales@castrol.com',  '025551003', 30,  1000000, true),
+        ('eeee0001-0000-0000-0000-000000000004', $1, 'SUPP-000004', 'Auto Parts Depot',           'supplier',  '000-444-555-000', 'Caloocan',              'Parts Manager',  'parts@apd.com',      '025551004', 15,  500000, true)
+      ON CONFLICT DO NOTHING`, [CO]);
+    results.push('seed suppliers: ok');
+  } catch (e) { results.push(`seed suppliers: ${(e as Error).message}`); }
+
+  // Sales invoices (open AR)
+  try {
+    await query(`
+      INSERT INTO sales_invoices
+        (id, company_id, branch_id, invoice_no, customer_id, invoice_date, due_date,
+         payment_terms_days, currency, subtotal, vat_amount, total, amount_paid, balance, discount_amount, status, created_by)
+      VALUES
+        ('ffff0001-0000-0000-0000-000000000001', $1, $2, 'SI-2026-000001', 'dddd0001-0000-0000-0000-000000000001',
+         '2026-04-10', '2026-05-10', 30, 'PHP', 89285.71, 10714.29, 100000.00, 0, 100000.00, 0, 'open', $3),
+        ('ffff0001-0000-0000-0000-000000000002', $1, $2, 'SI-2026-000002', 'dddd0001-0000-0000-0000-000000000002',
+         '2026-04-15', '2026-04-30', 15, 'PHP', 178571.43, 21428.57, 200000.00, 50000, 150000.00, 0, 'partially_paid', $3),
+        ('ffff0001-0000-0000-0000-000000000003', $1, $2, 'SI-2026-000003', 'dddd0001-0000-0000-0000-000000000003',
+         '2026-03-01', '2026-04-15', 45, 'PHP', 267857.14, 32142.86, 300000.00, 0, 300000.00, 0, 'overdue', $3),
+        ('ffff0001-0000-0000-0000-000000000004', $1, $2, 'SI-2026-000004', 'dddd0001-0000-0000-0000-000000000004',
+         '2026-05-01', '2026-05-31', 30, 'PHP', 446428.57, 53571.43, 500000.00, 0, 500000.00, 0, 'open', $3),
+        ('ffff0001-0000-0000-0000-000000000005', $1, $2, 'SI-2026-000005', 'dddd0001-0000-0000-0000-000000000001',
+         '2026-04-20', '2026-04-30', 10, 'PHP', 44642.86, 5357.14, 50000.00, 50000, 0, 0, 'paid', $3)
+      ON CONFLICT DO NOTHING`, [CO, HO, USR]);
+    results.push('seed sales_invoices: ok');
+  } catch (e) { results.push(`seed sales_invoices: ${(e as Error).message}`); }
+
+  // Sales invoice lines
+  try {
+    await query(`
+      INSERT INTO sales_invoice_lines
+        (invoice_id, line_no, item_id, description, quantity, unit_price, discount_pct, vat_rate, line_subtotal, line_vat, line_total)
+      VALUES
+        ('ffff0001-0000-0000-0000-000000000001', 1, 'cccc0001-0000-0000-0000-000000000001', 'Diesel Fuel', 1373.66, 65.00, 0, 12, 89285.71, 10714.29, 100000.00),
+        ('ffff0001-0000-0000-0000-000000000002', 1, 'cccc0001-0000-0000-0000-000000000002', 'Gasoline 91', 2625.66, 68.00, 0, 12, 178571.43, 21428.57, 200000.00),
+        ('ffff0001-0000-0000-0000-000000000003', 1, 'cccc0001-0000-0000-0000-000000000001', 'Diesel Fuel', 4122.45, 65.00, 0, 12, 267857.14, 32142.86, 300000.00),
+        ('ffff0001-0000-0000-0000-000000000004', 1, 'cccc0001-0000-0000-0000-000000000001', 'Diesel Fuel', 6868.91, 65.00, 0, 12, 446428.57, 53571.43, 500000.00),
+        ('ffff0001-0000-0000-0000-000000000005', 1, 'cccc0001-0000-0000-0000-000000000002', 'Gasoline 91', 735.29, 68.00, 0, 12, 50000.00, 5357.14, 50000.00)
+      ON CONFLICT DO NOTHING`, []);
+    results.push('seed sales_invoice_lines: ok');
+  } catch (e) { results.push(`seed sales_invoice_lines: ${(e as Error).message}`); }
+
+  // AP bills
+  try {
+    await query(`
+      INSERT INTO supplier_bills
+        (id, company_id, branch_id, internal_no, bill_no, supplier_id, bill_date, due_date,
+         payment_terms_days, subtotal, vat_amount, total, amount_paid, balance, status, created_by)
+      VALUES
+        ('gggg0001-0000-0000-0000-000000000001', $1, $2, 'BILL-2026-000001', 'PETRON-INV-001', 'eeee0001-0000-0000-0000-000000000001',
+         '2026-04-05', '2026-05-05', 30, 2232142.86, 267857.14, 2500000.00, 1000000, 1500000.00, 'open', $3),
+        ('gggg0001-0000-0000-0000-000000000002', $1, $2, 'BILL-2026-000002', 'SHELL-INV-002', 'eeee0001-0000-0000-0000-000000000002',
+         '2026-04-12', '2026-05-12', 30, 892857.14, 107142.86, 1000000.00, 0, 1000000.00, 'open', $3),
+        ('gggg0001-0000-0000-0000-000000000003', $1, $2, 'BILL-2026-000003', 'CASTROL-INV-003', 'eeee0001-0000-0000-0000-000000000003',
+         '2026-03-15', '2026-04-14', 30, 178571.43, 21428.57, 200000.00, 0, 200000.00, 'overdue', $3)
+      ON CONFLICT DO NOTHING`, [CO, HO, USR]);
+    results.push('seed supplier_bills: ok');
+  } catch (e) { results.push(`seed supplier_bills: ${(e as Error).message}`); }
+
+  // AP bill lines
+  try {
+    await query(`
+      INSERT INTO supplier_bill_lines
+        (bill_id, line_no, item_id, description, quantity, unit_price, vat_rate, line_subtotal, line_vat, line_total)
+      VALUES
+        ('gggg0001-0000-0000-0000-000000000001', 1, 'cccc0001-0000-0000-0000-000000000001', 'Diesel Fuel', 40000, 55.00, 12, 2200000.00, 264000.00, 2464000.00),
+        ('gggg0001-0000-0000-0000-000000000001', 2, 'cccc0001-0000-0000-0000-000000000002', 'Gasoline 91', 600, 55.00, 12, 33000.00, 3960.00, 36960.00),
+        ('gggg0001-0000-0000-0000-000000000002', 1, 'cccc0001-0000-0000-0000-000000000002', 'Gasoline 91', 15000, 58.00, 12, 870000.00, 104400.00, 974400.00),
+        ('gggg0001-0000-0000-0000-000000000003', 1, 'cccc0001-0000-0000-0000-000000000004', 'Engine Oil 10W-40', 500, 350.00, 12, 175000.00, 21000.00, 196000.00)
+      ON CONFLICT DO NOTHING`, []);
+    results.push('seed supplier_bill_lines: ok');
+  } catch (e) { results.push(`seed supplier_bill_lines: ${(e as Error).message}`); }
+
+  // Customer payments
+  try {
+    await query(`
+      INSERT INTO customer_payments
+        (id, company_id, branch_id, receipt_no, customer_id, payment_date, payment_method,
+         amount, unapplied_amount, is_advance, status, created_by)
+      VALUES
+        ('hhhh0001-0000-0000-0000-000000000001', $1, $2, 'OR-2026-000001', 'dddd0001-0000-0000-0000-000000000002',
+         '2026-04-20', 'bank_transfer', 50000.00, 0, false, 'posted', $3),
+        ('hhhh0001-0000-0000-0000-000000000002', $1, $2, 'OR-2026-000002', 'dddd0001-0000-0000-0000-000000000001',
+         '2026-04-25', 'cash', 50000.00, 0, false, 'posted', $3)
+      ON CONFLICT DO NOTHING`, [CO, HO, USR]);
+    results.push('seed customer_payments: ok');
+  } catch (e) { results.push(`seed customer_payments: ${(e as Error).message}`); }
+
+  // Journal entries (sample GL)
+  try {
+    await query(`
+      INSERT INTO journal_entries
+        (id, company_id, branch_id, entry_no, entry_date, memo, source_module, status, posted_at, posted_by, created_by)
+      VALUES
+        ('iiii0001-0000-0000-0000-000000000001', $1, $2, 'JV-2026-000001', '2026-04-10',
+         'Sales invoice SI-2026-000001 - ABC Transport', 'ar', 'posted', '2026-04-10 08:00:00+08', $3, $3),
+        ('iiii0001-0000-0000-0000-000000000002', $1, $2, 'JV-2026-000002', '2026-04-15',
+         'Sales invoice SI-2026-000002 - XYZ Logistics', 'ar', 'posted', '2026-04-15 08:00:00+08', $3, $3)
+      ON CONFLICT DO NOTHING`, [CO, HO, USR]);
+    results.push('seed journal_entries: ok');
+  } catch (e) { results.push(`seed journal_entries: ${(e as Error).message}`); }
+
   return ok({ results });
 }
