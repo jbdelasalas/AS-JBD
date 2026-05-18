@@ -10,9 +10,9 @@ export async function GET(req: NextRequest) {
   try { auth = await requireAuth(req); } catch (e) { return e as Response; }
 
     const rows = await query<{
-      id: string; module: string; action: string; description: string | null;
+      id: string; code: string; module: string; action: string; name: string;
     }>(
-      `SELECT id, module, action, description
+      `SELECT id, code, module, action, name
          FROM permissions
         ORDER BY module, action`
     );

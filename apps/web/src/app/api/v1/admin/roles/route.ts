@@ -13,18 +13,16 @@ export async function GET(req: NextRequest) {
     const companyId = searchParams.get('company_id');
 
     const rows = await query<{
-      id: string; company_id: string | null; name: string;
-      description: string | null; is_system: boolean; is_active: boolean; created_at: string;
+      id: string; code: string; name: string; description: string | null;
       permission_count: number;
     }>(
-      `SELECT r.id, r.company_id, r.name, r.description, r.is_system, r.is_active, r.created_at,
+      `SELECT r.id, r.code, r.name, r.description,
               COUNT(rp.permission_id)::int AS permission_count
          FROM roles r
          LEFT JOIN role_permissions rp ON rp.role_id = r.id
-        WHERE (r.company_id = $1 OR r.company_id IS NULL)
         GROUP BY r.id
-        ORDER BY r.is_system DESC, r.name`,
-      [companyId]
+        ORDER BY r.name`,
+      []
     );
 
     return ok(rows);
@@ -40,14 +38,14 @@ export async function POST(req: NextRequest) {
     if (!auth.isSuperadmin) return err('Forbidden', 403);
 
     const body = await req.json();
-    const { company_id, name, description } = body;
-    if (!name) return err('name is required', 400);
+    const { code, name, description } = body;
+    if (!code || !name) return err('code and name are required', 400);
 
-    const [role] = await query<{ id: string; name: string }>(
-      `INSERT INTO roles (company_id, name, description, is_system)
-       VALUES ($1, $2, $3, false)
-       RETURNING id, name`,
-      [company_id ?? null, name, description ?? null]
+    const [role] = await query<{ id: string; code: string; name: string }>(
+      `INSERT INTO roles (code, name, description)
+       VALUES ($1, $2, $3)
+       RETURNING id, code, name`,
+      [code, name, description ?? null]
     );
 
     return ok(role, 201);

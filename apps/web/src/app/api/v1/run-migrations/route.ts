@@ -52,6 +52,37 @@ export async function POST(request: NextRequest) {
     } catch (e) { results.push(`companies.${col}: ${(e as Error).message}`); }
   }
 
+  // Additional companies columns from migration 010
+  const companyCols010: [string, string][] = [
+    ['accounting_method', "varchar(10) CHECK (accounting_method IN ('ACCRUAL','CASH')) DEFAULT 'ACCRUAL'"],
+    ['fiscal_year_start_month', 'int DEFAULT 1 CHECK (fiscal_year_start_month BETWEEN 1 AND 12)'],
+    ['books_start_date', 'date'],
+    ['business_style', 'text'],
+    ['registration_date', 'date'],
+  ];
+  for (const [col, type] of companyCols010) {
+    try {
+      await query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+      results.push(`companies.${col}: ok`);
+    } catch (e) { results.push(`companies.${col}: ${(e as Error).message}`); }
+  }
+
+  // Branches columns
+  const branchCols: [string, string][] = [
+    ['phone', 'varchar(50)'],
+    ['bir_atp_number', 'varchar(50)'],
+    ['ptu_number', 'varchar(50)'],
+    ['man_number', 'varchar(50)'],
+    ['created_by', 'uuid'],
+    ['updated_by', 'uuid'],
+  ];
+  for (const [col, type] of branchCols) {
+    try {
+      await query(`ALTER TABLE branches ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+      results.push(`branches.${col}: ok`);
+    } catch (e) { results.push(`branches.${col}: ${(e as Error).message}`); }
+  }
+
   // --- 009: Stock adjustments, transfers, counts ---
   const client009 = await getPool().connect();
   try {

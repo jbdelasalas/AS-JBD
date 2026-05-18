@@ -15,8 +15,8 @@ export async function GET(request: NextRequest) {
 
   const productType = searchParams.get('product_type');
   const params: unknown[] = [companyId];
-  let where = `er.company_id = $1`;
-  if (productType) { params.push(productType); where += ` AND er.product_type = $${params.length}`; }
+  let where = `company_id = $1`;
+  if (productType) { params.push(productType); where += ` AND product_type = $${params.length}`; }
 
   try {
     const rows = await query(

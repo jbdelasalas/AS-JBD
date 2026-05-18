@@ -14,10 +14,10 @@ export async function GET(req: NextRequest) {
     if (!companyId) return err('company_id required', 400);
 
     const rows = await query<{
-      id: string; doc_type: string; prefix: string; last_no: number;
-      branch_id: string | null; updated_at: string;
+      id: string; doc_type: string; prefix: string; current_number: number;
+      branch_id: string | null; is_active: boolean; updated_at: string;
     }>(
-      `SELECT id, doc_type, prefix, last_no, branch_id, updated_at
+      `SELECT id, doc_type, prefix, current_number, branch_id, is_active, updated_at
          FROM document_series
         WHERE company_id = $1
         ORDER BY doc_type`,

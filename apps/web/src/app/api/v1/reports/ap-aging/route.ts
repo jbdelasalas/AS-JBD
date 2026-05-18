@@ -13,57 +13,74 @@ export async function GET(request: NextRequest) {
   const companyId = searchParams.get('company_id');
   if (!companyId) return err('company_id is required', 400);
 
-  const asOf       = searchParams.get('as_of') ?? new Date().toISOString().slice(0, 10);
+  const asOf       = (searchParams.get('as_of') ?? new Date().toISOString()).slice(0, 10);
   const supplierId = searchParams.get('supplier_id') ?? null;
 
   try {
     const t0 = Date.now();
+
     const rows = await query<{
-      supplier_id: string; supplier_name: string; bill_id: string;
-      bill_no: string; bill_date: string; due_date: string;
-      original: string; paid: string; balance: string;
-      days_overdue: number; aging_bucket: string;
+      supplier_id: string; supplier_name: string;
+      balance: string; days_overdue: string; aging_bucket: string;
     }>(
-      `SELECT * FROM ap_aging($1, $2::date, $3::uuid)`,
+      `SELECT
+        ap.supplier_id,
+        ap.supplier_name::text,
+        ap.balance,
+        GREATEST(($2::date - ap.due_date::date)::int, 0) AS days_overdue,
+        CASE
+          WHEN ap.balance <= 0                                     THEN 'current'
+          WHEN ($2::date - ap.due_date::date) <= 0                 THEN 'current'
+          WHEN ($2::date - ap.due_date::date) BETWEEN 1  AND 30    THEN '1-30'
+          WHEN ($2::date - ap.due_date::date) BETWEEN 31 AND 60    THEN '31-60'
+          WHEN ($2::date - ap.due_date::date) BETWEEN 61 AND 90    THEN '61-90'
+          ELSE '91+'
+        END AS aging_bucket
+       FROM v_ap_open_balance ap
+       WHERE ap.company_id = $1
+         AND ap.balance > 0
+         AND ($3::uuid IS NULL OR ap.supplier_id = $3::uuid)`,
       [companyId, asOf, supplierId],
     );
 
-    const mapped = rows.map((r) => ({
-      ...r,
-      original: Number(r.original),
-      paid: Number(r.paid),
-      balance: Number(r.balance),
-      days_overdue: Number(r.days_overdue),
-    }));
-
     const bySupplier: Record<string, {
-      supplier_id: string; supplier_name: string;
-      current: number; d1_30: number; d31_60: number; d61_90: number; d91plus: number; total: number;
+      supplier_id: string; supplier_name: string; supplier_tin: string;
+      current_amt: number; days_1_30: number; days_31_60: number;
+      days_61_90: number; days_91_plus: number; total_outstanding: number;
     }> = {};
-    for (const r of mapped) {
+
+    for (const r of rows) {
       if (!bySupplier[r.supplier_id]) {
         bySupplier[r.supplier_id] = {
-          supplier_id: r.supplier_id, supplier_name: r.supplier_name,
-          current: 0, d1_30: 0, d31_60: 0, d61_90: 0, d91plus: 0, total: 0,
+          supplier_id: r.supplier_id, supplier_name: r.supplier_name, supplier_tin: '',
+          current_amt: 0, days_1_30: 0, days_31_60: 0, days_61_90: 0, days_91_plus: 0, total_outstanding: 0,
         };
       }
-      const sup = bySupplier[r.supplier_id];
-      sup.total += r.balance;
-      if (r.aging_bucket === 'current') sup.current += r.balance;
-      else if (r.aging_bucket === '1-30')  sup.d1_30 += r.balance;
-      else if (r.aging_bucket === '31-60') sup.d31_60 += r.balance;
-      else if (r.aging_bucket === '61-90') sup.d61_90 += r.balance;
-      else                                 sup.d91plus += r.balance;
+      const bal = Number(r.balance);
+      const s = bySupplier[r.supplier_id];
+      s.total_outstanding += bal;
+      if (r.aging_bucket === 'current') s.current_amt += bal;
+      else if (r.aging_bucket === '1-30')  s.days_1_30 += bal;
+      else if (r.aging_bucket === '31-60') s.days_31_60 += bal;
+      else if (r.aging_bucket === '61-90') s.days_61_90 += bal;
+      else                                 s.days_91_plus += bal;
     }
 
-    const summary = Object.values(bySupplier).sort((a, b) => b.total - a.total);
-    const grandTotal = summary.reduce((s, c) => s + c.total, 0);
+    const summary = Object.values(bySupplier).sort((a, b) => b.total_outstanding - a.total_outstanding);
+
+    const grandTotal = summary.reduce((acc, s) => ({
+      current_amt:     acc.current_amt     + s.current_amt,
+      days_1_30:       acc.days_1_30       + s.days_1_30,
+      days_31_60:      acc.days_31_60      + s.days_31_60,
+      days_61_90:      acc.days_61_90      + s.days_61_90,
+      days_91_plus:    acc.days_91_plus    + s.days_91_plus,
+      total_outstanding: acc.total_outstanding + s.total_outstanding,
+    }), { current_amt: 0, days_1_30: 0, days_31_60: 0, days_61_90: 0, days_91_plus: 0, total_outstanding: 0 });
 
     return ok({
       as_of: asOf,
-      detail: mapped,
-      summary,
-      grand_total: parseFloat(grandTotal.toFixed(2)),
+      rows: summary,
+      grand_total: grandTotal,
       duration_ms: Date.now() - t0,
     });
   } catch (e: unknown) {
