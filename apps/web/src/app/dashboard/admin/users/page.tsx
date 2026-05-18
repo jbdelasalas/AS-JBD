@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import ImportExportButtons from '@/components/ImportExportButtons';
 
 interface UserRow {
   id: string;
@@ -43,10 +44,23 @@ export default function UsersPage() {
           <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Users</h1>
           <p className="text-sm text-slate-600 dark:text-slate-400">Manage system users and their roles.</p>
         </div>
-        <Link href="/dashboard/admin/users/new"
-          className="rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
-          + New user
-        </Link>
+        <div className="flex items-center gap-2">
+          <ImportExportButtons
+            rows={rows as unknown as Record<string, unknown>[]}
+            exportColumns={[
+              { key: 'full_name', header: 'Full Name' },
+              { key: 'email', header: 'Email' },
+              { key: 'roles', header: 'Roles' },
+              { key: 'is_active', header: 'Active' },
+              { key: 'created_at', header: 'Created' },
+            ]}
+            filename="users"
+          />
+          <Link href="/dashboard/admin/users/new"
+            className="rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+            + New user
+          </Link>
+        </div>
       </div>
 
       <form onSubmit={handleSearch} className="mb-4 flex gap-2">

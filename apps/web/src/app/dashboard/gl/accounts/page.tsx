@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import type { Account, AccountTypeCode } from '@perpet/shared';
+import Link from 'next/link';
 import { Pagination } from '@/components/Pagination';
+import ImportExportButtons from '@/components/ImportExportButtons';
 
 const TYPES: AccountTypeCode[] = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'];
 
@@ -46,6 +48,48 @@ export default function AccountsPage() {
         <div>
           <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Chart of accounts</h1>
           <p className="text-sm text-slate-600 dark:text-slate-400">{accounts.length} accounts loaded</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <ImportExportButtons
+            rows={accounts as unknown as Record<string, unknown>[]}
+            exportColumns={[
+              { key: 'code', header: 'Code' },
+              { key: 'name', header: 'Name' },
+              { key: 'account_type', header: 'Type' },
+              { key: 'currency', header: 'Currency' },
+              { key: 'is_control', header: 'Control' },
+              { key: 'description', header: 'Description' },
+            ]}
+            importColumns={[
+              { key: 'code', header: 'Code' },
+              { key: 'name', header: 'Name' },
+              { key: 'account_type', header: 'Type (ASSET/LIABILITY/EQUITY/REVENUE/EXPENSE)' },
+              { key: 'currency', header: 'Currency' },
+              { key: 'description', header: 'Description' },
+            ]}
+            filename="chart-of-accounts"
+            onImportRow={async (row) => {
+              const companyId = localStorage.getItem('company_id')!;
+              await api.post('/gl/accounts', {
+                company_id: companyId,
+                code: row['Code'],
+                name: row['Name'],
+                account_type: row['Type (ASSET/LIABILITY/EQUITY/REVENUE/EXPENSE)'] || 'ASSET',
+                currency: row['Currency'] || 'PHP',
+                description: row['Description'] || undefined,
+              });
+            }}
+            onImportComplete={() => {
+              const companyId = localStorage.getItem('company_id');
+              if (!companyId) return;
+              api.get<Account[]>(`/gl/accounts?company_id=${companyId}&active_only=true`)
+                .then(setAccounts).catch(() => {});
+            }}
+          />
+          <Link href="/dashboard/gl/accounts/new"
+            className="rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+            + New account
+          </Link>
         </div>
       </div>
 

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatPHP } from '@/lib/format';
 import { Pagination } from '@/components/Pagination';
+import ImportExportButtons from '@/components/ImportExportButtons';
 
 interface SupplierRow {
   id: string;
@@ -49,10 +50,55 @@ export default function SuppliersPage() {
           <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Suppliers</h1>
           <p className="text-sm text-slate-600 dark:text-slate-400">Manage vendor master records and payment terms.</p>
         </div>
-        <Link href="/dashboard/purchasing/suppliers/new"
-          className="rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
-          + New supplier
-        </Link>
+        <div className="flex items-center gap-2">
+          <ImportExportButtons
+            rows={rows as unknown as Record<string, unknown>[]}
+            exportColumns={[
+              { key: 'code', header: 'Code' },
+              { key: 'name', header: 'Name' },
+              { key: 'supplier_type', header: 'Type' },
+              { key: 'email', header: 'Email' },
+              { key: 'phone', header: 'Phone' },
+              { key: 'payment_terms_days', header: 'Payment Terms (days)' },
+              { key: 'is_active', header: 'Active' },
+            ]}
+            importColumns={[
+              { key: 'name', header: 'Name' },
+              { key: 'supplier_type', header: 'Type (trade/refinery/service)' },
+              { key: 'email', header: 'Email' },
+              { key: 'phone', header: 'Phone' },
+              { key: 'tin', header: 'TIN' },
+              { key: 'address', header: 'Address' },
+              { key: 'contact_person', header: 'Contact Person' },
+              { key: 'payment_terms_days', header: 'Payment Terms (days)' },
+            ]}
+            filename="suppliers"
+            onImportRow={async (row) => {
+              const companyId = localStorage.getItem('company_id')!;
+              await api.post('/ap/suppliers', {
+                company_id: companyId,
+                name: row['Name'],
+                supplier_type: row['Type (trade/refinery/service)'] || 'trade',
+                email: row['Email'] || undefined,
+                phone: row['Phone'] || undefined,
+                tin: row['TIN'] || undefined,
+                address: row['Address'] || undefined,
+                contact_person: row['Contact Person'] || undefined,
+                payment_terms_days: parseInt(row['Payment Terms (days)']) || 30,
+              });
+            }}
+            onImportComplete={() => {
+              const companyId = localStorage.getItem('company_id');
+              if (!companyId) return;
+              api.get<{ data: SupplierRow[] }>(`/ap/suppliers?company_id=${companyId}&limit=500`)
+                .then((r) => setRows(r.data)).catch(() => {});
+            }}
+          />
+          <Link href="/dashboard/purchasing/suppliers/new"
+            className="rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+            + New supplier
+          </Link>
+        </div>
       </div>
 
       <div className="mb-3">

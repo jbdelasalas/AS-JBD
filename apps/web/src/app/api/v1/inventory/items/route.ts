@@ -43,3 +43,50 @@ export async function GET(request: NextRequest) {
     reorder_point: Number(r.reorder_point),
   })));
 }
+
+export async function POST(request: NextRequest) {
+  let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try { auth = await requireAuth(request); } catch (e) { return e as Response; }
+
+  let dto: Record<string, unknown>;
+  try { dto = await request.json(); } catch { return err('Invalid request body', 400); }
+
+  const companyId = dto.company_id as string;
+  if (!companyId || !dto.sku || !dto.name) return err('company_id, sku, and name are required', 400);
+
+  const dup = await query(`SELECT id FROM items WHERE company_id = $1 AND sku = $2 LIMIT 1`, [companyId, dto.sku]);
+  if (dup.length) return err(`SKU ${dto.sku} already exists`, 409);
+
+  const rows = await query(
+    `INSERT INTO items
+       (company_id, sku, name, uom, item_type, costing_method,
+        standard_cost, selling_price, reorder_point, category_id, is_active)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+     RETURNING id, sku, name, uom, item_type, costing_method, standard_cost, selling_price, reorder_point, is_active`,
+    [
+      companyId, dto.sku, dto.name,
+      dto.uom ?? 'PCS',
+      dto.item_type ?? 'stock',
+      dto.costing_method ?? 'weighted_avg',
+      dto.standard_cost ?? 0,
+      dto.selling_price ?? 0,
+      dto.reorder_point ?? 0,
+      dto.category_id ?? null,
+      dto.is_active ?? true,
+    ],
+  );
+  const item = rows[0] as Record<string, unknown>;
+
+  await query(
+    `INSERT INTO audit_log (user_id, company_id, action, entity_type, entity_id, after_state)
+     VALUES ($1,$2,$3,$4,$5,$6)`,
+    [auth.userId, companyId, 'create', 'item', item.id, JSON.stringify(item)],
+  ).catch(() => {});
+
+  return ok({
+    ...item,
+    standard_cost: Number(item.standard_cost),
+    selling_price: Number(item.selling_price),
+    reorder_point: Number(item.reorder_point),
+  }, 201);
+}

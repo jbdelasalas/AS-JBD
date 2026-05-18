@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import ImportExportButtons from '@/components/ImportExportButtons';
 
 interface PMRow {
   id: string; code: string; name: string; account_id: string | null;
@@ -44,9 +45,22 @@ export default function PaymentMethodsPage() {
 
   return (
     <div>
-      <div className="mb-4">
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Payment Methods</h1>
-        <p className="text-sm text-slate-600 dark:text-slate-400">Configure accepted payment methods and their GL accounts.</p>
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Payment Methods</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">Configure accepted payment methods and their GL accounts.</p>
+        </div>
+        <ImportExportButtons
+          rows={rows as unknown as Record<string, unknown>[]}
+          exportColumns={[
+            { key: 'code', header: 'Code' },
+            { key: 'name', header: 'Name' },
+            { key: 'account_name', header: 'GL Account' },
+            { key: 'requires_reference', header: 'Requires Reference' },
+            { key: 'is_active', header: 'Active' },
+          ]}
+          filename="payment-methods"
+        />
       </div>
 
       {error && <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}

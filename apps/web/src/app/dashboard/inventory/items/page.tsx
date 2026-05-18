@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatPHP } from '@/lib/format';
 import { Pagination } from '@/components/Pagination';
+import ImportExportButtons from '@/components/ImportExportButtons';
 
 interface ItemRow {
   id: string;
@@ -53,6 +55,58 @@ export default function ItemsPage() {
         <div>
           <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Items</h1>
           <p className="text-sm text-slate-600 dark:text-slate-400">SKUs, pricing, and costing configuration.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <ImportExportButtons
+            rows={rows as unknown as Record<string, unknown>[]}
+            exportColumns={[
+              { key: 'sku', header: 'SKU' },
+              { key: 'name', header: 'Name' },
+              { key: 'category_name', header: 'Category' },
+              { key: 'uom', header: 'UOM' },
+              { key: 'item_type', header: 'Type' },
+              { key: 'costing_method', header: 'Costing Method' },
+              { key: 'standard_cost', header: 'Standard Cost' },
+              { key: 'selling_price', header: 'Selling Price' },
+              { key: 'reorder_point', header: 'Reorder Point' },
+              { key: 'is_active', header: 'Active' },
+            ]}
+            importColumns={[
+              { key: 'sku', header: 'SKU' },
+              { key: 'name', header: 'Name' },
+              { key: 'uom', header: 'UOM (e.g. PCS, L, KG)' },
+              { key: 'item_type', header: 'Type (stock/service/bundle)' },
+              { key: 'costing_method', header: 'Costing Method (weighted_avg/fifo/standard)' },
+              { key: 'standard_cost', header: 'Standard Cost' },
+              { key: 'selling_price', header: 'Selling Price' },
+              { key: 'reorder_point', header: 'Reorder Point' },
+            ]}
+            filename="items"
+            onImportRow={async (row) => {
+              const companyId = localStorage.getItem('company_id')!;
+              await api.post('/inventory/items', {
+                company_id: companyId,
+                sku: row['SKU'],
+                name: row['Name'],
+                uom: row['UOM (e.g. PCS, L, KG)'] || 'PCS',
+                item_type: row['Type (stock/service/bundle)'] || 'stock',
+                costing_method: row['Costing Method (weighted_avg/fifo/standard)'] || 'weighted_avg',
+                standard_cost: parseFloat(row['Standard Cost']) || 0,
+                selling_price: parseFloat(row['Selling Price']) || 0,
+                reorder_point: parseFloat(row['Reorder Point']) || 0,
+              });
+            }}
+            onImportComplete={() => {
+              const companyId = localStorage.getItem('company_id');
+              if (!companyId) return;
+              api.get<ItemRow[]>(`/inventory/items?company_id=${companyId}&limit=500`)
+                .then(setRows).catch(() => {});
+            }}
+          />
+          <Link href="/dashboard/inventory/items/new"
+            className="rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+            + New item
+          </Link>
         </div>
       </div>
 

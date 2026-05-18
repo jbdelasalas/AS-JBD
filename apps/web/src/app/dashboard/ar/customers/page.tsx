@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatPHP } from '@/lib/format';
 import { Pagination } from '@/components/Pagination';
+import ImportExportButtons from '@/components/ImportExportButtons';
 
 interface CustomerRow {
   id: string;
@@ -50,10 +51,58 @@ export default function CustomersPage() {
           <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Customers</h1>
           <p className="text-sm text-slate-600 dark:text-slate-400">Manage customer master records and credit limits.</p>
         </div>
-        <Link href="/dashboard/ar/customers/new"
-          className="rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
-          + New customer
-        </Link>
+        <div className="flex items-center gap-2">
+          <ImportExportButtons
+            rows={rows as unknown as Record<string, unknown>[]}
+            exportColumns={[
+              { key: 'code', header: 'Code' },
+              { key: 'name', header: 'Name' },
+              { key: 'customer_type', header: 'Type' },
+              { key: 'email', header: 'Email' },
+              { key: 'phone', header: 'Phone' },
+              { key: 'payment_terms_days', header: 'Payment Terms (days)' },
+              { key: 'credit_limit', header: 'Credit Limit' },
+              { key: 'is_active', header: 'Active' },
+            ]}
+            importColumns={[
+              { key: 'name', header: 'Name' },
+              { key: 'customer_type', header: 'Type (wholesale/fleet/gov/retail)' },
+              { key: 'email', header: 'Email' },
+              { key: 'phone', header: 'Phone' },
+              { key: 'tin', header: 'TIN' },
+              { key: 'address', header: 'Address' },
+              { key: 'contact_person', header: 'Contact Person' },
+              { key: 'payment_terms_days', header: 'Payment Terms (days)' },
+              { key: 'credit_limit', header: 'Credit Limit' },
+            ]}
+            filename="customers"
+            onImportRow={async (row) => {
+              const companyId = localStorage.getItem('company_id')!;
+              await api.post('/ar/customers', {
+                company_id: companyId,
+                name: row['Name'],
+                customer_type: row['Type (wholesale/fleet/gov/retail)'] || 'wholesale',
+                email: row['Email'] || undefined,
+                phone: row['Phone'] || undefined,
+                tin: row['TIN'] || undefined,
+                address: row['Address'] || undefined,
+                contact_person: row['Contact Person'] || undefined,
+                payment_terms_days: parseInt(row['Payment Terms (days)']) || 30,
+                credit_limit: parseFloat(row['Credit Limit']) || 0,
+              });
+            }}
+            onImportComplete={() => {
+              const companyId = localStorage.getItem('company_id');
+              if (!companyId) return;
+              api.get<{ data: CustomerRow[] }>(`/ar/customers?company_id=${companyId}&limit=500`)
+                .then((r) => setRows(r.data)).catch(() => {});
+            }}
+          />
+          <Link href="/dashboard/ar/customers/new"
+            className="rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+            + New customer
+          </Link>
+        </div>
       </div>
 
       <div className="mb-3">
