@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 
@@ -16,7 +16,7 @@ interface Line {
   vat_rate: number;
 }
 
-export default function NewCreditMemoPage() {
+function NewCreditMemoForm() {
   const router = useRouter();
   const params = useSearchParams();
   const preCustomerId = params.get('customer_id') ?? '';
@@ -244,4 +244,8 @@ export default function NewCreditMemoPage() {
       </form>
     </div>
   );
+}
+
+export default function NewCreditMemoPage() {
+  return <Suspense><NewCreditMemoForm /></Suspense>;
 }

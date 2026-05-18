@@ -969,5 +969,259 @@ export async function POST(request: NextRequest) {
     results.push('017 sales_summary(): ok');
   } catch (e) { results.push(`017 sales_summary FAILED: ${(e as Error).message}`); }
 
+  // ================================================================
+  // 008: AR module complete (sales order enhancements, delivery receipts,
+  //      credit memos, enhanced customer_payments, document series)
+  // ================================================================
+
+  // Enhance sales_orders
+  const salesOrderCols: [string, string][] = [
+    ['notes', 'text'],
+    ['payment_terms_days', 'int NOT NULL DEFAULT 30'],
+    ['discount_pct', 'numeric(5,2) NOT NULL DEFAULT 0'],
+    ['warehouse_id', 'uuid'],
+    ['approved_by', 'uuid'],
+    ['approved_at', 'timestamptz'],
+    ['approval_notes', 'text'],
+    ['cancelled_by', 'uuid'],
+    ['cancelled_at', 'timestamptz'],
+    ['cancel_reason', 'text'],
+    ['credit_checked', 'boolean NOT NULL DEFAULT false'],
+  ];
+  for (const [col, type] of salesOrderCols) {
+    try {
+      await query(`ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+      results.push(`sales_orders.${col}: ok`);
+    } catch (e) { results.push(`sales_orders.${col}: ${(e as Error).message}`); }
+  }
+
+  const salesOrderLineCols: [string, string][] = [
+    ['qty_reserved', 'numeric(18,4) NOT NULL DEFAULT 0'],
+    ['unit_cost', 'numeric(18,4) NOT NULL DEFAULT 0'],
+    ['discount_pct', 'numeric(5,2) NOT NULL DEFAULT 0'],
+    ['line_subtotal', 'numeric(18,2) NOT NULL DEFAULT 0'],
+    ['line_vat', 'numeric(18,2) NOT NULL DEFAULT 0'],
+  ];
+  for (const [col, type] of salesOrderLineCols) {
+    try {
+      await query(`ALTER TABLE sales_order_lines ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+      results.push(`sales_order_lines.${col}: ok`);
+    } catch (e) { results.push(`sales_order_lines.${col}: ${(e as Error).message}`); }
+  }
+
+  // Enhance sales_invoices
+  const salesInvoiceCols: [string, string][] = [
+    ['so_id', 'uuid'],
+    ['notes', 'text'],
+    ['payment_terms_days', 'int NOT NULL DEFAULT 30'],
+    ['discount_amount', 'numeric(18,2) NOT NULL DEFAULT 0'],
+    ['approved_by', 'uuid'],
+    ['approved_at', 'timestamptz'],
+    ['voided_at', 'timestamptz'],
+    ['voided_by', 'uuid'],
+    ['void_reason', 'text'],
+    ['dr_id', 'uuid'],
+    ['je_id', 'uuid'],
+    ['currency', "varchar(3) NOT NULL DEFAULT 'PHP'"],
+  ];
+  for (const [col, type] of salesInvoiceCols) {
+    try {
+      await query(`ALTER TABLE sales_invoices ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+      results.push(`sales_invoices.${col}: ok`);
+    } catch (e) { results.push(`sales_invoices.${col}: ${(e as Error).message}`); }
+  }
+
+  // Delivery receipts table
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS delivery_receipts (
+        id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id    uuid NOT NULL REFERENCES companies(id) ON DELETE RESTRICT,
+        branch_id     uuid REFERENCES branches(id),
+        dr_no         varchar(30) NOT NULL,
+        so_id         uuid NOT NULL REFERENCES sales_orders(id),
+        customer_id   uuid NOT NULL REFERENCES customers(id),
+        warehouse_id  uuid NOT NULL REFERENCES warehouses(id),
+        delivery_date date NOT NULL,
+        notes         text,
+        status        varchar(20) NOT NULL DEFAULT 'draft',
+        posted_at     timestamptz,
+        posted_by     uuid REFERENCES users(id),
+        je_id         uuid REFERENCES journal_entries(id),
+        created_by    uuid NOT NULL REFERENCES users(id),
+        created_at    timestamptz NOT NULL DEFAULT now(),
+        updated_at    timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, dr_no)
+      )
+    `);
+    results.push('delivery_receipts table: ok');
+  } catch (e) { results.push(`delivery_receipts table: ${(e as Error).message}`); }
+
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS delivery_receipt_lines (
+        id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        dr_id         uuid NOT NULL REFERENCES delivery_receipts(id) ON DELETE CASCADE,
+        so_line_id    uuid REFERENCES sales_order_lines(id),
+        line_no       int NOT NULL,
+        item_id       uuid NOT NULL REFERENCES items(id),
+        description   text NOT NULL,
+        qty_delivered numeric(18,4) NOT NULL,
+        unit_cost     numeric(18,4) NOT NULL DEFAULT 0,
+        UNIQUE (dr_id, line_no)
+      )
+    `);
+    results.push('delivery_receipt_lines table: ok');
+  } catch (e) { results.push(`delivery_receipt_lines table: ${(e as Error).message}`); }
+
+  // Inventory reservations
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS inventory_reservations (
+        id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        so_id        uuid NOT NULL REFERENCES sales_orders(id) ON DELETE CASCADE,
+        so_line_id   uuid NOT NULL REFERENCES sales_order_lines(id) ON DELETE CASCADE,
+        item_id      uuid NOT NULL REFERENCES items(id),
+        warehouse_id uuid NOT NULL REFERENCES warehouses(id),
+        qty_reserved numeric(18,4) NOT NULL,
+        reserved_at  timestamptz NOT NULL DEFAULT now(),
+        released_at  timestamptz,
+        status       varchar(20) NOT NULL DEFAULT 'active',
+        UNIQUE (so_line_id)
+      )
+    `);
+    results.push('inventory_reservations table: ok');
+  } catch (e) { results.push(`inventory_reservations table: ${(e as Error).message}`); }
+
+  // AR credit memos
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS ar_credit_memos (
+        id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id          uuid NOT NULL REFERENCES companies(id) ON DELETE RESTRICT,
+        branch_id           uuid REFERENCES branches(id),
+        cm_no               varchar(30) NOT NULL,
+        customer_id         uuid NOT NULL REFERENCES customers(id),
+        original_invoice_id uuid REFERENCES sales_invoices(id),
+        cm_date             date NOT NULL,
+        reason              varchar(200),
+        notes               text,
+        subtotal            numeric(18,2) NOT NULL DEFAULT 0,
+        vat_amount          numeric(18,2) NOT NULL DEFAULT 0,
+        total               numeric(18,2) NOT NULL DEFAULT 0,
+        amount_applied      numeric(18,2) NOT NULL DEFAULT 0,
+        unapplied_amount    numeric(18,2) NOT NULL DEFAULT 0,
+        status              varchar(20) NOT NULL DEFAULT 'draft',
+        approved_by         uuid REFERENCES users(id),
+        approved_at         timestamptz,
+        cancelled_by        uuid REFERENCES users(id),
+        cancelled_at        timestamptz,
+        cancel_reason       text,
+        je_id               uuid REFERENCES journal_entries(id),
+        created_by          uuid NOT NULL REFERENCES users(id),
+        created_at          timestamptz NOT NULL DEFAULT now(),
+        updated_at          timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, cm_no)
+      )
+    `);
+    results.push('ar_credit_memos table: ok');
+  } catch (e) { results.push(`ar_credit_memos table: ${(e as Error).message}`); }
+
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS ar_credit_memo_lines (
+        id                 uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        cm_id              uuid NOT NULL REFERENCES ar_credit_memos(id) ON DELETE CASCADE,
+        line_no            int NOT NULL,
+        item_id            uuid REFERENCES items(id),
+        description        text NOT NULL,
+        quantity           numeric(18,4) NOT NULL,
+        unit_price         numeric(18,4) NOT NULL,
+        vat_rate           numeric(5,2) NOT NULL DEFAULT 12.00,
+        line_subtotal      numeric(18,2) NOT NULL,
+        line_vat           numeric(18,2) NOT NULL,
+        line_total         numeric(18,2) NOT NULL,
+        revenue_account_id uuid REFERENCES accounts(id),
+        UNIQUE (cm_id, line_no)
+      )
+    `);
+    results.push('ar_credit_memo_lines table: ok');
+  } catch (e) { results.push(`ar_credit_memo_lines table: ${(e as Error).message}`); }
+
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS ar_credit_memo_applications (
+        id             uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        cm_id          uuid NOT NULL REFERENCES ar_credit_memos(id) ON DELETE CASCADE,
+        invoice_id     uuid NOT NULL REFERENCES sales_invoices(id) ON DELETE RESTRICT,
+        amount_applied numeric(18,2) NOT NULL CHECK (amount_applied > 0),
+        applied_at     timestamptz NOT NULL DEFAULT now(),
+        applied_by     uuid REFERENCES users(id),
+        UNIQUE (cm_id, invoice_id)
+      )
+    `);
+    results.push('ar_credit_memo_applications table: ok');
+  } catch (e) { results.push(`ar_credit_memo_applications table: ${(e as Error).message}`); }
+
+  // Enhance customer_payments
+  const customerPaymentCols: [string, string][] = [
+    ['unapplied_amount', 'numeric(18,2) NOT NULL DEFAULT 0'],
+    ['is_advance', 'boolean NOT NULL DEFAULT false'],
+    ['notes', 'text'],
+    ['bank_ref', 'varchar(100)'],
+    ['check_date', 'date'],
+    ['voided_by', 'uuid'],
+    ['voided_at', 'timestamptz'],
+    ['void_reason', 'text'],
+    ['bank_account_id', 'uuid'],
+  ];
+  for (const [col, type] of customerPaymentCols) {
+    try {
+      await query(`ALTER TABLE customer_payments ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+      results.push(`customer_payments.${col}: ok`);
+    } catch (e) { results.push(`customer_payments.${col}: ${(e as Error).message}`); }
+  }
+
+  // payment_applications table
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS payment_applications (
+        id             uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        payment_id     uuid NOT NULL REFERENCES customer_payments(id) ON DELETE CASCADE,
+        invoice_id     uuid NOT NULL REFERENCES sales_invoices(id) ON DELETE RESTRICT,
+        amount_applied numeric(18,2) NOT NULL CHECK (amount_applied > 0),
+        applied_at     timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (payment_id, invoice_id)
+      )
+    `);
+    results.push('payment_applications table: ok');
+  } catch (e) { results.push(`payment_applications table: ${(e as Error).message}`); }
+
+  // Document series for AR module
+  const arDocTypes = ['sales_order', 'delivery_receipt', 'credit_memo', 'official_receipt'];
+  const arPrefixes: Record<string, string> = {
+    sales_order: 'SO-',
+    delivery_receipt: 'DR-',
+    credit_memo: 'CM-',
+    official_receipt: 'OR-',
+  };
+  for (const docType of arDocTypes) {
+    try {
+      await query(
+        `INSERT INTO document_series (company_id, doc_type, prefix, start_number, current_number)
+         SELECT id, $1, $2 || to_char(now(), 'YYYY') || '-', 1, 0 FROM companies
+         ON CONFLICT DO NOTHING`,
+        [docType, arPrefixes[docType]],
+      );
+      results.push(`document_series ${docType}: ok`);
+    } catch (e) { results.push(`document_series ${docType}: ${(e as Error).message}`); }
+  }
+
+  // customers table: ensure payment_terms_days exists
+  try {
+    await query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS payment_terms_days int NOT NULL DEFAULT 30`);
+    results.push('customers.payment_terms_days: ok');
+  } catch (e) { results.push(`customers.payment_terms_days: ${(e as Error).message}`); }
+
   return ok({ results });
 }

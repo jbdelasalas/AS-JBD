@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 
@@ -17,7 +17,7 @@ interface Line {
   expense_account_id: string;
 }
 
-export default function NewBillPage() {
+function NewBillForm() {
   const router = useRouter();
   const params = useSearchParams();
   const prePoId = params.get('po_id') ?? '';
@@ -250,4 +250,8 @@ export default function NewBillPage() {
       </form>
     </div>
   );
+}
+
+export default function NewBillPage() {
+  return <Suspense><NewBillForm /></Suspense>;
 }

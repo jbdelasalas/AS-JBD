@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 
@@ -25,7 +25,7 @@ interface ReceiptLine {
   unit_cost: number;
 }
 
-export default function NewGoodsReceiptPage() {
+function NewGoodsReceiptForm() {
   const router = useRouter();
   const params = useSearchParams();
   const prePoId = params.get('po_id') ?? '';
@@ -209,4 +209,8 @@ export default function NewGoodsReceiptPage() {
       </form>
     </div>
   );
+}
+
+export default function NewGoodsReceiptPage() {
+  return <Suspense><NewGoodsReceiptForm /></Suspense>;
 }

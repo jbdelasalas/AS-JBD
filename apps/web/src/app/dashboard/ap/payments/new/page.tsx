@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { formatPHP, formatDate } from '@/lib/format';
@@ -17,7 +17,7 @@ interface OpenBill {
   balance: number;
 }
 
-export default function NewPaymentPage() {
+function NewPaymentForm() {
   const router = useRouter();
   const params = useSearchParams();
   const preSupplierId = params.get('supplier_id') ?? '';
@@ -227,4 +227,8 @@ export default function NewPaymentPage() {
       </form>
     </div>
   );
+}
+
+export default function NewPaymentPage() {
+  return <Suspense><NewPaymentForm /></Suspense>;
 }

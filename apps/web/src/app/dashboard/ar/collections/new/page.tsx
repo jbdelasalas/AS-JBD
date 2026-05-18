@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { formatPHP } from '@/lib/format';
@@ -11,7 +11,7 @@ interface BankAccount { id: string; code: string; name: string; account_type?: s
 
 interface Application { invoice_id: string; invoice_no: string; amount_applied: number; balance: number; }
 
-export default function NewCollectionPage() {
+function NewCollectionForm() {
   const router = useRouter();
   const params = useSearchParams();
   const preCustomerId = params.get('customer_id') ?? '';
@@ -266,4 +266,8 @@ export default function NewCollectionPage() {
       </form>
     </div>
   );
+}
+
+export default function NewCollectionPage() {
+  return <Suspense><NewCollectionForm /></Suspense>;
 }
