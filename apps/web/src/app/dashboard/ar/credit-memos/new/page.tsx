@@ -45,8 +45,8 @@ function NewCreditMemoForm() {
     if (!companyId) return;
     Promise.all([
       api.get<{ data: Customer[] }>(`/ar/customers?company_id=${companyId}&is_active=true&limit=200`),
-      api.get<{ data: Item[] }>(`/inventory/items?company_id=${companyId}&limit=200`),
-    ]).then(([c, i]) => { setCustomers(c.data); setItems(i.data); }).catch(() => {});
+      api.get<Item[]>(`/inventory/items?company_id=${companyId}&limit=200`),
+    ]).then(([c, i]) => { setCustomers(c.data); setItems(i); }).catch(() => {});
   }, []);
 
   useEffect(() => {

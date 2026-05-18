@@ -42,15 +42,12 @@ export default function NewSalesOrderPage() {
   useEffect(() => {
     const companyId = localStorage.getItem('company_id');
     if (!companyId) return;
-    Promise.all([
-      api.get<{ data: Customer[] }>(`/ar/customers?company_id=${companyId}&is_active=true&limit=200`),
-      api.get<{ data: Item[] }>(`/inventory/items?company_id=${companyId}&limit=200`),
-      api.get<{ data: Warehouse[] }>(`/inventory/warehouses?company_id=${companyId}&limit=50`),
-    ]).then(([c, i, w]) => {
-      setCustomers(c.data);
-      setItems(i.data);
-      setWarehouses(w.data);
-    }).catch(() => {});
+    api.get<{ data: Customer[] }>(`/ar/customers?company_id=${companyId}&is_active=true&limit=200`)
+      .then((c) => setCustomers(c.data)).catch(() => {});
+    api.get<Item[]>(`/inventory/items?company_id=${companyId}&limit=200`)
+      .then((i) => setItems(i)).catch(() => {});
+    api.get<{ data: Warehouse[] }>(`/inventory/warehouses?company_id=${companyId}&limit=50`)
+      .then((w) => setWarehouses(w.data ?? [])).catch(() => {});
   }, []);
 
   function addLine() {
