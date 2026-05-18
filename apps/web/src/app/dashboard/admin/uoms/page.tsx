@@ -14,6 +14,9 @@ export default function UomsPage() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ code: '', name: '', type: 'COUNT', is_base: false });
   const [creating, setCreating] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Partial<UomRow>>({});
+  const [editSaving, setEditSaving] = useState(false);
 
   function load() {
     const companyId = localStorage.getItem('company_id') ?? '';
@@ -42,7 +45,29 @@ export default function UomsPage() {
     }
   }
 
+  function startEdit(u: UomRow) {
+    setEditId(u.id);
+    setEditForm({ code: u.code, name: u.name, type: u.type, is_base: u.is_base });
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editId) return;
+    setEditSaving(true);
+    setError(null);
+    try {
+      await api.patch(`/admin/uoms/${editId}`, editForm);
+      setEditId(null);
+      load();
+    } catch (e: unknown) {
+      setError((e as Error).message);
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   const grouped = UOM_TYPES.map((t) => ({ type: t, items: rows.filter((r) => r.type === t) })).filter((g) => g.items.length > 0);
+  const inp = 'rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-xs dark:bg-slate-800 dark:text-slate-100';
 
   return (
     <div>
@@ -107,13 +132,48 @@ export default function UomsPage() {
               <table className="min-w-full text-sm">
                 <tbody>
                   {items.map((u) => (
-                    <tr key={u.id} className="border-b border-slate-100 dark:border-slate-700 last:border-0">
-                      <td className="px-3 py-2 font-mono text-xs font-medium text-slate-700 dark:text-slate-300 w-20">{u.code}</td>
-                      <td className="px-3 py-2 text-xs text-slate-900 dark:text-slate-100">{u.name}</td>
-                      <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
-                        {u.is_base && <span className="rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">base</span>}
-                      </td>
-                    </tr>
+                    editId === u.id ? (
+                      <tr key={u.id} className="border-b border-slate-100 dark:border-slate-700 bg-brand-50 dark:bg-slate-800">
+                        <td colSpan={4} className="px-3 py-2">
+                          <form onSubmit={saveEdit} className="flex items-center gap-2">
+                            <input value={editForm.code ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
+                              className={`w-20 ${inp}`} required />
+                            <input value={editForm.name ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                              className={`w-36 ${inp}`} required />
+                            <select value={editForm.type ?? 'COUNT'} onChange={(e) => setEditForm((f) => ({ ...f, type: e.target.value }))}
+                              className={inp}>
+                              {UOM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                            <label className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
+                              <input type="checkbox" checked={editForm.is_base ?? false} onChange={(e) => setEditForm((f) => ({ ...f, is_base: e.target.checked }))} />
+                              Base
+                            </label>
+                            <button type="submit" disabled={editSaving}
+                              className="rounded bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                              {editSaving ? 'Saving…' : 'Save'}
+                            </button>
+                            <button type="button" onClick={() => setEditId(null)}
+                              className="rounded border border-slate-300 px-3 py-1 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800">
+                              Cancel
+                            </button>
+                          </form>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={u.id} className="border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <td className="px-3 py-2 font-mono text-xs font-medium text-slate-700 dark:text-slate-300 w-20">{u.code}</td>
+                        <td className="px-3 py-2 text-xs text-slate-900 dark:text-slate-100">{u.name}</td>
+                        <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
+                          {u.is_base && <span className="rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">base</span>}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <button onClick={() => startEdit(u)}
+                            className="text-xs text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-brand-400">
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    )
                   ))}
                 </tbody>
               </table>

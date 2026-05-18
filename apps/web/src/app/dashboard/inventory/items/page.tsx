@@ -147,7 +147,9 @@ export default function ItemsPage() {
             ) : paged.map((r) => (
               <tr key={r.id} className="border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800">
                 <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">{r.sku}</td>
-                <td className="px-3 py-2 font-medium text-slate-900 dark:text-slate-100">{r.name}</td>
+                <td className="px-3 py-2 font-medium text-slate-900 dark:text-slate-100">
+                  <Link href={`/dashboard/inventory/items/${r.id}`} className="text-brand-700 hover:underline dark:text-brand-400">{r.name}</Link>
+                </td>
                 <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{r.category_name ?? '—'}</td>
                 <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{r.uom}</td>
                 <td className="px-3 py-2">
