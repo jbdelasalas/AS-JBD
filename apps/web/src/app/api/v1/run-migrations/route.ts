@@ -1022,6 +1022,8 @@ export async function POST(request: NextRequest) {
     ['void_reason', 'text'],
     ['dr_id', 'uuid'],
     ['je_id', 'uuid'],
+    ['posted_at', 'timestamptz'],
+    ['posted_by', 'uuid'],
     ['currency', "varchar(3) NOT NULL DEFAULT 'PHP'"],
   ];
   for (const [col, type] of salesInvoiceCols) {
@@ -1197,20 +1199,21 @@ export async function POST(request: NextRequest) {
     results.push('payment_applications table: ok');
   } catch (e) { results.push(`payment_applications table: ${(e as Error).message}`); }
 
-  // Document series for AR module
-  const arDocTypes = ['sales_order', 'delivery_receipt', 'credit_memo', 'official_receipt'];
+  // Document series for AR module + GL
+  const arDocTypes = ['sales_order', 'delivery_receipt', 'credit_memo', 'official_receipt', 'journal_voucher'];
   const arPrefixes: Record<string, string> = {
     sales_order: 'SO-',
     delivery_receipt: 'DR-',
     credit_memo: 'CM-',
     official_receipt: 'OR-',
+    journal_voucher: 'JV-',
   };
   for (const docType of arDocTypes) {
     try {
       await query(
         `INSERT INTO document_series (company_id, doc_type, prefix, start_number, current_number)
          SELECT id, $1, $2 || to_char(now(), 'YYYY') || '-', 1, 0 FROM companies
-         ON CONFLICT DO NOTHING`,
+         WHERE NOT EXISTS (SELECT 1 FROM document_series ds WHERE ds.company_id = companies.id AND ds.doc_type = $1)`,
         [docType, arPrefixes[docType]],
       );
       results.push(`document_series ${docType}: ok`);
@@ -1222,6 +1225,27 @@ export async function POST(request: NextRequest) {
     await query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS payment_terms_days int NOT NULL DEFAULT 30`);
     results.push('customers.payment_terms_days: ok');
   } catch (e) { results.push(`customers.payment_terms_days: ${(e as Error).message}`); }
+
+  // Seed fiscal_periods for 2025 and 2026 (all 12 months, status open)
+  try {
+    await query(`
+      INSERT INTO fiscal_periods (company_id, year, period, start_date, end_date, status)
+      SELECT c.id,
+             y.yr,
+             m.mo,
+             make_date(y.yr, m.mo, 1),
+             (make_date(y.yr, m.mo, 1) + interval '1 month - 1 day')::date,
+             'open'
+      FROM companies c
+      CROSS JOIN (VALUES (2025),(2026)) AS y(yr)
+      CROSS JOIN generate_series(1,12) AS m(mo)
+      WHERE NOT EXISTS (
+        SELECT 1 FROM fiscal_periods fp
+        WHERE fp.company_id = c.id AND fp.year = y.yr AND fp.period = m.mo
+      )
+    `);
+    results.push('seed fiscal_periods 2025-2026: ok');
+  } catch (e) { results.push(`seed fiscal_periods: ${(e as Error).message}`); }
 
   // ================================================================
   // TEST DATA SEED — idempotent (ON CONFLICT DO NOTHING)
