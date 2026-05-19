@@ -38,6 +38,21 @@ export async function GET(request: NextRequest) {
   if (fromDate) { params.push(fromDate); where += ` AND cp.payment_date >= $${params.length}`; }
   if (toDate) { params.push(toDate); where += ` AND cp.payment_date <= $${params.length}`; }
 
+  const invoiceId = searchParams.get('invoice_id');
+  if (invoiceId) {
+    const rows = await query(
+      `SELECT cp.id, cp.receipt_no, cp.payment_date, cp.payment_method, cp.amount, cp.status,
+              pa.amount_applied, c.name AS customer_name
+         FROM customer_payments cp
+         JOIN payment_applications pa ON pa.payment_id = cp.id
+         JOIN customers c ON c.id = cp.customer_id
+        WHERE cp.company_id = $1 AND pa.invoice_id = $2
+        ORDER BY cp.payment_date DESC`,
+      [companyId, invoiceId],
+    );
+    return ok({ data: rows.map((r) => ({ ...mapRow(r as Record<string, unknown>), amount_applied: Number((r as Record<string, unknown>).amount_applied) })), total: rows.length });
+  }
+
   params.push(limit, offset);
   const rows = await query(
     `SELECT cp.id, cp.receipt_no, cp.payment_date, cp.payment_method, cp.amount, cp.unapplied_amount, cp.is_advance, cp.status,

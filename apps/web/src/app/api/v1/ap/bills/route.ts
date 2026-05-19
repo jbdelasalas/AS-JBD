@@ -34,9 +34,11 @@ export async function GET(request: NextRequest) {
 
   const status = searchParams.get('status');
   const supplierId = searchParams.get('supplier_id');
+  const poId = searchParams.get('po_id');
 
   if (status) { params.push(status); where += ` AND b.status = $${params.length}`; }
   if (supplierId) { params.push(supplierId); where += ` AND b.supplier_id = $${params.length}`; }
+  if (poId) { params.push(poId); where += ` AND b.po_id = $${params.length}`; }
 
   params.push(limit, offset);
 

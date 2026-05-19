@@ -18,6 +18,15 @@ interface InvoiceRow {
   status: string;
 }
 
+interface Payment {
+  id: string;
+  receipt_no: string;
+  payment_date: string;
+  payment_method: string;
+  amount: number;
+  status: string;
+}
+
 const SI_STATUS: Record<string, string> = {
   draft: 'bg-slate-100 text-slate-600 dark:text-slate-400',
   open: 'bg-blue-100 text-blue-700',
@@ -33,6 +42,7 @@ export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [customer, setCustomer] = useState<(Customer & { open_ar_balance: number }) | null>(null);
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Partial<Customer>>({});
@@ -40,17 +50,21 @@ export default function CustomerDetailPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const companyId = typeof window !== 'undefined' ? localStorage.getItem('company_id') ?? '' : '';
+
   const load = useCallback(() => {
     setLoading(true);
     Promise.all([
       api.get<Customer & { open_ar_balance: number }>(`/ar/customers/${id}`),
       api.get<InvoiceRow[]>(`/ar/customers/${id}/outstanding`),
-    ]).then(([c, inv]) => {
+      api.get<{ data: Payment[] }>(`/ar/collections?company_id=${companyId}&customer_id=${id}&limit=20`),
+    ]).then(([c, inv, pay]) => {
       setCustomer(c);
       setInvoices(inv);
+      setPayments(pay.data);
       setForm(c);
     }).finally(() => setLoading(false));
-  }, [id]);
+  }, [id, companyId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -279,6 +293,41 @@ export default function CustomerDetailPage() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Payment History */}
+      <div className="mt-5 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+        <div className="border-b border-slate-200 dark:border-slate-700 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300">
+          Payment History
+        </div>
+        {payments.length === 0 ? (
+          <div className="px-4 py-6 text-center text-xs text-slate-400">No payments recorded yet.</div>
+        ) : (
+          <table className="min-w-full text-xs">
+            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">Receipt No.</th>
+                <th className="px-3 py-2 text-left font-medium">Date</th>
+                <th className="px-3 py-2 text-left font-medium">Method</th>
+                <th className="px-3 py-2 text-right font-medium">Amount</th>
+                <th className="px-3 py-2 text-left font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {payments.map((p) => (
+                <tr key={p.id} className="border-t border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                  <td className="px-3 py-2">
+                    <Link href={`/dashboard/ar/collections/${p.id}`} className="text-brand-700 hover:underline dark:text-brand-400">{p.receipt_no}</Link>
+                  </td>
+                  <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{formatDate(p.payment_date)}</td>
+                  <td className="px-3 py-2 capitalize text-slate-600 dark:text-slate-400">{p.payment_method?.replace(/_/g, ' ')}</td>
+                  <td className="px-3 py-2 text-right font-mono font-semibold text-emerald-700">{formatPHP(p.amount)}</td>
+                  <td className="px-3 py-2 capitalize text-slate-500 dark:text-slate-400">{p.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

@@ -50,8 +50,11 @@ export async function GET(request: NextRequest) {
   const fromDate = searchParams.get('from_date');
   const toDate = searchParams.get('to_date');
 
+  const soId = searchParams.get('so_id');
+
   if (status) { params.push(status); where += ` AND si.status = $${params.length}`; }
   if (customerId) { params.push(customerId); where += ` AND si.customer_id = $${params.length}`; }
+  if (soId) { params.push(soId); where += ` AND si.so_id = $${params.length}`; }
   if (fromDate) { params.push(fromDate); where += ` AND si.invoice_date >= $${params.length}`; }
   if (toDate) { params.push(toDate); where += ` AND si.invoice_date <= $${params.length}`; }
 

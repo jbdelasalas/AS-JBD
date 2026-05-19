@@ -1,11 +1,22 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatPHP, formatDate } from '@/lib/format';
 import type { SalesOrder } from '@perpet/shared';
+
+interface InvoiceRow {
+  id: string;
+  invoice_no: string;
+  invoice_date: string;
+  due_date: string;
+  total: number;
+  amount_paid: number;
+  balance: number;
+  status: string;
+}
 
 const STATUS_STYLES: Record<string, string> = {
   draft:                'bg-slate-100 text-slate-700 dark:text-slate-300',
@@ -17,10 +28,19 @@ const STATUS_STYLES: Record<string, string> = {
   cancelled:            'bg-red-100 text-red-700',
 };
 
+const INV_STATUS: Record<string, string> = {
+  draft: 'bg-slate-100 text-slate-600',
+  open: 'bg-blue-100 text-blue-700',
+  partially_paid: 'bg-amber-100 text-amber-700',
+  paid: 'bg-emerald-100 text-emerald-700',
+  overdue: 'bg-red-100 text-red-700',
+  cancelled: 'bg-slate-100 text-slate-500',
+};
+
 export default function SalesOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const [order, setOrder] = useState<SalesOrder | null>(null);
+  const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
@@ -30,13 +50,17 @@ export default function SalesOrderDetailPage() {
   const [showApprove, setShowApprove] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const companyId = typeof window !== 'undefined' ? localStorage.getItem('company_id') ?? '' : '';
+
   const load = useCallback(() => {
     setLoading(true);
-    api.get<SalesOrder>(`/sales/orders/${id}`)
-      .then(setOrder)
+    Promise.all([
+      api.get<SalesOrder>(`/sales/orders/${id}`),
+      api.get<{ data: InvoiceRow[] }>(`/ar/invoices?company_id=${companyId}&so_id=${id}`),
+    ]).then(([o, inv]) => { setOrder(o); setInvoices(inv.data); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, companyId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -127,7 +151,7 @@ export default function SalesOrderDetailPage() {
       </div>
 
       {/* Lines table */}
-      <div className="mb-5 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white">
+      <div className="mb-5 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
         <div className="border-b border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300">Line Items</div>
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
@@ -173,6 +197,47 @@ export default function SalesOrderDetailPage() {
             </tr>
           </tfoot>
         </table>
+      </div>
+
+      {/* Related Invoices */}
+      <div className="mb-5 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+        <div className="border-b border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+          Invoices
+        </div>
+        {invoices.length === 0 ? (
+          <div className="px-4 py-6 text-center text-xs text-slate-400">No invoices created for this order.</div>
+        ) : (
+          <table className="min-w-full text-xs">
+            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">Invoice No.</th>
+                <th className="px-3 py-2 text-left font-medium">Date</th>
+                <th className="px-3 py-2 text-left font-medium">Due</th>
+                <th className="px-3 py-2 text-right font-medium">Total</th>
+                <th className="px-3 py-2 text-right font-medium">Balance</th>
+                <th className="px-3 py-2 text-left font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((inv) => (
+                <tr key={inv.id} className="border-t border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                  <td className="px-3 py-2">
+                    <Link href={`/dashboard/ar/invoices/${inv.id}`} className="font-mono text-brand-700 hover:underline dark:text-brand-400">{inv.invoice_no}</Link>
+                  </td>
+                  <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{formatDate(inv.invoice_date)}</td>
+                  <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{formatDate(inv.due_date)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{formatPHP(inv.total)}</td>
+                  <td className="px-3 py-2 text-right font-mono font-semibold">{formatPHP(inv.balance)}</td>
+                  <td className="px-3 py-2">
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${INV_STATUS[inv.status] ?? INV_STATUS.open}`}>
+                      {inv.status.replace(/_/g, ' ')}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Approve modal */}

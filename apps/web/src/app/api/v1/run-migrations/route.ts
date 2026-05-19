@@ -1266,14 +1266,18 @@ export async function POST(request: NextRequest) {
     results.push('seed item_categories: ok');
   } catch (e) { results.push(`seed item_categories: ${(e as Error).message}`); }
 
-  // Warehouse
+  // Locations (Warehouses)
   try {
     await query(`
       INSERT INTO warehouses (id, company_id, code, name, address, is_active) VALUES
-        ('bbbb0001-0000-0000-0000-000000000001', $1, 'WH-MAIN', 'Main Warehouse', 'Manila', true)
+        ('bbbb0001-0000-0000-0000-000000000001', $1, 'WH-MAIN',   'Main Warehouse',        'Pier 5, South Harbor, Manila',          true),
+        ('bbbb0001-0000-0000-0000-000000000002', $1, 'WH-NORTH',  'North Depot',           'MacArthur Hwy, Malabon, Metro Manila',  true),
+        ('bbbb0001-0000-0000-0000-000000000003', $1, 'WH-SOUTH',  'South Distribution Hub','Coastal Road, Las Piñas, Metro Manila', true),
+        ('bbbb0001-0000-0000-0000-000000000004', $1, 'WH-QC',     'QC Branch Stockroom',   'E. Rodriguez Jr. Ave, Quezon City',     true),
+        ('bbbb0001-0000-0000-0000-000000000005', $1, 'WH-CEBU',   'Cebu Regional Depot',   'M. J. Cuenco Ave, Cebu City',           false)
       ON CONFLICT DO NOTHING`, [CO]);
-    results.push('seed warehouse: ok');
-  } catch (e) { results.push(`seed warehouse: ${(e as Error).message}`); }
+    results.push('seed locations: ok');
+  } catch (e) { results.push(`seed locations: ${(e as Error).message}`); }
 
   // Items
   try {

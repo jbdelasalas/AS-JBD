@@ -4,7 +4,23 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { formatPHP, formatDate } from '@/lib/format';
 import type { Account, AccountTypeCode } from '@perpet/shared';
+
+interface LedgerEntry {
+  id: string;
+  entry_id: string;
+  entry_no: string;
+  entry_date: string;
+  description: string | null;
+  memo: string | null;
+  source_module: string;
+  source_doc_type: string | null;
+  source_doc_id: string | null;
+  debit: number;
+  credit: number;
+  balance: number;
+}
 
 const TYPES: AccountTypeCode[] = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'];
 
@@ -12,6 +28,7 @@ export default function AccountDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [account, setAccount] = useState<Account | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Partial<Account>>({});
   const [saving, setSaving] = useState(false);
@@ -21,8 +38,10 @@ export default function AccountDetailPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get<Account>(`/gl/accounts/${id}`)
-      .then((a) => { setAccount(a); setForm(a); })
+    Promise.all([
+      api.get<Account>(`/gl/accounts/${id}`),
+      api.get<LedgerEntry[]>(`/gl/accounts/${id}/ledger`),
+    ]).then(([a, entries]) => { setAccount(a); setForm(a); setLedger(entries); })
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -153,24 +172,65 @@ export default function AccountDetailPage() {
           </div>
         </form>
       ) : (
-        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
-          <dl className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
-            {[
-              ['Code', account.code],
-              ['Name', account.name],
-              ['Type', account.account_type],
-              ['Currency', account.currency],
-              ['Control', account.is_control ? 'Yes' : 'No'],
-              ['Status', account.is_active ? 'Active' : 'Inactive'],
-              ['Description', account.description ?? '—'],
-            ].map(([k, v]) => (
-              <div key={k} className="flex gap-2">
-                <dt className="w-28 shrink-0 text-slate-500 dark:text-slate-400">{k}</dt>
-                <dd className="font-medium text-slate-900 dark:text-slate-100">{v}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
+        <>
+          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+            <dl className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+              {[
+                ['Code', account.code],
+                ['Name', account.name],
+                ['Type', account.account_type],
+                ['Currency', account.currency],
+                ['Control', account.is_control ? 'Yes' : 'No'],
+                ['Status', account.is_active ? 'Active' : 'Inactive'],
+                ['Description', account.description ?? '—'],
+              ].map(([k, v]) => (
+                <div key={k} className="flex gap-2">
+                  <dt className="w-28 shrink-0 text-slate-500 dark:text-slate-400">{k}</dt>
+                  <dd className="font-medium text-slate-900 dark:text-slate-100">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+
+          {/* Ledger */}
+          <div className="mt-5 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+            <div className="border-b border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+              Ledger (last 50 posted entries)
+            </div>
+            {ledger.length === 0 ? (
+              <div className="px-4 py-6 text-center text-xs text-slate-400">No posted transactions found.</div>
+            ) : (
+              <table className="min-w-full text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium">Entry No.</th>
+                    <th className="px-3 py-2 text-left font-medium">Date</th>
+                    <th className="px-3 py-2 text-left font-medium">Description</th>
+                    <th className="px-3 py-2 text-left font-medium">Module</th>
+                    <th className="px-3 py-2 text-right font-medium">Debit</th>
+                    <th className="px-3 py-2 text-right font-medium">Credit</th>
+                    <th className="px-3 py-2 text-right font-medium">Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ledger.map((e) => (
+                    <tr key={e.id} className="border-t border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300">{e.entry_no}</td>
+                      <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{formatDate(e.entry_date)}</td>
+                      <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{e.description ?? e.memo ?? '—'}</td>
+                      <td className="px-3 py-2 capitalize text-slate-500 dark:text-slate-400">{e.source_module.replace(/_/g, ' ')}</td>
+                      <td className="px-3 py-2 text-right font-mono text-slate-800 dark:text-slate-200">{e.debit > 0 ? formatPHP(e.debit) : '—'}</td>
+                      <td className="px-3 py-2 text-right font-mono text-slate-800 dark:text-slate-200">{e.credit > 0 ? formatPHP(e.credit) : '—'}</td>
+                      <td className={`px-3 py-2 text-right font-mono font-semibold ${e.balance < 0 ? 'text-red-600' : 'text-slate-900 dark:text-slate-100'}`}>
+                        {formatPHP(Math.abs(e.balance))}{e.balance < 0 ? ' Cr' : ''}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

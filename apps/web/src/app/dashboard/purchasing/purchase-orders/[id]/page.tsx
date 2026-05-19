@@ -6,6 +6,19 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatPHP, formatDate } from '@/lib/format';
 
+interface BillRow {
+  id: string;
+  internal_no: string;
+  bill_no: string;
+  bill_date: string;
+  due_date: string;
+  total: number;
+  amount_paid: number;
+  balance: number;
+  status: string;
+  supplier_name: string;
+}
+
 interface POLine {
   id: string;
   line_no: number;
@@ -45,17 +58,33 @@ const STATUS_STYLES: Record<string, string> = {
   cancelled: 'bg-red-100 text-red-700',
 };
 
+const BILL_STATUS: Record<string, string> = {
+  draft: 'bg-slate-100 text-slate-700',
+  pending_approval: 'bg-amber-100 text-amber-700',
+  approved: 'bg-blue-100 text-blue-700',
+  partial: 'bg-orange-100 text-orange-700',
+  paid: 'bg-emerald-100 text-emerald-700',
+  voided: 'bg-red-100 text-red-700',
+};
+
 export default function PODetailPage() {
   const { id } = useParams<{ id: string }>();
   const [po, setPo] = useState<PO | null>(null);
+  const [bills, setBills] = useState<BillRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
 
+  const companyId = typeof window !== 'undefined' ? localStorage.getItem('company_id') ?? '' : '';
+
   const load = useCallback(() => {
     setLoading(true);
-    api.get<PO>(`/purchasing/purchase-orders/${id}`).then(setPo).finally(() => setLoading(false));
-  }, [id]);
+    Promise.all([
+      api.get<PO>(`/purchasing/purchase-orders/${id}`),
+      api.get<{ data: BillRow[] }>(`/ap/bills?company_id=${companyId}&po_id=${id}`),
+    ]).then(([p, b]) => { setPo(p); setBills(b.data); })
+      .finally(() => setLoading(false));
+  }, [id, companyId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -135,7 +164,7 @@ export default function PODetailPage() {
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+      <div className="mb-5 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
         <div className="border-b border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:text-slate-300">PO Lines</div>
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-400">
@@ -185,6 +214,49 @@ export default function PODetailPage() {
             </tr>
           </tfoot>
         </table>
+      </div>
+
+      {/* Related Bills */}
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+        <div className="border-b border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:text-slate-300">
+          Bills
+        </div>
+        {bills.length === 0 ? (
+          <div className="px-4 py-6 text-center text-xs text-slate-400">No bills linked to this PO.</div>
+        ) : (
+          <table className="min-w-full text-xs">
+            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">Internal No.</th>
+                <th className="px-3 py-2 text-left font-medium">Bill No.</th>
+                <th className="px-3 py-2 text-left font-medium">Date</th>
+                <th className="px-3 py-2 text-left font-medium">Due</th>
+                <th className="px-3 py-2 text-right font-medium">Total</th>
+                <th className="px-3 py-2 text-right font-medium">Balance</th>
+                <th className="px-3 py-2 text-left font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bills.map((b) => (
+                <tr key={b.id} className="border-t border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                  <td className="px-3 py-2">
+                    <Link href={`/dashboard/ap/bills/${b.id}`} className="font-mono text-brand-700 hover:underline dark:text-brand-400">{b.internal_no}</Link>
+                  </td>
+                  <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400">{b.bill_no}</td>
+                  <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{formatDate(b.bill_date)}</td>
+                  <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{formatDate(b.due_date)}</td>
+                  <td className="px-3 py-2 text-right font-mono dark:text-slate-300">{formatPHP(b.total)}</td>
+                  <td className="px-3 py-2 text-right font-mono font-semibold text-amber-700 dark:text-amber-400">{formatPHP(b.balance)}</td>
+                  <td className="px-3 py-2">
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${BILL_STATUS[b.status] ?? BILL_STATUS.draft}`}>
+                      {b.status.replace(/_/g, ' ')}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

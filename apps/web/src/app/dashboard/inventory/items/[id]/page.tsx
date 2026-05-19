@@ -1,10 +1,29 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatPHP } from '@/lib/format';
+
+interface StockBalance {
+  warehouse_name: string;
+  warehouse_id: string;
+  qty_on_hand: number;
+  avg_cost: number;
+}
+
+interface Transaction {
+  txn_type: string;
+  ref: string;
+  txn_date: string | null;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  party_name: string;
+  doc_id: string;
+  status: string;
+}
 
 interface Item {
   id: string;
@@ -30,8 +49,9 @@ const COSTING_METHODS = ['weighted_avg', 'fifo', 'standard'];
 
 export default function ItemDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const [item, setItem] = useState<Item | null>(null);
+  const [stockOnHand, setStockOnHand] = useState<StockBalance[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [uoms, setUoms] = useState<UomRow[]>([]);
   const [editing, setEditing] = useState(false);
@@ -43,12 +63,15 @@ export default function ItemDetailPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get<Item>(`/inventory/items/${id}`)
-      .then((it) => {
-        setItem(it);
-        setForm(it);
-      })
-      .finally(() => setLoading(false));
+    Promise.all([
+      api.get<Item>(`/inventory/items/${id}`),
+      api.get<{ stock_on_hand: StockBalance[]; transactions: Transaction[] }>(`/inventory/items/${id}/transactions`),
+    ]).then(([it, txns]) => {
+      setItem(it);
+      setForm(it);
+      setStockOnHand(txns.stock_on_hand);
+      setTransactions(txns.transactions);
+    }).finally(() => setLoading(false));
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
@@ -201,42 +224,116 @@ export default function ItemDetailPage() {
           </div>
         </form>
       ) : (
-        <div className="grid grid-cols-2 gap-4">
-          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
-            <div className="mb-3 text-xs font-medium text-slate-600 dark:text-slate-400">Item Details</div>
-            <dl className="space-y-2 text-sm">
-              {[
-                ['SKU', item.sku],
-                ['Name', item.name],
-                ['Type', item.item_type],
-                ['UOM', item.uom],
-                ['Category', item.category_name ?? '—'],
-                ['Status', item.is_active ? 'Active' : 'Inactive'],
-              ].map(([k, v]) => (
-                <div key={k} className="flex gap-2">
-                  <dt className="w-28 shrink-0 text-slate-500 dark:text-slate-400">{k}</dt>
-                  <dd className="font-medium text-slate-900 dark:text-slate-100">{v}</dd>
-                </div>
-              ))}
-            </dl>
+        <>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+              <div className="mb-3 text-xs font-medium text-slate-600 dark:text-slate-400">Item Details</div>
+              <dl className="space-y-2 text-sm">
+                {[
+                  ['SKU', item.sku],
+                  ['Name', item.name],
+                  ['Type', item.item_type],
+                  ['UOM', item.uom],
+                  ['Category', item.category_name ?? '—'],
+                  ['Status', item.is_active ? 'Active' : 'Inactive'],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex gap-2">
+                    <dt className="w-28 shrink-0 text-slate-500 dark:text-slate-400">{k}</dt>
+                    <dd className="font-medium text-slate-900 dark:text-slate-100">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+              <div className="mb-3 text-xs font-medium text-slate-600 dark:text-slate-400">Pricing & Costing</div>
+              <dl className="space-y-2 text-sm">
+                {[
+                  ['Costing Method', item.costing_method.replace('_', ' ')],
+                  ['Standard Cost', formatPHP(item.standard_cost)],
+                  ['Selling Price', formatPHP(item.selling_price)],
+                  ['Reorder Point', String(item.reorder_point)],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex gap-2">
+                    <dt className="w-32 shrink-0 text-slate-500 dark:text-slate-400">{k}</dt>
+                    <dd className="font-mono font-medium text-slate-900 dark:text-slate-100">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
           </div>
-          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
-            <div className="mb-3 text-xs font-medium text-slate-600 dark:text-slate-400">Pricing & Costing</div>
-            <dl className="space-y-2 text-sm">
-              {[
-                ['Costing Method', item.costing_method.replace('_', ' ')],
-                ['Standard Cost', formatPHP(item.standard_cost)],
-                ['Selling Price', formatPHP(item.selling_price)],
-                ['Reorder Point', String(item.reorder_point)],
-              ].map(([k, v]) => (
-                <div key={k} className="flex gap-2">
-                  <dt className="w-32 shrink-0 text-slate-500 dark:text-slate-400">{k}</dt>
-                  <dd className="font-mono font-medium text-slate-900 dark:text-slate-100">{v}</dd>
-                </div>
-              ))}
-            </dl>
+
+          {/* Stock on Hand */}
+          {stockOnHand.length > 0 && (
+            <div className="mt-5 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+              <div className="border-b border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+                Stock on Hand by Location
+              </div>
+              <table className="min-w-full text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium">Location</th>
+                    <th className="px-3 py-2 text-right font-medium">Qty on Hand</th>
+                    <th className="px-3 py-2 text-right font-medium">Avg Cost</th>
+                    <th className="px-3 py-2 text-right font-medium">Total Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stockOnHand.map((s) => (
+                    <tr key={s.warehouse_id} className="border-t border-slate-100 dark:border-slate-700">
+                      <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-200">{s.warehouse_name}</td>
+                      <td className="px-3 py-2 text-right font-mono">{s.qty_on_hand}</td>
+                      <td className="px-3 py-2 text-right font-mono">{formatPHP(s.avg_cost)}</td>
+                      <td className="px-3 py-2 text-right font-mono font-semibold">{formatPHP(s.qty_on_hand * s.avg_cost)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Recent Transactions */}
+          <div className="mt-5 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+            <div className="border-b border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+              Recent Transactions
+            </div>
+            {transactions.length === 0 ? (
+              <div className="px-4 py-6 text-center text-xs text-slate-400">No transactions found.</div>
+            ) : (
+              <table className="min-w-full text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium">Type</th>
+                    <th className="px-3 py-2 text-left font-medium">Reference</th>
+                    <th className="px-3 py-2 text-left font-medium">Date</th>
+                    <th className="px-3 py-2 text-left font-medium">Party</th>
+                    <th className="px-3 py-2 text-right font-medium">Qty</th>
+                    <th className="px-3 py-2 text-right font-medium">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map((t, i) => (
+                    <tr key={i} className="border-t border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <td className="px-3 py-2 capitalize">
+                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                          t.txn_type === 'sale' ? 'bg-blue-100 text-blue-700' :
+                          t.txn_type === 'purchase' ? 'bg-emerald-100 text-emerald-700' :
+                          'bg-slate-100 text-slate-600'
+                        }`}>{t.txn_type}</span>
+                      </td>
+                      <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300">{t.ref}</td>
+                      <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{t.txn_date ?? '—'}</td>
+                      <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{t.party_name}</td>
+                      <td className={`px-3 py-2 text-right font-mono ${t.quantity < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
+                        {t.quantity > 0 ? '+' : ''}{t.quantity}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono font-semibold text-slate-800 dark:text-slate-200">{formatPHP(t.line_total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
-        </div>
+        </>
       )}
     </div>
   );

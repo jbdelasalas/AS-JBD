@@ -26,6 +26,21 @@ export async function GET(request: NextRequest) {
   if (status) { params.push(status); where += ` AND sp.status = $${params.length}`; }
   if (supplierId) { params.push(supplierId); where += ` AND sp.supplier_id = $${params.length}`; }
 
+  const billId = searchParams.get('bill_id');
+  if (billId) {
+    const rows = await query(
+      `SELECT sp.id, sp.voucher_no, sp.payment_date, sp.payment_method, sp.amount, sp.status,
+              bpa.amount_applied, s.name AS supplier_name
+         FROM supplier_payments sp
+         JOIN bill_payment_applications bpa ON bpa.payment_id = sp.id
+         JOIN suppliers s ON s.id = sp.supplier_id
+        WHERE sp.company_id = $1 AND bpa.bill_id = $2
+        ORDER BY sp.payment_date DESC`,
+      [companyId, billId],
+    );
+    return ok({ data: rows.map((r) => ({ ...r, amount: Number((r as Record<string, unknown>).amount), amount_applied: Number((r as Record<string, unknown>).amount_applied) })), total: rows.length });
+  }
+
   params.push(limit, offset);
 
   try {

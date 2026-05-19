@@ -16,19 +16,31 @@ const STATUS_STYLES: Record<string, string> = {
   cancelled: 'bg-slate-100 text-slate-500 dark:text-slate-400',
 };
 
+interface Payment {
+  id: string; receipt_no: string; payment_date: string;
+  payment_method: string; amount: number; amount_applied: number; status: string;
+}
+
 export default function SalesInvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [inv, setInv] = useState<SalesInvoice | null>(null);
   const [loading, setLoading] = useState(true);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [busy, setBusy] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [voidReason, setVoidReason] = useState('');
   const [showVoid, setShowVoid] = useState(false);
 
+  const companyId = typeof window !== 'undefined' ? localStorage.getItem('company_id') ?? '' : '';
+
   const load = useCallback(() => {
     setLoading(true);
-    api.get<SalesInvoice>(`/ar/invoices/${id}`).then(setInv).finally(() => setLoading(false));
-  }, [id]);
+    Promise.all([
+      api.get<SalesInvoice>(`/ar/invoices/${id}`),
+      api.get<{ data: Payment[] }>(`/ar/collections?company_id=${companyId}&invoice_id=${id}`),
+    ]).then(([inv, pay]) => { setInv(inv); setPayments(pay.data); })
+      .finally(() => setLoading(false));
+  }, [id, companyId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -181,6 +193,41 @@ export default function SalesInvoiceDetailPage() {
             </tr>
           </tfoot>
         </table>
+      </div>
+
+      {/* Payments Applied */}
+      <div className="mt-5 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+        <div className="border-b border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+          Payments Applied
+        </div>
+        {payments.length === 0 ? (
+          <div className="px-4 py-6 text-center text-xs text-slate-400">No payments recorded yet.</div>
+        ) : (
+          <table className="min-w-full text-xs">
+            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">Receipt No.</th>
+                <th className="px-3 py-2 text-left font-medium">Date</th>
+                <th className="px-3 py-2 text-left font-medium">Method</th>
+                <th className="px-3 py-2 text-right font-medium">Applied</th>
+                <th className="px-3 py-2 text-right font-medium">Total Payment</th>
+              </tr>
+            </thead>
+            <tbody>
+              {payments.map((p) => (
+                <tr key={p.id} className="border-t border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                  <td className="px-3 py-2">
+                    <Link href={`/dashboard/ar/collections/${p.id}`} className="text-brand-700 hover:underline dark:text-brand-400">{p.receipt_no}</Link>
+                  </td>
+                  <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{formatDate(p.payment_date)}</td>
+                  <td className="px-3 py-2 text-slate-600 dark:text-slate-400 capitalize">{p.payment_method?.replace(/_/g, ' ')}</td>
+                  <td className="px-3 py-2 text-right font-mono font-semibold text-emerald-700">{formatPHP(p.amount_applied)}</td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-500 dark:text-slate-400">{formatPHP(p.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Void modal */}
