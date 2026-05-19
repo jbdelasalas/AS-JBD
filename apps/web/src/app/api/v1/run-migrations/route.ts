@@ -1212,8 +1212,9 @@ export async function POST(request: NextRequest) {
     try {
       await query(
         `INSERT INTO document_series (company_id, doc_type, prefix, start_number, current_number)
-         SELECT id, $1, $2 || to_char(now(), 'YYYY') || '-', 1, 0 FROM companies
-         WHERE NOT EXISTS (SELECT 1 FROM document_series ds WHERE ds.company_id = companies.id AND ds.doc_type = $1)`,
+         SELECT c.id, $1::varchar, ($2 || to_char(now(), 'YYYY') || '-')::varchar, 1, 0
+         FROM companies c
+         WHERE NOT EXISTS (SELECT 1 FROM document_series ds WHERE ds.company_id = c.id AND ds.doc_type = $1::varchar)`,
         [docType, arPrefixes[docType]],
       );
       results.push(`document_series ${docType}: ok`);
