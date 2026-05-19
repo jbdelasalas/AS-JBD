@@ -130,7 +130,8 @@ export async function POST(request: NextRequest) {
       companies,
     });
   } catch (e) {
-    console.error('Login error:', e);
-    return err('Service unavailable — database connection failed', 503);
+    const msg = (e as Error).message ?? String(e);
+    console.error('Login error:', msg);
+    return err(`Service unavailable — ${msg}`, 503);
   }
 }
