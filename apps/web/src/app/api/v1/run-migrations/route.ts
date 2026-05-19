@@ -1440,5 +1440,24 @@ export async function POST(request: NextRequest) {
     results.push('seed journal_entries: ok');
   } catch (e) { results.push(`seed journal_entries: ${(e as Error).message}`); }
 
+  // Advance document_series counters past seeded data so new docs don't collide
+  // sales_invoices seeded: SI-2026-000001..000005 → current_number must be >= 5
+  // official_receipts seeded: OR-2026-000001..000002 → current_number must be >= 2
+  // journal_voucher seeded: JV-2026-000001..000002 → current_number must be >= 2
+  const seriesFloors: [string, number][] = [
+    ['sales_invoice',   5],
+    ['official_receipt', 2],
+    ['journal_voucher',  2],
+  ];
+  for (const [docType, floor] of seriesFloors) {
+    try {
+      await query(
+        `UPDATE document_series SET current_number = GREATEST(current_number, $2) WHERE doc_type = $1 AND current_number < $2`,
+        [docType, floor],
+      );
+      results.push(`document_series floor ${docType}=${floor}: ok`);
+    } catch (e) { results.push(`document_series floor ${docType}: ${(e as Error).message}`); }
+  }
+
   return ok({ results });
 }

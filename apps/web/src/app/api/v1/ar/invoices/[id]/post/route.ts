@@ -178,7 +178,7 @@ export async function POST(
     await client.query('COMMIT');
   } catch (e) {
     await client.query('ROLLBACK');
-    throw e;
+    return err((e as Error).message ?? 'Internal server error', 500);
   } finally {
     client.release();
   }
