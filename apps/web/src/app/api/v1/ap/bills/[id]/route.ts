@@ -22,9 +22,11 @@ function mapLine(l: Record<string, unknown>) {
     quantity: Number(l.quantity),
     unit_price: Number(l.unit_price),
     vat_rate: Number(l.vat_rate),
+    ewt_rate: Number(l.ewt_rate ?? 0),
     line_subtotal: Number(l.line_subtotal),
     line_vat: Number(l.line_vat),
     line_total: Number(l.line_total),
+    ewt_amount: Number(l.ewt_amount ?? 0),
   };
 }
 

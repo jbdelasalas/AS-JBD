@@ -24,9 +24,11 @@ interface BillLine {
   quantity: number;
   unit_price: number;
   vat_rate: number;
+  ewt_rate: number;
   line_subtotal: number;
   line_vat: number;
   line_total: number;
+  ewt_amount: number;
   account_name: string | null;
   account_code: string | null;
 }
@@ -60,10 +62,18 @@ const STATUS_STYLES: Record<string, string> = {
   voided: 'bg-red-100 text-red-700',
 };
 
+interface WhtCert {
+  id: string;
+  cert_no: string;
+  status: string;
+  amount_withheld: number;
+}
+
 export default function BillDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [bill, setBill] = useState<Bill | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [cert, setCert] = useState<WhtCert | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
@@ -76,8 +86,13 @@ export default function BillDetailPage() {
     Promise.all([
       api.get<Bill>(`/ap/bills/${id}`),
       api.get<{ data: Payment[] }>(`/ap/payments?company_id=${companyId}&bill_id=${id}`),
-    ]).then(([b, pay]) => { setBill(b); setPayments(pay.data); })
-      .finally(() => setLoading(false));
+      api.get<WhtCert[]>(`/bir/certificates?company_id=${companyId}&bill_id=${id}`).catch(() => []),
+    ]).then(([b, pay, certs]) => {
+      setBill(b);
+      setPayments(pay.data);
+      const arr = Array.isArray(certs) ? certs : [];
+      setCert(arr[0] ?? null);
+    }).finally(() => setLoading(false));
   }, [id, companyId]);
 
   useEffect(() => { load(); }, [load]);
@@ -141,6 +156,20 @@ export default function BillDetailPage() {
         <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">{actionMsg}</div>
       )}
 
+      {/* BIR Form 2307 certificate badge */}
+      {cert && (
+        <div className="mb-4 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 dark:border-amber-800 dark:bg-amber-950">
+          <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">BIR Form 2307</span>
+          <span className="font-mono text-xs text-amber-700 dark:text-amber-400">{cert.cert_no}</span>
+          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900 dark:text-amber-300 capitalize">{cert.status}</span>
+          <span className="text-xs text-amber-600 dark:text-amber-400">EWT Withheld: ₱{cert.amount_withheld.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+          <Link href={`/dashboard/bir/certificates/${cert.id}`}
+            className="ml-auto text-xs font-medium text-amber-800 hover:underline dark:text-amber-300">
+            View Certificate →
+          </Link>
+        </div>
+      )}
+
       {bill.status !== 'draft' && bill.status !== 'voided' && (
         <div className="mb-5 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
           <div className="mb-1 flex justify-between text-xs text-slate-600 dark:text-slate-400">
@@ -185,8 +214,10 @@ export default function BillDetailPage() {
               <th className="px-3 py-2 text-right font-medium">Qty</th>
               <th className="px-3 py-2 text-right font-medium">Unit Price</th>
               <th className="px-3 py-2 text-right font-medium">VAT %</th>
+              <th className="px-3 py-2 text-right font-medium">EWT %</th>
               <th className="px-3 py-2 text-right font-medium">Subtotal</th>
               <th className="px-3 py-2 text-right font-medium">VAT</th>
+              <th className="px-3 py-2 text-right font-medium">EWT</th>
               <th className="px-3 py-2 text-right font-medium">Total</th>
             </tr>
           </thead>
@@ -201,8 +232,10 @@ export default function BillDetailPage() {
                 <td className="px-3 py-2 text-right font-mono text-xs dark:text-slate-300">{l.quantity}</td>
                 <td className="px-3 py-2 text-right font-mono text-xs dark:text-slate-300">{formatPHP(l.unit_price)}</td>
                 <td className="px-3 py-2 text-right text-xs dark:text-slate-300">{l.vat_rate}%</td>
+                <td className="px-3 py-2 text-right text-xs dark:text-slate-300">{l.ewt_rate}%</td>
                 <td className="px-3 py-2 text-right font-mono text-xs dark:text-slate-300">{formatPHP(l.line_subtotal)}</td>
                 <td className="px-3 py-2 text-right font-mono text-xs dark:text-slate-300">{formatPHP(l.line_vat)}</td>
+                <td className="px-3 py-2 text-right font-mono text-xs text-amber-700 dark:text-amber-400">{l.ewt_amount > 0 ? formatPHP(l.ewt_amount) : '—'}</td>
                 <td className="px-3 py-2 text-right font-mono text-xs font-semibold dark:text-slate-300">{formatPHP(l.line_total)}</td>
               </tr>
             ))}
@@ -211,14 +244,15 @@ export default function BillDetailPage() {
             {[
               { label: 'Subtotal', value: bill.subtotal },
               { label: 'VAT', value: bill.vat_amount },
+              { label: 'EWT (Withheld)', value: bill.ewt_amount },
             ].map((row) => (
               <tr key={row.label} className="bg-slate-50 dark:bg-slate-800">
-                <td colSpan={8} className="px-3 py-1.5 text-right text-xs text-slate-600 dark:text-slate-400">{row.label}</td>
+                <td colSpan={10} className="px-3 py-1.5 text-right text-xs text-slate-600 dark:text-slate-400">{row.label}</td>
                 <td className="px-3 py-1.5 text-right font-mono text-xs dark:text-slate-300">{formatPHP(row.value)}</td>
               </tr>
             ))}
             <tr className="border-t border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
-              <td colSpan={8} className="px-3 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">Total</td>
+              <td colSpan={10} className="px-3 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">Total</td>
               <td className="px-3 py-2 text-right font-mono text-sm font-bold text-slate-900 dark:text-slate-100">{formatPHP(bill.total)}</td>
             </tr>
           </tfoot>

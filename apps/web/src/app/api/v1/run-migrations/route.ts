@@ -1463,5 +1463,137 @@ export async function POST(request: NextRequest) {
     } catch (e) { results.push(`document_series floor ${docType}: ${(e as Error).message}`); }
   }
 
+  // --- 018: EWT columns on bill_lines + BIR 2307 table ---
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS wht_certificates (
+        id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id      uuid NOT NULL REFERENCES companies(id),
+        cert_no         varchar(30) NOT NULL,
+        bill_id         uuid NOT NULL REFERENCES bills(id),
+        supplier_id     uuid NOT NULL REFERENCES suppliers(id),
+        bir_atc_code    varchar(10) NOT NULL,
+        taxable_amount  numeric(18,2) NOT NULL,
+        rate_pct        numeric(6,4) NOT NULL,
+        amount_withheld numeric(18,2) NOT NULL,
+        period_year     int NOT NULL,
+        period_quarter  int NOT NULL CHECK (period_quarter BETWEEN 1 AND 4),
+        status          varchar(20) NOT NULL DEFAULT 'draft',
+        issued_at       timestamptz,
+        filed_at        timestamptz,
+        created_by      uuid NOT NULL REFERENCES users(id),
+        created_at      timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, cert_no)
+      )
+    `);
+    results.push('018 wht_certificates: ok');
+  } catch (e) { results.push(`018 wht_certificates: ${(e as Error).message}`); }
+
+  try {
+    await query(`ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS bir_atc_code varchar(10)`);
+    results.push('018 suppliers.bir_atc_code: ok');
+  } catch (e) { results.push(`018 suppliers.bir_atc_code: ${(e as Error).message}`); }
+
+  // --- 018: EWT columns on bill_lines ---
+  try {
+    await query(`ALTER TABLE bill_lines ADD COLUMN IF NOT EXISTS ewt_rate numeric(5,2) NOT NULL DEFAULT 0`);
+    results.push('018 bill_lines.ewt_rate: ok');
+  } catch (e) { results.push(`018 bill_lines.ewt_rate: ${(e as Error).message}`); }
+  try {
+    await query(`ALTER TABLE bill_lines ADD COLUMN IF NOT EXISTS ewt_amount numeric(18,2) NOT NULL DEFAULT 0`);
+    results.push('018 bill_lines.ewt_amount: ok');
+  } catch (e) { results.push(`018 bill_lines.ewt_amount: ${(e as Error).message}`); }
+
+  // ================================================================
+  // 019: BIR tax codes + EWT sample data
+  // ================================================================
+
+  // Full EWT + VAT tax code set
+  try {
+    await query(`
+      INSERT INTO tax_codes (company_id, code, name, tax_type, rate_pct, bir_atc_code, is_active) VALUES
+        ($1, 'VAT12-OUT',  'Output VAT 12%',                                       'vat_output',  12.0000, NULL,    true),
+        ($1, 'VAT12-IN',   'Input VAT 12%',                                        'vat_input',   12.0000, NULL,    true),
+        ($1, 'VAT0-OUT',   'Zero-rated Sales (0%)',                                'vat_output',   0.0000, NULL,    true),
+        ($1, 'VAT-EXEMPT', 'VAT-Exempt Transactions',                              'vat_output',   0.0000, NULL,    true),
+        ($1, 'EWT-1',      'EWT 1% — Supplier of Goods (WC158)',                   'ewt',          1.0000, 'WC158', true),
+        ($1, 'EWT-2',      'EWT 2% — Supplier of Services (WC160)',                'ewt',          2.0000, 'WC160', true),
+        ($1, 'EWT-5R',     'EWT 5% — Rental of Real/Personal Property (WC100)',    'ewt',          5.0000, 'WC100', true),
+        ($1, 'EWT-5P',     'EWT 5% — Payments to Brokers / Agents (WC120)',        'ewt',          5.0000, 'WC120', true),
+        ($1, 'EWT-10C',    'EWT 10% — Commission to Corporations (WC180)',         'ewt',         10.0000, 'WC180', true),
+        ($1, 'EWT-10I',    'EWT 10% — Commission to Individuals (WI180)',          'ewt',         10.0000, 'WI180', true),
+        ($1, 'EWT-15C',    'EWT 15% — Professional Fees to Corporations (WC010)',  'ewt',         15.0000, 'WC010', true),
+        ($1, 'EWT-15I',    'EWT 15% — Professional Fees to Individuals (WI010)',   'ewt',         15.0000, 'WI010', true),
+        ($1, 'EWT-20',     'EWT 20% — Royalties / Interest (WC050)',               'ewt',         20.0000, 'WC050', true),
+        ($1, 'EWT-2C',     'EWT 2% — General Engineering Contractors (WC200)',     'ewt',          2.0000, 'WC200', true),
+        ($1, 'EWT-1P',     'EWT 1% — Payments by Credit Card Companies (WC250)',   'ewt',          1.0000, 'WC250', true)
+      ON CONFLICT (company_id, code) DO UPDATE
+        SET name = EXCLUDED.name, bir_atc_code = EXCLUDED.bir_atc_code
+    `, [CO]);
+    results.push('019 tax_codes EWT+VAT: ok');
+  } catch (e) { results.push(`019 tax_codes: ${(e as Error).message}`); }
+
+  // Update suppliers with specific EWT rates + ATC codes
+  try {
+    await query(`
+      UPDATE suppliers SET ewt_rate = 1.00, bir_atc_code = 'WC158'
+       WHERE company_id = $1 AND code IN ('TEST-S001','TEST-S002','TEST-S003','TEST-S004')
+         AND ewt_rate = 1.00
+    `, [CO]);
+    results.push('019 supplier ewt defaults: ok');
+  } catch (e) { results.push(`019 supplier ewt defaults: ${(e as Error).message}`); }
+
+  // Back-fill EWT on seeded bills and their lines (1% of subtotal each)
+  try {
+    await query(`
+      UPDATE bills
+         SET ewt_amount = ROUND(subtotal * 0.01, 2)
+       WHERE id IN (
+         'a1b20001-0000-0000-0000-000000000001',
+         'a1b20001-0000-0000-0000-000000000002',
+         'a1b20001-0000-0000-0000-000000000003'
+       ) AND ewt_amount = 0
+    `);
+    results.push('019 bills ewt backfill: ok');
+  } catch (e) { results.push(`019 bills ewt backfill: ${(e as Error).message}`); }
+
+  try {
+    await query(`
+      UPDATE bill_lines
+         SET ewt_rate   = 1.00,
+             ewt_amount = ROUND(line_subtotal * 0.01, 2)
+       WHERE bill_id IN (
+         'a1b20001-0000-0000-0000-000000000001',
+         'a1b20001-0000-0000-0000-000000000002',
+         'a1b20001-0000-0000-0000-000000000003'
+       ) AND ewt_rate = 0
+    `);
+    results.push('019 bill_lines ewt backfill: ok');
+  } catch (e) { results.push(`019 bill_lines ewt backfill: ${(e as Error).message}`); }
+
+  // Seed wht_certificates for each approved seeded bill
+  try {
+    await query(`
+      INSERT INTO wht_certificates
+        (id, company_id, cert_no, bill_id, supplier_id, bir_atc_code,
+         taxable_amount, rate_pct, amount_withheld, period_year, period_quarter, status, created_by)
+      SELECT
+        v.cert_id::uuid, $1, v.cert_no, v.bill_id::uuid,
+        (SELECT id FROM suppliers WHERE company_id = $1 AND code = v.scode LIMIT 1),
+        'WC158',
+        v.gross::numeric, 1.0000, v.withheld::numeric,
+        v.yr::int, v.qtr::int, v.status, $2
+      FROM (VALUES
+        ('a1b50001-0000-0000-0000-000000000001','2307-2026-Q2-00001','a1b20001-0000-0000-0000-000000000001','TEST-S001',2232142.86, 22321.43, 2026, 2,'issued'),
+        ('a1b50001-0000-0000-0000-000000000002','2307-2026-Q2-00002','a1b20001-0000-0000-0000-000000000002','TEST-S002', 892857.14,  8928.57, 2026, 2,'draft'),
+        ('a1b50001-0000-0000-0000-000000000003','2307-2026-Q1-00001','a1b20001-0000-0000-0000-000000000003','TEST-S003', 178571.43,  1785.71, 2026, 1,'draft')
+      ) AS v(cert_id, cert_no, bill_id, scode, gross, withheld, yr, qtr, status)
+      WHERE (SELECT id FROM suppliers WHERE company_id = $1 AND code = v.scode LIMIT 1) IS NOT NULL
+        AND EXISTS (SELECT 1 FROM bills WHERE id = v.bill_id::uuid)
+      ON CONFLICT (company_id, cert_no) DO NOTHING
+    `, [CO, USR]);
+    results.push('019 wht_certificates: ok');
+  } catch (e) { results.push(`019 wht_certificates: ${(e as Error).message}`); }
+
   return ok({ results });
 }

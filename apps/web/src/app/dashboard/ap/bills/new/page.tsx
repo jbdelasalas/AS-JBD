@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 
-interface Supplier { id: string; code: string; name: string; payment_terms_days: number; }
+interface Supplier { id: string; code: string; name: string; payment_terms_days: number; ewt_rate: number; }
 interface Account { id: string; code: string; name: string; }
 interface POOption { id: string; po_no: string; }
 
@@ -14,6 +14,7 @@ interface Line {
   quantity: number;
   unit_price: number;
   vat_rate: number;
+  ewt_rate: number;
   expense_account_id: string;
 }
 
@@ -37,7 +38,7 @@ function NewBillForm() {
   });
 
   const [lines, setLines] = useState<Line[]>([
-    { item_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12, expense_account_id: '' },
+    { item_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12, ewt_rate: 0, expense_account_id: '' },
   ]);
 
   useEffect(() => {
@@ -54,8 +55,10 @@ function NewBillForm() {
     }).catch(() => {});
   }, []);
 
+  const currentEwtRate = lines[0]?.ewt_rate ?? 0;
+
   function addLine() {
-    setLines((l) => [...l, { item_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12, expense_account_id: '' }]);
+    setLines((l) => [...l, { item_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12, ewt_rate: currentEwtRate, expense_account_id: '' }]);
   }
 
   function updateLine(idx: number, field: keyof Line, val: string | number) {
@@ -66,12 +69,13 @@ function NewBillForm() {
     });
   }
 
-  function lineTotal(l: Line) {
-    const sub = l.quantity * l.unit_price;
-    return sub + sub * (l.vat_rate / 100);
-  }
+  function lineSubtotal(l: Line) { return l.quantity * l.unit_price; }
+  function lineTotal(l: Line) { const sub = lineSubtotal(l); return sub + sub * (l.vat_rate / 100); }
+  function lineEwt(l: Line) { return lineSubtotal(l) * (l.ewt_rate / 100); }
 
   const grandTotal = lines.reduce((s, l) => s + lineTotal(l), 0);
+  const totalEwt = lines.reduce((s, l) => s + lineEwt(l), 0);
+  const netPayable = grandTotal - totalEwt;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -119,10 +123,13 @@ function NewBillForm() {
                 onChange={(e) => {
                   const s = suppliers.find((x) => x.id === e.target.value);
                   setForm((f) => ({ ...f, supplier_id: e.target.value }));
-                  if (s && !form.due_date) {
-                    const d = new Date(form.bill_date);
-                    d.setDate(d.getDate() + s.payment_terms_days);
-                    setForm((f) => ({ ...f, supplier_id: e.target.value, due_date: d.toISOString().split('T')[0] }));
+                  if (s) {
+                    if (!form.due_date) {
+                      const d = new Date(form.bill_date);
+                      d.setDate(d.getDate() + s.payment_terms_days);
+                      setForm((f) => ({ ...f, supplier_id: e.target.value, due_date: d.toISOString().split('T')[0] }));
+                    }
+                    setLines((prev) => prev.map((l) => ({ ...l, ewt_rate: s.ewt_rate ?? 0 })));
                   }
                 }}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
@@ -178,6 +185,7 @@ function NewBillForm() {
                 <th className="px-2 py-1.5 text-right font-medium w-20">Qty</th>
                 <th className="px-2 py-1.5 text-right font-medium w-28">Unit Price</th>
                 <th className="px-2 py-1.5 text-right font-medium w-16">VAT %</th>
+                <th className="px-2 py-1.5 text-right font-medium w-16">EWT %</th>
                 <th className="px-2 py-1.5 text-right font-medium w-28">Total</th>
                 <th className="w-6" />
               </tr>
@@ -213,6 +221,11 @@ function NewBillForm() {
                       onChange={(e) => updateLine(idx, 'vat_rate', parseFloat(e.target.value) || 0)}
                       className="w-full rounded border border-slate-300 px-1 py-1 text-right dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
                   </td>
+                  <td className="px-2 py-1">
+                    <input type="number" min={0} step="any" value={l.ewt_rate}
+                      onChange={(e) => updateLine(idx, 'ewt_rate', parseFloat(e.target.value) || 0)}
+                      className="w-full rounded border border-slate-300 px-1 py-1 text-right dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+                  </td>
                   <td className="px-2 py-1 text-right font-mono dark:text-slate-300">
                     {lineTotal(l).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                   </td>
@@ -226,10 +239,26 @@ function NewBillForm() {
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
-                <td colSpan={5} className="px-2 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Grand Total (incl. VAT)</td>
-                <td className="px-2 py-2 text-right font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">
+              <tr className="bg-slate-50 dark:bg-slate-800">
+                <td colSpan={6} className="px-2 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">Grand Total (incl. VAT)</td>
+                <td className="px-2 py-1.5 text-right font-mono text-xs text-slate-700 dark:text-slate-300">
                   ₱{grandTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                </td>
+                <td />
+              </tr>
+              {totalEwt > 0 && (
+                <tr className="bg-slate-50 dark:bg-slate-800">
+                  <td colSpan={6} className="px-2 py-1.5 text-right text-xs text-amber-700 dark:text-amber-400">Less: EWT (Withheld)</td>
+                  <td className="px-2 py-1.5 text-right font-mono text-xs text-amber-700 dark:text-amber-400">
+                    ({totalEwt.toLocaleString('en-PH', { minimumFractionDigits: 2 })})
+                  </td>
+                  <td />
+                </tr>
+              )}
+              <tr className="border-t border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
+                <td colSpan={6} className="px-2 py-2 text-right text-xs font-semibold text-slate-700 dark:text-slate-300">Net Payable to Supplier</td>
+                <td className="px-2 py-2 text-right font-mono text-sm font-bold text-slate-900 dark:text-slate-100">
+                  ₱{netPayable.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </td>
                 <td />
               </tr>

@@ -16,9 +16,12 @@ export async function POST(
     await client.query('BEGIN');
 
     const rows = await client.query(
-      `SELECT b.*, s.ap_account_id, s.name AS supplier_name
+      `SELECT b.*, s.ap_account_id, s.name AS supplier_name, s.ewt_rate AS supplier_ewt_rate,
+              COALESCE(s.bir_atc_code, tc.bir_atc_code) AS supplier_atc_code
          FROM bills b
          JOIN suppliers s ON s.id = b.supplier_id
+         LEFT JOIN tax_codes tc ON tc.company_id = b.company_id AND tc.tax_type = 'ewt'
+                                AND ROUND(tc.rate_pct::numeric, 2) = ROUND(s.ewt_rate::numeric, 2)
         WHERE b.id = $1 FOR UPDATE`,
       [params.id],
     );
@@ -148,6 +151,40 @@ export async function POST(
       `INSERT INTO audit_log (user_id, company_id, action, entity_type, entity_id) VALUES ($1,$2,$3,$4,$5)`,
       [auth.userId, bill.company_id, 'approve', 'bill', params.id],
     ).catch(() => {});
+
+    // Auto-create BIR Form 2307 certificate if EWT was withheld
+    const ewtAmt = Number(bill.ewt_amount ?? 0);
+    if (ewtAmt > 0) {
+      const existingCert = await client.query(
+        `SELECT id FROM wht_certificates WHERE bill_id = $1 LIMIT 1`,
+        [params.id],
+      );
+      if (!existingCert.rows[0]) {
+        const billDate = new Date(bill.bill_date as string);
+        const periodYear = billDate.getFullYear();
+        const periodQuarter = Math.ceil((billDate.getMonth() + 1) / 3);
+        const ewtRate = Number(bill.supplier_ewt_rate ?? 1);
+        const atcCode = (bill.supplier_atc_code as string | null) ?? 'WC158';
+
+        const certSeqRows = await client.query(
+          `SELECT COUNT(*)::int AS c FROM wht_certificates WHERE company_id = $1`,
+          [bill.company_id],
+        );
+        const certNo = `2307-${periodYear}-Q${periodQuarter}-${String(certSeqRows.rows[0].c + 1).padStart(5, '0')}`;
+
+        await client.query(
+          `INSERT INTO wht_certificates
+             (company_id, cert_no, bill_id, supplier_id, bir_atc_code,
+              taxable_amount, rate_pct, amount_withheld, period_year, period_quarter, status, created_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'draft',$11)`,
+          [
+            bill.company_id, certNo, params.id, bill.supplier_id, atcCode,
+            Number(bill.subtotal).toFixed(2), ewtRate.toFixed(4), ewtAmt.toFixed(2),
+            periodYear, periodQuarter, auth.userId,
+          ],
+        );
+      }
+    }
 
     await client.query('COMMIT');
   } catch (e) {

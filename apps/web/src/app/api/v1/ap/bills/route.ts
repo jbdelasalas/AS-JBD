@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
   if (!dto.bill_date || !dto.bill_no) return err('bill_date and bill_no are required', 400);
 
   const suppliers = await query(
-    `SELECT id, payment_terms_days FROM suppliers WHERE id = $1 AND company_id = $2 AND is_active = true`,
+    `SELECT id, payment_terms_days, ewt_rate FROM suppliers WHERE id = $1 AND company_id = $2 AND is_active = true`,
     [supplierId, companyId],
   );
   if (!suppliers[0]) return err('Supplier not found or inactive', 404);
@@ -112,19 +112,23 @@ export async function POST(request: NextRequest) {
     const seq = seqRows.rows[0].c + 1;
     const internalNo = `BL-${new Date().getFullYear()}-${String(seq).padStart(6, '0')}`;
 
+    const supplierEwtRate = Number(supplier.ewt_rate ?? 0);
     const mappedLines = (lines as Array<Record<string, unknown>>).map((l, idx) => {
       const qty = Number(l.quantity);
       const price = Number(l.unit_price);
       const vatRate = Number(l.vat_rate ?? 12);
+      const ewtRate = Number(l.ewt_rate ?? supplierEwtRate);
       const lineSubtotal = parseFloat((qty * price).toFixed(2));
       const lineVat = parseFloat((lineSubtotal * (vatRate / 100)).toFixed(2));
       const lineTotal = parseFloat((lineSubtotal + lineVat).toFixed(2));
-      return { ...l, line_no: idx + 1, qty, price, vatRate, lineSubtotal, lineVat, lineTotal } as Record<string, unknown> & { line_no: number; qty: number; price: number; vatRate: number; lineSubtotal: number; lineVat: number; lineTotal: number; item_id?: unknown; description: unknown; expense_account_id?: unknown };
+      const ewtAmount = parseFloat((lineSubtotal * (ewtRate / 100)).toFixed(2));
+      return { ...l, line_no: idx + 1, qty, price, vatRate, ewtRate, lineSubtotal, lineVat, lineTotal, ewtAmount } as Record<string, unknown> & { line_no: number; qty: number; price: number; vatRate: number; ewtRate: number; lineSubtotal: number; lineVat: number; lineTotal: number; ewtAmount: number; item_id?: unknown; description: unknown; expense_account_id?: unknown };
     });
 
     const totSubtotal = mappedLines.reduce((s, l) => s + l.lineSubtotal, 0);
     const totVat = mappedLines.reduce((s, l) => s + l.lineVat, 0);
     const totTotal = mappedLines.reduce((s, l) => s + l.lineTotal, 0);
+    const totEwt = mappedLines.reduce((s, l) => s + l.ewtAmount, 0);
 
     const terms = (dto.payment_terms_days as number) ?? Number(supplier.payment_terms_days) ?? 30;
     let dueDate = dto.due_date as string;
@@ -138,12 +142,12 @@ export async function POST(request: NextRequest) {
       `INSERT INTO bills
          (company_id, branch_id, bill_no, internal_no, supplier_id, bill_date, due_date, currency,
           subtotal, vat_amount, ewt_amount, total, amount_paid, balance, status, po_id, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'PHP',$8,$9,0,$10,0,$10,'draft',$11,$12)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'PHP',$8,$9,$10,$11,0,$11,'draft',$12,$13)
        RETURNING *`,
       [
         companyId, dto.branch_id ?? null, dto.bill_no, internalNo, supplierId,
         dto.bill_date, dueDate,
-        totSubtotal.toFixed(2), totVat.toFixed(2), totTotal.toFixed(2),
+        totSubtotal.toFixed(2), totVat.toFixed(2), totEwt.toFixed(2), totTotal.toFixed(2),
         dto.po_id ?? null, auth.userId,
       ],
     );
@@ -152,13 +156,13 @@ export async function POST(request: NextRequest) {
     for (const l of mappedLines) {
       await client.query(
         `INSERT INTO bill_lines
-           (bill_id, line_no, item_id, description, quantity, unit_price, vat_rate,
-            line_subtotal, line_vat, line_total, expense_account_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+           (bill_id, line_no, item_id, description, quantity, unit_price, vat_rate, ewt_rate,
+            line_subtotal, line_vat, line_total, ewt_amount, expense_account_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [
           header.id, l.line_no, l.item_id ?? null, l.description,
-          l.qty, l.price, l.vatRate,
-          l.lineSubtotal.toFixed(2), l.lineVat.toFixed(2), l.lineTotal.toFixed(2),
+          l.qty, l.price, l.vatRate, l.ewtRate,
+          l.lineSubtotal.toFixed(2), l.lineVat.toFixed(2), l.lineTotal.toFixed(2), l.ewtAmount.toFixed(2),
           l.expense_account_id ?? null,
         ],
       );
@@ -197,9 +201,11 @@ export async function POST(request: NextRequest) {
           quantity: Number(row.quantity),
           unit_price: Number(row.unit_price),
           vat_rate: Number(row.vat_rate),
+          ewt_rate: Number(row.ewt_rate ?? 0),
           line_subtotal: Number(row.line_subtotal),
           line_vat: Number(row.line_vat),
           line_total: Number(row.line_total),
+          ewt_amount: Number(row.ewt_amount ?? 0),
         };
       }),
     }, 201);

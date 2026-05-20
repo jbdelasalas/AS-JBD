@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
   const year = searchParams.get('year');
   const quarter = searchParams.get('quarter');
   const supplierId = searchParams.get('supplier_id');
+  const billId = searchParams.get('bill_id');
   const status = searchParams.get('status');
 
   const params: unknown[] = [companyId];
@@ -32,6 +33,7 @@ export async function GET(request: NextRequest) {
   if (year) { params.push(parseInt(year)); where += ` AND wc.period_year = $${params.length}`; }
   if (quarter) { params.push(parseInt(quarter)); where += ` AND wc.period_quarter = $${params.length}`; }
   if (supplierId) { params.push(supplierId); where += ` AND wc.supplier_id = $${params.length}`; }
+  if (billId) { params.push(billId); where += ` AND wc.bill_id = $${params.length}`; }
   if (status) { params.push(status); where += ` AND wc.status = $${params.length}`; }
 
   try {
