@@ -85,14 +85,14 @@ export default function BillDetailPage() {
     setLoading(true);
     Promise.all([
       api.get<Bill>(`/ap/bills/${id}`),
-      api.get<{ data: Payment[] }>(`/ap/payments?company_id=${companyId}&bill_id=${id}`),
-      api.get<WhtCert[]>(`/bir/certificates?company_id=${companyId}&bill_id=${id}`).catch(() => []),
+      api.get<{ data: Payment[] }>(`/ap/payments?company_id=${companyId}&bill_id=${id}`).catch(() => ({ data: [] as Payment[] })),
+      api.get<WhtCert[]>(`/bir/certificates?company_id=${companyId}&bill_id=${id}`).catch(() => [] as WhtCert[]),
     ]).then(([b, pay, certs]) => {
       setBill(b);
       setPayments(pay.data);
       const arr = Array.isArray(certs) ? certs : [];
       setCert(arr[0] ?? null);
-    }).finally(() => setLoading(false));
+    }).catch(() => {}).finally(() => setLoading(false));
   }, [id, companyId]);
 
   useEffect(() => { load(); }, [load]);

@@ -9,6 +9,7 @@ interface Item { id: string; sku: string; name: string; selling_price: number; }
 interface Warehouse { id: string; code: string; name: string; }
 
 interface Line {
+  line_type: 'item' | 'service';
   item_id: string;
   description: string;
   quantity: number;
@@ -36,7 +37,7 @@ export default function NewSalesOrderPage() {
   });
 
   const [lines, setLines] = useState<Line[]>([
-    { item_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12 },
+    { line_type: 'item', item_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12 },
   ]);
 
   useEffect(() => {
@@ -51,7 +52,7 @@ export default function NewSalesOrderPage() {
   }, []);
 
   function addLine() {
-    setLines((l) => [...l, { item_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12 }]);
+    setLines((l) => [...l, { line_type: 'item', item_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12 }]);
   }
 
   function removeLine(idx: number) {
@@ -62,7 +63,10 @@ export default function NewSalesOrderPage() {
     setLines((prev) => {
       const next = [...prev];
       const line = { ...next[idx] };
-      if (field === 'item_id' && typeof val === 'string') {
+      if (field === 'line_type') {
+        line.line_type = val as 'item' | 'service';
+        if (val === 'service') line.item_id = '';
+      } else if (field === 'item_id' && typeof val === 'string') {
         const item = items.find((i) => i.id === val);
         line.item_id = val;
         if (item) {
@@ -88,7 +92,7 @@ export default function NewSalesOrderPage() {
     e.preventDefault();
     setError(null);
     if (!form.customer_id) { setError('Select a customer'); return; }
-    if (lines.some((l) => !l.item_id)) { setError('All lines must have an item'); return; }
+    if (lines.some((l) => l.line_type === 'item' && !l.item_id)) { setError('All item lines must have an item selected'); return; }
     setSaving(true);
     try {
       const companyId = localStorage.getItem('company_id')!;
@@ -97,7 +101,7 @@ export default function NewSalesOrderPage() {
         ...form,
         warehouse_id: form.warehouse_id || undefined,
         delivery_date: form.delivery_date || undefined,
-        lines: lines.map((l) => ({ ...l })),
+        lines: lines.map((l) => ({ ...l, item_id: l.line_type === 'item' ? l.item_id || undefined : undefined })),
       });
       router.push(`/dashboard/sales/orders/${order.id}`);
     } catch (e: unknown) {
@@ -224,7 +228,8 @@ export default function NewSalesOrderPage() {
           <table className="min-w-full text-xs">
             <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
               <tr>
-                <th className="px-2 py-1.5 text-left font-medium w-48">Item</th>
+                <th className="px-2 py-1.5 text-left font-medium w-24">Type</th>
+                <th className="px-2 py-1.5 text-left font-medium w-40">Item</th>
                 <th className="px-2 py-1.5 text-left font-medium">Description</th>
                 <th className="px-2 py-1.5 text-right font-medium w-20">Qty</th>
                 <th className="px-2 py-1.5 text-right font-medium w-28">Unit Price</th>
@@ -238,23 +243,29 @@ export default function NewSalesOrderPage() {
               {lines.map((l, idx) => (
                 <tr key={idx} className="border-b border-slate-100 dark:border-slate-700">
                   <td className="px-2 py-1">
-                    <select
-                      value={l.item_id}
-                      onChange={(e) => updateLine(idx, 'item_id', e.target.value)}
-                      className="w-full rounded border border-slate-300 px-1 py-1"
-                    >
-                      <option value="">Select…</option>
-                      {items.map((i) => (
-                        <option key={i.id} value={i.id}>{i.sku} — {i.name}</option>
-                      ))}
+                    <select value={l.line_type} onChange={(e) => updateLine(idx, 'line_type', e.target.value)}
+                      className="w-full rounded border border-slate-300 px-1 py-1 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                      <option value="item">Item</option>
+                      <option value="service">Service</option>
                     </select>
+                  </td>
+                  <td className="px-2 py-1">
+                    {l.line_type === 'item' ? (
+                      <select value={l.item_id} onChange={(e) => updateLine(idx, 'item_id', e.target.value)}
+                        className="w-full rounded border border-slate-300 px-1 py-1 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                        <option value="">Select…</option>
+                        {items.map((i) => <option key={i.id} value={i.id}>{i.sku} — {i.name}</option>)}
+                      </select>
+                    ) : (
+                      <span className="px-1 text-slate-400 text-xs italic">—</span>
+                    )}
                   </td>
                   <td className="px-2 py-1">
                     <input
                       type="text"
                       value={l.description}
                       onChange={(e) => updateLine(idx, 'description', e.target.value)}
-                      className="w-full rounded border border-slate-300 px-1 py-1"
+                      className="w-full rounded border border-slate-300 px-1 py-1 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                     />
                   </td>
                   <td className="px-2 py-1">
@@ -317,7 +328,7 @@ export default function NewSalesOrderPage() {
             </tbody>
             <tfoot>
               <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-                <td colSpan={6} className="px-2 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Grand Total</td>
+                <td colSpan={7} className="px-2 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Grand Total</td>
                 <td className="px-2 py-2 text-right font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">
                   ₱{grandTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </td>

@@ -9,6 +9,7 @@ interface Account { id: string; code: string; name: string; }
 interface POOption { id: string; po_no: string; }
 
 interface Line {
+  line_type: 'item' | 'service';
   item_id: string;
   description: string;
   quantity: number;
@@ -38,7 +39,7 @@ function NewBillForm() {
   });
 
   const [lines, setLines] = useState<Line[]>([
-    { item_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12, ewt_rate: 0, expense_account_id: '' },
+    { line_type: 'service', item_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12, ewt_rate: 0, expense_account_id: '' },
   ]);
 
   useEffect(() => {
@@ -58,7 +59,7 @@ function NewBillForm() {
   const currentEwtRate = lines[0]?.ewt_rate ?? 0;
 
   function addLine() {
-    setLines((l) => [...l, { item_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12, ewt_rate: currentEwtRate, expense_account_id: '' }]);
+    setLines((l) => [...l, { line_type: 'service', item_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12, ewt_rate: currentEwtRate, expense_account_id: '' }]);
   }
 
   function updateLine(idx: number, field: keyof Line, val: string | number) {
@@ -180,6 +181,7 @@ function NewBillForm() {
           <table className="min-w-full text-xs">
             <thead className="border-b border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
               <tr>
+                <th className="px-2 py-1.5 text-left font-medium w-24">Type</th>
                 <th className="px-2 py-1.5 text-left font-medium">Description *</th>
                 <th className="px-2 py-1.5 text-left font-medium w-36">Expense Account</th>
                 <th className="px-2 py-1.5 text-right font-medium w-20">Qty</th>
@@ -193,6 +195,13 @@ function NewBillForm() {
             <tbody>
               {lines.map((l, idx) => (
                 <tr key={idx} className="border-b border-slate-100 dark:border-slate-700">
+                  <td className="px-2 py-1">
+                    <select value={l.line_type} onChange={(e) => updateLine(idx, 'line_type', e.target.value)}
+                      className="w-full rounded border border-slate-300 px-1 py-1 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                      <option value="service">Service</option>
+                      <option value="item">Item</option>
+                    </select>
+                  </td>
                   <td className="px-2 py-1">
                     <input required type="text" value={l.description}
                       onChange={(e) => updateLine(idx, 'description', e.target.value)}
@@ -240,7 +249,7 @@ function NewBillForm() {
             </tbody>
             <tfoot>
               <tr className="bg-slate-50 dark:bg-slate-800">
-                <td colSpan={6} className="px-2 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">Grand Total (incl. VAT)</td>
+                <td colSpan={7} className="px-2 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">Grand Total (incl. VAT)</td>
                 <td className="px-2 py-1.5 text-right font-mono text-xs text-slate-700 dark:text-slate-300">
                   ₱{grandTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </td>
@@ -248,7 +257,7 @@ function NewBillForm() {
               </tr>
               {totalEwt > 0 && (
                 <tr className="bg-slate-50 dark:bg-slate-800">
-                  <td colSpan={6} className="px-2 py-1.5 text-right text-xs text-amber-700 dark:text-amber-400">Less: EWT (Withheld)</td>
+                  <td colSpan={7} className="px-2 py-1.5 text-right text-xs text-amber-700 dark:text-amber-400">Less: EWT (Withheld)</td>
                   <td className="px-2 py-1.5 text-right font-mono text-xs text-amber-700 dark:text-amber-400">
                     ({totalEwt.toLocaleString('en-PH', { minimumFractionDigits: 2 })})
                   </td>
@@ -256,7 +265,7 @@ function NewBillForm() {
                 </tr>
               )}
               <tr className="border-t border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
-                <td colSpan={6} className="px-2 py-2 text-right text-xs font-semibold text-slate-700 dark:text-slate-300">Net Payable to Supplier</td>
+                <td colSpan={7} className="px-2 py-2 text-right text-xs font-semibold text-slate-700 dark:text-slate-300">Net Payable to Supplier</td>
                 <td className="px-2 py-2 text-right font-mono text-sm font-bold text-slate-900 dark:text-slate-100">
                   ₱{netPayable.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </td>
