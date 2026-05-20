@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatPHP, formatDate } from '@/lib/format';
 import type { SalesInvoice } from '@perpet/shared';
+import JournalPreviewModal from '@/components/JournalPreviewModal';
 
 const STATUS_STYLES: Record<string, string> = {
   draft: 'bg-slate-100 text-slate-700 dark:text-slate-300',
@@ -30,6 +31,7 @@ export default function SalesInvoiceDetailPage() {
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [voidReason, setVoidReason] = useState('');
   const [showVoid, setShowVoid] = useState(false);
+  const [showJEPreview, setShowJEPreview] = useState(false);
 
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('company_id') ?? '' : '';
 
@@ -86,7 +88,7 @@ export default function SalesInvoiceDetailPage() {
         </div>
         <div className="flex gap-2">
           {inv.status === 'draft' && (
-            <button onClick={doPost} disabled={busy}
+            <button onClick={() => setShowJEPreview(true)} disabled={busy}
               className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700 disabled:opacity-50">
               Post Invoice
             </button>
@@ -229,6 +231,17 @@ export default function SalesInvoiceDetailPage() {
           </table>
         )}
       </div>
+
+      {/* JE Preview modal */}
+      {showJEPreview && (
+        <JournalPreviewModal
+          previewUrl={`/ar/invoices/${id}/journal-preview`}
+          confirmLabel="Confirm Post Invoice"
+          busy={busy}
+          onConfirm={async () => { await doPost(); setShowJEPreview(false); }}
+          onCancel={() => setShowJEPreview(false)}
+        />
+      )}
 
       {/* Void modal */}
       {showVoid && (

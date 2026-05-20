@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { formatPHP, formatDate } from '@/lib/format';
 import type { CustomerPayment } from '@perpet/shared';
+import JournalPreviewModal from '@/components/JournalPreviewModal';
 
 const STATUS_STYLES: Record<string, string> = {
   draft: 'bg-slate-100 text-slate-700 dark:text-slate-300',
@@ -21,6 +22,7 @@ export default function CollectionDetailPage() {
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [voidReason, setVoidReason] = useState('');
   const [showVoid, setShowVoid] = useState(false);
+  const [showJEPreview, setShowJEPreview] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -66,7 +68,7 @@ export default function CollectionDetailPage() {
         </div>
         <div className="flex gap-2">
           {pmt.status === 'draft' && (
-            <button onClick={doPost} disabled={busy}
+            <button onClick={() => setShowJEPreview(true)} disabled={busy}
               className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700 disabled:opacity-50">
               Post Receipt
             </button>
@@ -145,6 +147,16 @@ export default function CollectionDetailPage() {
       </div>
 
       {/* Void modal */}
+      {showJEPreview && (
+        <JournalPreviewModal
+          previewUrl={`/ar/collections/${id}/journal-preview`}
+          confirmLabel="Confirm Post Receipt"
+          busy={busy}
+          onConfirm={async () => { await doPost(); setShowJEPreview(false); }}
+          onCancel={() => setShowJEPreview(false)}
+        />
+      )}
+
       {showVoid && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-96 rounded-lg bg-white dark:bg-slate-900 p-6 shadow-xl">

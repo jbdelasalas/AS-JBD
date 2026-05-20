@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatPHP, formatDate } from '@/lib/format';
+import JournalPreviewModal from '@/components/JournalPreviewModal';
 
 interface Payment {
   id: string;
@@ -66,6 +67,7 @@ export default function BillDetailPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [showJEPreview, setShowJEPreview] = useState(false);
 
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('company_id') ?? '' : '';
 
@@ -115,7 +117,7 @@ export default function BillDetailPage() {
         </div>
         <div className="flex gap-2">
           {['draft','pending_approval'].includes(bill.status) && (
-            <button onClick={() => doAction('approve')} disabled={busy}
+            <button onClick={() => setShowJEPreview(true)} disabled={busy}
               className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700 disabled:opacity-50">
               Approve
             </button>
@@ -257,6 +259,16 @@ export default function BillDetailPage() {
           </table>
         )}
       </div>
+
+      {showJEPreview && (
+        <JournalPreviewModal
+          previewUrl={`/ap/bills/${id}/journal-preview`}
+          confirmLabel="Confirm Approve Bill"
+          busy={busy}
+          onConfirm={async () => { await doAction('approve'); setShowJEPreview(false); }}
+          onCancel={() => setShowJEPreview(false)}
+        />
+      )}
     </div>
   );
 }

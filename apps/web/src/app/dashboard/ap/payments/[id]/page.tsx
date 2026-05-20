@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatPHP, formatDate } from '@/lib/format';
+import JournalPreviewModal from '@/components/JournalPreviewModal';
 
 interface Application {
   id: string;
@@ -41,6 +42,7 @@ export default function PaymentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [showJEPreview, setShowJEPreview] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -80,7 +82,7 @@ export default function PaymentDetailPage() {
           </p>
         </div>
         {payment.status === 'draft' && (
-          <button onClick={doPost} disabled={busy}
+          <button onClick={() => setShowJEPreview(true)} disabled={busy}
             className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700 disabled:opacity-50">
             Post Payment
           </button>
@@ -142,6 +144,16 @@ export default function PaymentDetailPage() {
           </tfoot>
         </table>
       </div>
+
+      {showJEPreview && (
+        <JournalPreviewModal
+          previewUrl={`/ap/payments/${id}/journal-preview`}
+          confirmLabel="Confirm Post Payment"
+          busy={busy}
+          onConfirm={async () => { await doPost(); setShowJEPreview(false); }}
+          onCancel={() => setShowJEPreview(false)}
+        />
+      )}
     </div>
   );
 }
