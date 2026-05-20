@@ -6,10 +6,12 @@ import { api } from '@/lib/api';
 
 interface Supplier { id: string; code: string; name: string; payment_terms_days: number; }
 interface Item { id: string; sku: string; name: string; selling_price: number; }
+interface Account { id: string; code: string; name: string; }
 
 interface Line {
-  line_type: 'item' | 'service';
+  line_type: 'item' | 'gl';
   item_id: string;
+  gl_account_id: string;
   description: string;
   quantity: number;
   unit_price: number;
@@ -20,6 +22,7 @@ export default function NewPurchaseOrderPage() {
   const router = useRouter();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [items, setItems] = useState<Item[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +34,7 @@ export default function NewPurchaseOrderPage() {
   });
 
   const [lines, setLines] = useState<Line[]>([
-    { line_type: 'item', item_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12 },
+    { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12 },
   ]);
 
   useEffect(() => {
@@ -43,10 +46,13 @@ export default function NewPurchaseOrderPage() {
     api.get<Item[]>(`/inventory/items?company_id=${companyId}&limit=500`)
       .then((r) => setItems(Array.isArray(r) ? r : []))
       .catch(() => {});
+    api.get<{ data: Account[] }>(`/gl/accounts?company_id=${companyId}&limit=500`)
+      .then((r) => setAccounts(r.data ?? []))
+      .catch(() => {});
   }, []);
 
   function addLine() {
-    setLines((l) => [...l, { line_type: 'item', item_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12 }]);
+    setLines((l) => [...l, { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12 }]);
   }
 
   function updateLine(idx: number, field: keyof Line, val: string | number) {
@@ -54,8 +60,9 @@ export default function NewPurchaseOrderPage() {
       const next = [...prev];
       const line = { ...next[idx] };
       if (field === 'line_type') {
-        line.line_type = val as 'item' | 'service';
-        if (val === 'service') line.item_id = '';
+        line.line_type = val as 'item' | 'gl';
+        if (val === 'gl') line.item_id = '';
+        if (val === 'item') line.gl_account_id = '';
       } else if (field === 'item_id' && typeof val === 'string') {
         const item = items.find((i) => i.id === val);
         line.item_id = val;
@@ -151,8 +158,8 @@ export default function NewPurchaseOrderPage() {
           <table className="min-w-full text-xs">
             <thead className="border-b border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
               <tr>
-                <th className="px-2 py-1.5 text-left font-medium w-24">Type</th>
-                <th className="px-2 py-1.5 text-left font-medium w-40">Item</th>
+                <th className="px-2 py-1.5 text-left font-medium w-28">Type</th>
+                <th className="px-2 py-1.5 text-left font-medium w-44">Account / Item</th>
                 <th className="px-2 py-1.5 text-left font-medium">Description *</th>
                 <th className="px-2 py-1.5 text-right font-medium w-20">Qty</th>
                 <th className="px-2 py-1.5 text-right font-medium w-28">Unit Price</th>
@@ -168,7 +175,7 @@ export default function NewPurchaseOrderPage() {
                     <select value={l.line_type} onChange={(e) => updateLine(idx, 'line_type', e.target.value)}
                       className="w-full rounded border border-slate-300 px-1 py-1 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                       <option value="item">Item</option>
-                      <option value="service">Service</option>
+                      <option value="gl">GL Account</option>
                     </select>
                   </td>
                   <td className="px-2 py-1">
@@ -179,7 +186,11 @@ export default function NewPurchaseOrderPage() {
                         {items.map((i) => <option key={i.id} value={i.id}>{i.sku} — {i.name}</option>)}
                       </select>
                     ) : (
-                      <span className="px-1 text-slate-400 text-xs italic">—</span>
+                      <select value={l.gl_account_id} onChange={(e) => updateLine(idx, 'gl_account_id', e.target.value)}
+                        className="w-full rounded border border-slate-300 px-1 py-1 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                        <option value="">Select account…</option>
+                        {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+                      </select>
                     )}
                   </td>
                   <td className="px-2 py-1">

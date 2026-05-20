@@ -9,7 +9,7 @@ interface Account { id: string; code: string; name: string; }
 interface POOption { id: string; po_no: string; }
 
 interface Line {
-  line_type: 'item' | 'service';
+  line_type: 'item' | 'gl';
   item_id: string;
   description: string;
   quantity: number;
@@ -39,7 +39,7 @@ function NewBillForm() {
   });
 
   const [lines, setLines] = useState<Line[]>([
-    { line_type: 'service', item_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12, ewt_rate: 0, expense_account_id: '' },
+    { line_type: 'gl', item_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12, ewt_rate: 0, expense_account_id: '' },
   ]);
 
   useEffect(() => {
@@ -59,7 +59,7 @@ function NewBillForm() {
   const currentEwtRate = lines[0]?.ewt_rate ?? 0;
 
   function addLine() {
-    setLines((l) => [...l, { line_type: 'service', item_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12, ewt_rate: currentEwtRate, expense_account_id: '' }]);
+    setLines((l) => [...l, { line_type: 'gl', item_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12, ewt_rate: currentEwtRate, expense_account_id: '' }]);
   }
 
   function updateLine(idx: number, field: keyof Line, val: string | number) {
@@ -181,9 +181,9 @@ function NewBillForm() {
           <table className="min-w-full text-xs">
             <thead className="border-b border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
               <tr>
-                <th className="px-2 py-1.5 text-left font-medium w-24">Type</th>
+                <th className="px-2 py-1.5 text-left font-medium w-28">Type</th>
+                <th className="px-2 py-1.5 text-left font-medium w-44">Account / Item</th>
                 <th className="px-2 py-1.5 text-left font-medium">Description *</th>
-                <th className="px-2 py-1.5 text-left font-medium w-36">Expense Account</th>
                 <th className="px-2 py-1.5 text-right font-medium w-20">Qty</th>
                 <th className="px-2 py-1.5 text-right font-medium w-28">Unit Price</th>
                 <th className="px-2 py-1.5 text-right font-medium w-16">VAT %</th>
@@ -198,22 +198,26 @@ function NewBillForm() {
                   <td className="px-2 py-1">
                     <select value={l.line_type} onChange={(e) => updateLine(idx, 'line_type', e.target.value)}
                       className="w-full rounded border border-slate-300 px-1 py-1 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
-                      <option value="service">Service</option>
+                      <option value="gl">GL Account</option>
                       <option value="item">Item</option>
                     </select>
+                  </td>
+                  <td className="px-2 py-1">
+                    {l.line_type === 'gl' ? (
+                      <select value={l.expense_account_id}
+                        onChange={(e) => updateLine(idx, 'expense_account_id', e.target.value)}
+                        className="w-full rounded border border-slate-300 px-1 py-1 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                        <option value="">Select account…</option>
+                        {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+                      </select>
+                    ) : (
+                      <span className="px-1 text-slate-400 text-xs italic">—</span>
+                    )}
                   </td>
                   <td className="px-2 py-1">
                     <input required type="text" value={l.description}
                       onChange={(e) => updateLine(idx, 'description', e.target.value)}
                       className="w-full rounded border border-slate-300 px-1 py-1 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
-                  </td>
-                  <td className="px-2 py-1">
-                    <select value={l.expense_account_id}
-                      onChange={(e) => updateLine(idx, 'expense_account_id', e.target.value)}
-                      className="w-full rounded border border-slate-300 px-1 py-1 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
-                      <option value="">— none —</option>
-                      {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
-                    </select>
                   </td>
                   <td className="px-2 py-1">
                     <input type="number" min={0.0001} step="any" value={l.quantity}
