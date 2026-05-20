@@ -1307,6 +1307,76 @@ export async function POST(request: NextRequest) {
     results.push('seed stock_balances: ok');
   } catch (e) { results.push(`seed stock_balances: ${(e as Error).message}`); }
 
+  // 020 — seed items/warehouse/categories for every company that has none yet
+  try {
+    await query(`
+      DO $$
+      DECLARE
+        co    RECORD;
+        cat1  uuid; cat2 uuid; cat3 uuid;
+        wh    uuid;
+        it1   uuid; it2  uuid; it3  uuid; it4  uuid; it5  uuid; it6  uuid;
+      BEGIN
+        FOR co IN
+          SELECT id FROM companies
+          WHERE is_active = true
+            AND NOT EXISTS (SELECT 1 FROM items i WHERE i.company_id = companies.id)
+        LOOP
+          -- get or create categories
+          SELECT id INTO cat1 FROM item_categories WHERE company_id = co.id AND code = 'FUEL' LIMIT 1;
+          IF cat1 IS NULL THEN
+            cat1 := gen_random_uuid();
+            INSERT INTO item_categories (id, company_id, code, name) VALUES (cat1, co.id, 'FUEL', 'Fuel Products');
+          END IF;
+
+          SELECT id INTO cat2 FROM item_categories WHERE company_id = co.id AND code = 'LUBE' LIMIT 1;
+          IF cat2 IS NULL THEN
+            cat2 := gen_random_uuid();
+            INSERT INTO item_categories (id, company_id, code, name) VALUES (cat2, co.id, 'LUBE', 'Lubricants');
+          END IF;
+
+          SELECT id INTO cat3 FROM item_categories WHERE company_id = co.id AND code = 'PARTS' LIMIT 1;
+          IF cat3 IS NULL THEN
+            cat3 := gen_random_uuid();
+            INSERT INTO item_categories (id, company_id, code, name) VALUES (cat3, co.id, 'PARTS', 'Spare Parts');
+          END IF;
+
+          -- get or create warehouse
+          SELECT id INTO wh FROM warehouses WHERE company_id = co.id AND is_active = true LIMIT 1;
+          IF wh IS NULL THEN
+            wh := gen_random_uuid();
+            INSERT INTO warehouses (id, company_id, code, name, is_active)
+            VALUES (wh, co.id, 'WH-MAIN', 'Main Warehouse', true);
+          END IF;
+
+          -- insert sample items
+          it1 := gen_random_uuid(); it2 := gen_random_uuid(); it3 := gen_random_uuid();
+          it4 := gen_random_uuid(); it5 := gen_random_uuid(); it6 := gen_random_uuid();
+
+          INSERT INTO items (id, company_id, category_id, sku, name, uom, item_type, costing_method, standard_cost, selling_price, is_active) VALUES
+            (it1, co.id, cat1, 'DIESEL',     'Diesel Fuel',       'liter', 'product', 'AVERAGE', 55.00,  65.00,  true),
+            (it2, co.id, cat1, 'GAS91',      'Gasoline 91',       'liter', 'product', 'AVERAGE', 58.00,  68.00,  true),
+            (it3, co.id, cat1, 'GAS95',      'Gasoline 95',       'liter', 'product', 'AVERAGE', 62.00,  72.00,  true),
+            (it4, co.id, cat2, 'OIL-10W40',  'Engine Oil 10W-40', 'liter', 'product', 'FIFO',    350.00, 450.00, true),
+            (it5, co.id, cat2, 'OIL-20W50',  'Engine Oil 20W-50', 'liter', 'product', 'FIFO',    320.00, 420.00, true),
+            (it6, co.id, cat3, 'FILTER-OIL', 'Oil Filter',        'pcs',   'product', 'FIFO',    85.00,  120.00, true)
+          ON CONFLICT DO NOTHING;
+
+          -- stock balances
+          INSERT INTO stock_balances (item_id, warehouse_id, qty_on_hand, avg_cost) VALUES
+            (it1, wh, 50000, 55.00),
+            (it2, wh, 20000, 58.00),
+            (it3, wh, 15000, 62.00),
+            (it4, wh,   500, 350.00),
+            (it5, wh,   300, 320.00),
+            (it6, wh,   200, 85.00)
+          ON CONFLICT (item_id, warehouse_id) DO NOTHING;
+        END LOOP;
+      END;
+      $$`);
+    results.push('020 seed items for all companies: ok');
+  } catch (e) { results.push(`020 seed items for all companies: ${(e as Error).message}`); }
+
   // Customers — use code prefix TEST-C so they don't conflict with API-generated CUST-xxxxxx
   try {
     await query(`

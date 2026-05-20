@@ -24,24 +24,28 @@ export async function GET(request: NextRequest) {
   }
   params.push(limit);
 
-  const rows = await query(
-    `SELECT i.id, i.sku, i.name, i.uom, i.item_type, i.costing_method,
-            i.standard_cost, i.selling_price, i.reorder_point, i.is_active,
-            ic.name AS category_name
-       FROM items i
-       LEFT JOIN item_categories ic ON ic.id = i.category_id
-      WHERE ${where}
-      ORDER BY i.sku
-      LIMIT $${params.length}`,
-    params,
-  );
+  try {
+    const rows = await query(
+      `SELECT i.id, i.sku, i.name, i.uom, i.item_type, i.costing_method,
+              i.standard_cost, i.selling_price, i.reorder_point, i.is_active,
+              ic.name AS category_name
+         FROM items i
+         LEFT JOIN item_categories ic ON ic.id = i.category_id
+        WHERE ${where}
+        ORDER BY i.sku
+        LIMIT $${params.length}`,
+      params,
+    );
 
-  return ok(rows.map((r) => ({
-    ...r,
-    standard_cost: Number(r.standard_cost),
-    selling_price: Number(r.selling_price),
-    reorder_point: Number(r.reorder_point),
-  })));
+    return ok(rows.map((r) => ({
+      ...r,
+      standard_cost: Number(r.standard_cost),
+      selling_price: Number(r.selling_price),
+      reorder_point: Number(r.reorder_point),
+    })));
+  } catch (e: unknown) {
+    return err((e as Error).message, 500);
+  }
 }
 
 export async function POST(request: NextRequest) {
