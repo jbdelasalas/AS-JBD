@@ -1759,6 +1759,45 @@ export async function POST(request: NextRequest) {
     } catch (e) { results.push(`021 doc_series ${docType}: ${(e as Error).message}`); }
   }
 
+  // 022 — Grow Cycle extended fields
+  const grow022 = [
+    `ALTER TABLE grow_cycles ADD COLUMN IF NOT EXISTS grow_reference text`,
+    `ALTER TABLE grow_cycles ADD COLUMN IF NOT EXISTS approx_heads numeric(14,4) DEFAULT 0`,
+    `ALTER TABLE grow_cycles ADD COLUMN IF NOT EXISTS chick_price_per_head numeric(14,6) DEFAULT 0`,
+    `ALTER TABLE grow_cycles ADD COLUMN IF NOT EXISTS approx_chick_price_per_head numeric(14,6) DEFAULT 0`,
+    `ALTER TABLE grow_cycles ADD COLUMN IF NOT EXISTS culling_qty numeric(14,4) DEFAULT 0`,
+    `CREATE TABLE IF NOT EXISTS grow_daily_mortality (
+      id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      grow_cycle_id uuid NOT NULL REFERENCES grow_cycles(id) ON DELETE CASCADE,
+      day_no        int NOT NULL,
+      qty           numeric(14,4) DEFAULT 0,
+      UNIQUE (grow_cycle_id, day_no)
+    )`,
+    `CREATE TABLE IF NOT EXISTS grow_weekly_weights (
+      id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      grow_cycle_id uuid NOT NULL REFERENCES grow_cycles(id) ON DELETE CASCADE,
+      week_no       int NOT NULL,
+      weight_kg     numeric(10,4) DEFAULT 0,
+      UNIQUE (grow_cycle_id, week_no)
+    )`,
+    `CREATE TABLE IF NOT EXISTS grow_item_consumption (
+      id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      grow_cycle_id uuid NOT NULL REFERENCES grow_cycles(id) ON DELETE CASCADE,
+      line_no       int NOT NULL,
+      item_id       uuid NOT NULL REFERENCES items(id),
+      quantity      numeric(14,4) DEFAULT 0,
+      uom           text DEFAULT 'bags',
+      unit_cost     numeric(12,4) DEFAULT 0,
+      total_cost    numeric(14,2) DEFAULT 0,
+      remarks       text
+    )`,
+  ];
+  for (const sql of grow022) {
+    const label = sql.trim().split(/\s+/).slice(0, 5).join(' ').substring(0, 50);
+    try { await query(sql); results.push(`022 ${label}: ok`); }
+    catch (e) { results.push(`022 ${label}: ${(e as Error).message}`); }
+  }
+
   // Customers — use code prefix TEST-C so they don't conflict with API-generated CUST-xxxxxx
   try {
     await query(`

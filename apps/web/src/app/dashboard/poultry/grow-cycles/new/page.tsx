@@ -4,23 +4,38 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 
 interface Batch { id: string; batch_no: string; heads_available: number; item_name: string; date_received: string; }
-interface Building { id: string; code: string; name: string; capacity_heads: number | null; }
+interface Building { id: string; code: string; name: string; }
+interface Branch { id: string; name: string; code: string; }
 
 export default function NewGrowCyclePage() {
   const router = useRouter();
   const [batches, setBatches] = useState<Batch[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ batch_id: '', start_date: new Date().toISOString().split('T')[0], expected_end_date: '', heads: '', building_id: '', est_harvest_recovery: '70', remarks: '' });
+
+  const now = new Date().toISOString().split('T')[0];
+  const endDefault = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+  const [form, setForm] = useState({
+    batch_id: '', branch_id: '', building_id: '',
+    grow_reference: '', year: new Date().getFullYear().toString(),
+    start_date: now, expected_end_date: endDefault,
+    heads: '', approx_heads: '', est_harvest_recovery: '70',
+    chick_price_per_head: '', approx_chick_price_per_head: '',
+    remarks: '',
+  });
 
   useEffect(() => {
     const cid = localStorage.getItem('company_id'); if (!cid) return;
     api.get<Batch[]>(`/poultry/chick-batches?company_id=${cid}&status=available`).then(setBatches).catch(() => {});
     api.get<Building[]>(`/poultry/buildings?company_id=${cid}`).then(setBuildings).catch(() => {});
+    api.get<{ data: Branch[] }>(`/admin/branches?company_id=${cid}`).then(r => setBranches(r.data ?? [])).catch(() => {});
   }, []);
 
   const selectedBatch = batches.find(b => b.id === form.batch_id);
+
+  function setField(k: string, v: string) { setForm(f => ({ ...f, [k]: v })); }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setError(null);
@@ -29,11 +44,18 @@ export default function NewGrowCyclePage() {
     try {
       const cid = localStorage.getItem('company_id')!;
       const rec = await api.post<{ id: string }>('/poultry/grow-cycles', {
-        company_id: cid, batch_id: form.batch_id,
-        start_date: form.start_date, expected_end_date: form.expected_end_date || undefined,
-        heads: form.heads ? parseFloat(form.heads) : undefined,
+        company_id: cid,
+        batch_id: form.batch_id,
+        branch_id: form.branch_id || undefined,
         building_id: form.building_id || undefined,
+        grow_reference: form.grow_reference || undefined,
+        start_date: form.start_date,
+        expected_end_date: form.expected_end_date || undefined,
+        heads: form.heads ? parseFloat(form.heads) : undefined,
+        approx_heads: form.approx_heads ? parseFloat(form.approx_heads) : undefined,
         est_harvest_recovery: form.est_harvest_recovery ? parseFloat(form.est_harvest_recovery) : undefined,
+        chick_price_per_head: form.chick_price_per_head ? parseFloat(form.chick_price_per_head) : undefined,
+        approx_chick_price_per_head: form.approx_chick_price_per_head ? parseFloat(form.approx_chick_price_per_head) : undefined,
         remarks: form.remarks || undefined,
       });
       router.push(`/dashboard/poultry/grow-cycles/${rec.id}`);
@@ -42,52 +64,124 @@ export default function NewGrowCyclePage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">New Grow Cycle</h1>
-      <p className="mb-5 text-sm text-slate-500">Start growing a chick batch.</p>
+      <div className="mb-5 flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">New Grow Cycle</h1>
+          <p className="text-sm text-slate-500">Create a growing cycle for a chick batch.</p>
+        </div>
+        <button type="button" onClick={() => router.back()} className="text-sm text-slate-500 hover:text-slate-700">← Back</button>
+      </div>
       {error && <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
-      <form onSubmit={handleSubmit} className="space-y-5 max-w-2xl">
-        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-4">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Chick Batch *</label>
-            <select required value={form.batch_id} onChange={e => setForm(f => ({ ...f, batch_id: e.target.value }))} className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
-              <option value="">Select available batch…</option>
-              {batches.map(b => <option key={b.id} value={b.id}>{b.batch_no} — {b.item_name} ({Number(b.heads_available).toLocaleString()} heads available)</option>)}
-            </select>
-            {selectedBatch && <p className="mt-1 text-xs text-slate-500">Available: {Number(selectedBatch.heads_available).toLocaleString()} heads · Received: {selectedBatch.date_received}</p>}
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit} className="space-y-0">
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6">
+          <div className="grid grid-cols-4 gap-x-8 gap-y-5">
+
+            {/* Row 1 */}
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Heads to Grow</label>
-              <input type="number" min={1} placeholder="All available" value={form.heads} onChange={e => setForm(f => ({ ...f, heads: e.target.value }))} className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Transaction Number</label>
+              <input readOnly value="(auto)" className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-400 dark:border-slate-700 dark:bg-slate-800" />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Building</label>
-              <select value={form.building_id} onChange={e => setForm(f => ({ ...f, building_id: e.target.value }))} className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Start Date *</label>
+              <input required type="date" value={form.start_date} onChange={e => setField('start_date', e.target.value)}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Est. Harvest Recovery %</label>
+              <input type="number" min={0} max={100} step="0.01" value={form.est_harvest_recovery}
+                onChange={e => setField('est_harvest_recovery', e.target.value)}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Remarks</label>
+              <input type="text" value={form.remarks} onChange={e => setField('remarks', e.target.value)}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
+
+            {/* Row 2 */}
+            <div>
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Year</label>
+              <input type="number" value={form.year} onChange={e => setField('year', e.target.value)}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">End Date</label>
+              <input type="date" value={form.expected_end_date} onChange={e => setField('expected_end_date', e.target.value)}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Approx Heads</label>
+              <input type="number" min={0} value={form.approx_heads} onChange={e => setField('approx_heads', e.target.value)}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Status</label>
+              <input readOnly value="Active" className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-400 dark:border-slate-700 dark:bg-slate-800" />
+            </div>
+
+            {/* Row 3 */}
+            <div className="col-span-2">
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Location *</label>
+              <select required value={form.branch_id} onChange={e => setField('branch_id', e.target.value)}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                <option value="">Select location…</option>
+                {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Grow Reference</label>
+              <input type="text" placeholder="e.g. Grow 1" value={form.grow_reference} onChange={e => setField('grow_reference', e.target.value)}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
+
+            {/* Row 4 */}
+            <div>
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Building</label>
+              <select value={form.building_id} onChange={e => setField('building_id', e.target.value)}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                 <option value="">Select building…</option>
-                {buildings.map(b => <option key={b.id} value={b.id}>{b.code} — {b.name}{b.capacity_heads ? ` (cap: ${b.capacity_heads.toLocaleString()})` : ''}</option>)}
+                {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Start Date *</label>
-              <input required type="date" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Chick Batch *</label>
+              <select required value={form.batch_id} onChange={e => setField('batch_id', e.target.value)}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                <option value="">Select batch…</option>
+                {batches.map(b => <option key={b.id} value={b.id}>{b.item_name} {b.batch_no}</option>)}
+              </select>
+              {selectedBatch && <p className="mt-0.5 text-xs text-slate-400">Available: {Number(selectedBatch.heads_available).toLocaleString()} heads</p>}
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Expected Harvest Date</label>
-              <input type="date" value={form.expected_end_date} onChange={e => setForm(f => ({ ...f, expected_end_date: e.target.value }))} className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Heads</label>
+              <input type="number" min={1} placeholder={selectedBatch ? String(selectedBatch.heads_available) : ''} value={form.heads}
+                onChange={e => setField('heads', e.target.value)}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Est. Harvest Recovery %</label>
-              <input type="number" min={0} max={100} step="0.01" value={form.est_harvest_recovery} onChange={e => setForm(f => ({ ...f, est_harvest_recovery: e.target.value }))} className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Chick Price/Head</label>
+              <input type="number" min={0} step="0.000001" value={form.chick_price_per_head}
+                onChange={e => setField('chick_price_per_head', e.target.value)}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Remarks</label>
-              <input type="text" value={form.remarks} onChange={e => setForm(f => ({ ...f, remarks: e.target.value }))} className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Approx Chick Price/Head</label>
+              <input type="number" min={0} step="0.000001" value={form.approx_chick_price_per_head}
+                onChange={e => setField('approx_chick_price_per_head', e.target.value)}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
           </div>
         </div>
-        <div className="flex gap-3">
-          <button type="submit" disabled={saving} className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">{saving ? 'Saving…' : 'Start Grow Cycle'}</button>
-          <button type="button" onClick={() => router.back()} className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50">Cancel</button>
+
+        <div className="flex gap-3 pt-5">
+          <button type="submit" disabled={saving}
+            className="rounded bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+            {saving ? 'Saving…' : 'Create Grow Cycle'}
+          </button>
+          <button type="button" onClick={() => router.back()}
+            className="rounded border border-slate-300 px-6 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50">
+            Cancel
+          </button>
         </div>
       </form>
     </div>
