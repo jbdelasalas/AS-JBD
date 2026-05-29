@@ -8,8 +8,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   try { await requireAuth(_req); } catch (e) { return e as Response; }
   try {
     const [hdr] = await query(
-      `SELECT o.*, s.name AS supplier_name, s.code AS supplier_code
-         FROM order_ins o JOIN suppliers s ON s.id = o.supplier_id WHERE o.id = $1`, [params.id]);
+      `SELECT o.*, s.name AS supplier_name, s.code AS supplier_code, po.po_no
+         FROM order_ins o
+         JOIN suppliers s ON s.id = o.supplier_id
+         LEFT JOIN purchase_orders po ON po.id = o.purchase_order_id
+        WHERE o.id = $1`, [params.id]);
     if (!hdr) return err('Not found', 404);
     const lines = await query(
       `SELECT l.*, i.name AS item_name, i.sku FROM order_in_lines l JOIN items i ON i.id = l.item_id WHERE l.order_in_id = $1 ORDER BY l.line_no`,

@@ -10,6 +10,7 @@ interface OrderIn {
   reference_no: string | null; delivery_method: string | null; payment_terms: string | null;
   remarks: string | null; notes: string | null; total_amount: number;
   supplier_name: string; supplier_code: string;
+  purchase_order_id: string | null; po_no: string | null;
   lines: Array<{ id: string; line_no: number; item_name: string; sku: string; quantity: number; uom: string; unit_price: number; amount: number; remarks: string | null }>;
 }
 
@@ -49,6 +50,11 @@ export default function OrderInDetailPage() {
             <span className={`rounded px-2 py-0.5 text-xs font-medium ${S[doc.status] ?? ''}`}>{doc.status}</span>
           </div>
           <p className="text-sm text-slate-500">{doc.supplier_code} — {doc.supplier_name}</p>
+          {doc.po_no && doc.purchase_order_id && (
+            <p className="text-xs text-slate-500 mt-0.5">
+              PO: <Link href={`/dashboard/purchasing/purchase-orders/${doc.purchase_order_id}`} className="font-mono text-brand-600 hover:underline">{doc.po_no}</Link>
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           {doc.status === 'saved' && <button onClick={() => action('confirm')} disabled={busy} className="rounded bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50">Confirm</button>}

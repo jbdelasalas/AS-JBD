@@ -3,14 +3,19 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 
-interface Batch { id: string; batch_no: string; heads_available: number; item_name: string; date_received: string; }
-interface Building { id: string; code: string; name: string; }
+interface Batch {
+  id: string; batch_no: string; heads_available: number; heads_in: number;
+  item_name: string; date_received: string; price_per_head: number;
+  grn_no: string | null; grn_date: string | null;
+  po_id: string | null; po_no: string | null;
+}
+interface Building { id: string; code: string; name: string; branch_id: string | null; }
 interface Branch { id: string; name: string; code: string; }
 interface GrowRef { id: string; code: string; name: string; }
 
 export default function NewGrowCyclePage() {
   const router = useRouter();
-  const [batches, setBatches] = useState<Batch[]>([]);
+  const [allBatches, setAllBatches] = useState<Batch[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [growRefs, setGrowRefs] = useState<GrowRef[]>([]);
@@ -30,15 +35,34 @@ export default function NewGrowCyclePage() {
 
   useEffect(() => {
     const cid = localStorage.getItem('company_id'); if (!cid) return;
-    api.get<Batch[]>(`/poultry/chick-batches?company_id=${cid}&status=available`).then(setBatches).catch(() => {});
+    api.get<Batch[]>(`/poultry/chick-batches?company_id=${cid}&status=available`).then(setAllBatches).catch(() => {});
     api.get<Building[]>(`/poultry/buildings?company_id=${cid}`).then(setBuildings).catch(() => {});
     api.get<Branch[]>(`/admin/branches?company_id=${cid}`).then(r => setBranches(Array.isArray(r) ? r : [])).catch(() => {});
     api.get<GrowRef[]>(`/poultry/grow-references?company_id=${cid}`).then(r => setGrowRefs(Array.isArray(r) ? r : [])).catch(() => {});
   }, []);
 
-  const selectedBatch = batches.find(b => b.id === form.batch_id);
+  // Filter buildings by selected location
+  const filteredBuildings = form.branch_id
+    ? buildings.filter(b => b.branch_id === form.branch_id)
+    : buildings;
+
+  const selectedBatch = allBatches.find(b => b.id === form.batch_id);
 
   function setField(k: string, v: string) { setForm(f => ({ ...f, [k]: v })); }
+
+  function handleLocationChange(branchId: string) {
+    setForm(f => ({ ...f, branch_id: branchId, building_id: '', batch_id: '', heads: '', chick_price_per_head: '' }));
+  }
+
+  function handleBatchChange(batchId: string) {
+    const batch = allBatches.find(b => b.id === batchId);
+    setForm(f => ({
+      ...f,
+      batch_id: batchId,
+      heads: batch ? String(batch.heads_available) : '',
+      chick_price_per_head: batch?.price_per_head ? String(batch.price_per_head) : '',
+    }));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setError(null);
@@ -122,10 +146,10 @@ export default function NewGrowCyclePage() {
               <input readOnly value="Active" className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-400 dark:border-slate-700 dark:bg-slate-800" />
             </div>
 
-            {/* Row 3 */}
+            {/* Row 3 — Location + Grow Reference */}
             <div className="col-span-2">
               <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Location *</label>
-              <select required value={form.branch_id} onChange={e => setField('branch_id', e.target.value)}
+              <select required value={form.branch_id} onChange={e => handleLocationChange(e.target.value)}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                 <option value="">Select location…</option>
                 {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -145,35 +169,49 @@ export default function NewGrowCyclePage() {
               )}
             </div>
 
-            {/* Row 4 */}
+            {/* Row 4 — Building + Chick Batch (with PO tag) */}
             <div>
               <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Building</label>
               <select value={form.building_id} onChange={e => setField('building_id', e.target.value)}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                 <option value="">Select building…</option>
-                {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                {filteredBuildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             </div>
-            <div>
+            <div className="col-span-3">
               <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Chick Batch *</label>
-              <select required value={form.batch_id} onChange={e => setField('batch_id', e.target.value)}
+              <select required value={form.batch_id} onChange={e => handleBatchChange(e.target.value)}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                 <option value="">Select batch…</option>
-                {batches.map(b => <option key={b.id} value={b.id}>{b.item_name} {b.batch_no}</option>)}
+                {allBatches.map(b => (
+                  <option key={b.id} value={b.id}>
+                    {b.item_name} — {b.batch_no}{b.po_no ? ` [${b.po_no}]` : ''}{b.grn_no ? ` · ${b.grn_no}` : ''} ({Number(b.heads_available).toLocaleString()} heads)
+                  </option>
+                ))}
               </select>
-              {selectedBatch && <p className="mt-0.5 text-xs text-slate-400">Available: {Number(selectedBatch.heads_available).toLocaleString()} heads</p>}
+              {selectedBatch && (
+                <p className="mt-0.5 text-xs text-slate-400">
+                  Available: {Number(selectedBatch.heads_available).toLocaleString()} heads
+                  {selectedBatch.po_no && ` · PO: ${selectedBatch.po_no}`}
+                  {selectedBatch.grn_no && ` · GRN: ${selectedBatch.grn_no}`}
+                </p>
+              )}
             </div>
+
+            {/* Row 5 — Heads and pricing (auto-filled from GRN) */}
             <div>
               <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Heads</label>
-              <input type="number" min={1} placeholder={selectedBatch ? String(selectedBatch.heads_available) : ''} value={form.heads}
+              <input type="number" min={1} value={form.heads}
                 onChange={e => setField('heads', e.target.value)}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+              {selectedBatch && <p className="mt-0.5 text-xs text-slate-400">Max: {Number(selectedBatch.heads_available).toLocaleString()}</p>}
             </div>
             <div>
               <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Chick Price/Head</label>
               <input type="number" min={0} step="0.000001" value={form.chick_price_per_head}
                 onChange={e => setField('chick_price_per_head', e.target.value)}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+              {selectedBatch && <p className="mt-0.5 text-xs text-slate-400">From GRN</p>}
             </div>
             <div>
               <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Approx Chick Price/Head</label>

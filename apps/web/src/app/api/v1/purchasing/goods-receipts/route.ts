@@ -147,6 +147,41 @@ export async function POST(request: NextRequest) {
       [header.id],
     );
 
+    // Auto-create chick batches for each GRN line
+    const { rows: cntRows } = await client.query<{ c: number }>(
+      `SELECT count(*)::int AS c FROM chick_batches WHERE company_id = $1`, [companyId]);
+    let batchSeq = cntRows[0].c;
+    const year = new Date(dto.receipt_date as string || new Date().toISOString()).getFullYear();
+
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i] as Record<string, unknown>;
+      const qty = Number(l.qty_received);
+      if (qty <= 0) continue;
+
+      // Get item_id from the PO line
+      const { rows: polRows } = await client.query<{ item_id: string }>(
+        `SELECT item_id FROM purchase_order_lines WHERE id = $1 LIMIT 1`, [l.po_line_id]);
+      if (!polRows[0]) continue;
+
+      batchSeq += 1;
+      const batchNo = `BATCH-${year}-${String(batchSeq).padStart(5, '0')}`;
+      const grnLineRows = await client.query(
+        `SELECT id FROM goods_receipt_lines WHERE grn_id = $1 AND line_no = $2 LIMIT 1`,
+        [header.id, i + 1]);
+      const grnLineId = grnLineRows.rows[0]?.id ?? null;
+
+      await client.query(
+        `INSERT INTO chick_batches
+           (company_id, batch_no, grn_id, grn_line_id, po_id, item_id,
+            heads_in, heads_available, price_per_head, date_received, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$7,$8,$9,'available')
+         ON CONFLICT DO NOTHING`,
+        [companyId, batchNo, header.id, grnLineId, poId,
+         polRows[0].item_id, qty, Number(l.unit_cost ?? 0),
+         dto.receipt_date],
+      );
+    }
+
     await client.query(
       `INSERT INTO audit_log (user_id, company_id, action, entity_type, entity_id)
        VALUES ($1, $2, $3, $4, $5)`,

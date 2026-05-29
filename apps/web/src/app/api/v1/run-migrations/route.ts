@@ -1259,9 +1259,10 @@ export async function POST(request: NextRequest) {
   try {
     await query(`
       INSERT INTO item_categories (id, company_id, code, name) VALUES
-        ('aaaa0001-0000-0000-0000-000000000001', $1, 'FUEL',  'Fuel Products'),
-        ('aaaa0001-0000-0000-0000-000000000002', $1, 'LUBE',  'Lubricants'),
-        ('aaaa0001-0000-0000-0000-000000000003', $1, 'PARTS', 'Spare Parts')
+        ('aaaa0001-0000-0000-0000-000000000001', $1, 'DOC',   'Day-Old Chicks'),
+        ('aaaa0001-0000-0000-0000-000000000002', $1, 'FEEDS', 'Poultry Feeds'),
+        ('aaaa0001-0000-0000-0000-000000000003', $1, 'VET',   'Medicines & Vaccines'),
+        ('aaaa0001-0000-0000-0000-000000000004', $1, 'BIRDS', 'Live Birds')
       ON CONFLICT DO NOTHING`, [CO]);
     results.push('seed item_categories: ok');
   } catch (e) { results.push(`seed item_categories: ${(e as Error).message}`); }
@@ -1270,11 +1271,10 @@ export async function POST(request: NextRequest) {
   try {
     await query(`
       INSERT INTO warehouses (id, company_id, code, name, address, is_active) VALUES
-        ('bbbb0001-0000-0000-0000-000000000001', $1, 'WH-MAIN',   'Main Warehouse',        'Pier 5, South Harbor, Manila',          true),
-        ('bbbb0001-0000-0000-0000-000000000002', $1, 'WH-NORTH',  'North Depot',           'MacArthur Hwy, Malabon, Metro Manila',  true),
-        ('bbbb0001-0000-0000-0000-000000000003', $1, 'WH-SOUTH',  'South Distribution Hub','Coastal Road, Las Piñas, Metro Manila', true),
-        ('bbbb0001-0000-0000-0000-000000000004', $1, 'WH-QC',     'QC Branch Stockroom',   'E. Rodriguez Jr. Ave, Quezon City',     true),
-        ('bbbb0001-0000-0000-0000-000000000005', $1, 'WH-CEBU',   'Cebu Regional Depot',   'M. J. Cuenco Ave, Cebu City',           false)
+        ('bbbb0001-0000-0000-0000-000000000001', $1, 'WH-MAIN',   'Main Feed Store',          'Head Office, Manila',              true),
+        ('bbbb0001-0000-0000-0000-000000000002', $1, 'WH-FARM1',  'Farm Site 1 Feed Store',   'San Pablo, Laguna',                true),
+        ('bbbb0001-0000-0000-0000-000000000003', $1, 'WH-FARM2',  'Farm Site 2 Feed Store',   'Calamba, Laguna',                  true),
+        ('bbbb0001-0000-0000-0000-000000000004', $1, 'WH-MEDS',   'Medicine & Vaccine Store', 'Head Office, Manila',              true)
       ON CONFLICT DO NOTHING`, [CO]);
     results.push('seed locations: ok');
   } catch (e) { results.push(`seed locations: ${(e as Error).message}`); }
@@ -1283,12 +1283,14 @@ export async function POST(request: NextRequest) {
   try {
     await query(`
       INSERT INTO items (id, company_id, category_id, sku, name, uom, item_type, costing_method, standard_cost, selling_price, is_active) VALUES
-        ('cccc0001-0000-0000-0000-000000000001', $1, 'aaaa0001-0000-0000-0000-000000000001', 'DIESEL',    'Diesel Fuel',       'liter', 'product', 'AVERAGE', 55.00, 65.00, true),
-        ('cccc0001-0000-0000-0000-000000000002', $1, 'aaaa0001-0000-0000-0000-000000000001', 'GAS91',     'Gasoline 91',       'liter', 'product', 'AVERAGE', 58.00, 68.00, true),
-        ('cccc0001-0000-0000-0000-000000000003', $1, 'aaaa0001-0000-0000-0000-000000000001', 'GAS95',     'Gasoline 95',       'liter', 'product', 'AVERAGE', 62.00, 72.00, true),
-        ('cccc0001-0000-0000-0000-000000000004', $1, 'aaaa0001-0000-0000-0000-000000000002', 'OIL-10W40', 'Engine Oil 10W-40', 'liter', 'product', 'FIFO',    350.00, 450.00, true),
-        ('cccc0001-0000-0000-0000-000000000005', $1, 'aaaa0001-0000-0000-0000-000000000002', 'OIL-20W50', 'Engine Oil 20W-50', 'liter', 'product', 'FIFO',    320.00, 420.00, true),
-        ('cccc0001-0000-0000-0000-000000000006', $1, 'aaaa0001-0000-0000-0000-000000000003', 'FILTER-OIL','Oil Filter',        'pcs',   'product', 'FIFO',    85.00,  120.00, true)
+        ('cccc0001-0000-0000-0000-000000000001', $1, 'aaaa0001-0000-0000-0000-000000000001', 'DOC-ROSS308',  'Ross 308 Day-Old Chicks',       'heads', 'product', 'AVERAGE',  45.00,   0.00, true),
+        ('cccc0001-0000-0000-0000-000000000002', $1, 'aaaa0001-0000-0000-0000-000000000001', 'DOC-COBB500',  'Cobb 500 Day-Old Chicks',       'heads', 'product', 'AVERAGE',  42.00,   0.00, true),
+        ('cccc0001-0000-0000-0000-000000000003', $1, 'aaaa0001-0000-0000-0000-000000000002', 'FEED-STARTER', 'Starter Mash (50kg bag)',        'bags',  'product', 'AVERAGE', 850.00,   0.00, true),
+        ('cccc0001-0000-0000-0000-000000000004', $1, 'aaaa0001-0000-0000-0000-000000000002', 'FEED-GROWER',  'Grower Pellets (50kg bag)',      'bags',  'product', 'AVERAGE', 820.00,   0.00, true),
+        ('cccc0001-0000-0000-0000-000000000005', $1, 'aaaa0001-0000-0000-0000-000000000002', 'FEED-FINISH',  'Finisher Pellets (50kg bag)',    'bags',  'product', 'AVERAGE', 800.00,   0.00, true),
+        ('cccc0001-0000-0000-0000-000000000006', $1, 'aaaa0001-0000-0000-0000-000000000003', 'VAC-ND',       'Newcastle Disease Vaccine',      'vials', 'product', 'FIFO',     25.00,   0.00, true),
+        ('cccc0001-0000-0000-0000-000000000007', $1, 'aaaa0001-0000-0000-0000-000000000004', 'LB-BROILER',   'Live Broiler Chicken',          'kg',    'product', 'AVERAGE',  95.00, 115.00, true),
+        ('cccc0001-0000-0000-0000-000000000008', $1, 'aaaa0001-0000-0000-0000-000000000004', 'DC-DRESSED',   'Dressed Chicken (whole)',        'kg',    'product', 'AVERAGE', 140.00, 175.00, true)
       ON CONFLICT DO NOTHING`, [CO]);
     results.push('seed items: ok');
   } catch (e) { results.push(`seed items: ${(e as Error).message}`); }
@@ -1297,12 +1299,10 @@ export async function POST(request: NextRequest) {
   try {
     await query(`
       INSERT INTO stock_balances (item_id, warehouse_id, qty_on_hand, avg_cost) VALUES
-        ('cccc0001-0000-0000-0000-000000000001', 'bbbb0001-0000-0000-0000-000000000001', 50000, 55.00),
-        ('cccc0001-0000-0000-0000-000000000002', 'bbbb0001-0000-0000-0000-000000000001', 20000, 58.00),
-        ('cccc0001-0000-0000-0000-000000000003', 'bbbb0001-0000-0000-0000-000000000001', 15000, 62.00),
-        ('cccc0001-0000-0000-0000-000000000004', 'bbbb0001-0000-0000-0000-000000000001', 500,   350.00),
-        ('cccc0001-0000-0000-0000-000000000005', 'bbbb0001-0000-0000-0000-000000000001', 300,   320.00),
-        ('cccc0001-0000-0000-0000-000000000006', 'bbbb0001-0000-0000-0000-000000000001', 200,   85.00)
+        ('cccc0001-0000-0000-0000-000000000003', 'bbbb0001-0000-0000-0000-000000000002', 500,  850.00),
+        ('cccc0001-0000-0000-0000-000000000004', 'bbbb0001-0000-0000-0000-000000000002', 300,  820.00),
+        ('cccc0001-0000-0000-0000-000000000005', 'bbbb0001-0000-0000-0000-000000000002', 200,  800.00),
+        ('cccc0001-0000-0000-0000-000000000006', 'bbbb0001-0000-0000-0000-000000000004', 100,   25.00)
       ON CONFLICT (item_id, warehouse_id) DO NOTHING`);
     results.push('seed stock_balances: ok');
   } catch (e) { results.push(`seed stock_balances: ${(e as Error).message}`); }
@@ -1323,22 +1323,22 @@ export async function POST(request: NextRequest) {
             AND NOT EXISTS (SELECT 1 FROM items i WHERE i.company_id = companies.id)
         LOOP
           -- get or create categories
-          SELECT id INTO cat1 FROM item_categories WHERE company_id = co.id AND code = 'FUEL' LIMIT 1;
+          SELECT id INTO cat1 FROM item_categories WHERE company_id = co.id AND code = 'DOC' LIMIT 1;
           IF cat1 IS NULL THEN
             cat1 := gen_random_uuid();
-            INSERT INTO item_categories (id, company_id, code, name) VALUES (cat1, co.id, 'FUEL', 'Fuel Products');
+            INSERT INTO item_categories (id, company_id, code, name) VALUES (cat1, co.id, 'DOC', 'Day-Old Chicks');
           END IF;
 
-          SELECT id INTO cat2 FROM item_categories WHERE company_id = co.id AND code = 'LUBE' LIMIT 1;
+          SELECT id INTO cat2 FROM item_categories WHERE company_id = co.id AND code = 'FEEDS' LIMIT 1;
           IF cat2 IS NULL THEN
             cat2 := gen_random_uuid();
-            INSERT INTO item_categories (id, company_id, code, name) VALUES (cat2, co.id, 'LUBE', 'Lubricants');
+            INSERT INTO item_categories (id, company_id, code, name) VALUES (cat2, co.id, 'FEEDS', 'Poultry Feeds');
           END IF;
 
-          SELECT id INTO cat3 FROM item_categories WHERE company_id = co.id AND code = 'PARTS' LIMIT 1;
+          SELECT id INTO cat3 FROM item_categories WHERE company_id = co.id AND code = 'VET' LIMIT 1;
           IF cat3 IS NULL THEN
             cat3 := gen_random_uuid();
-            INSERT INTO item_categories (id, company_id, code, name) VALUES (cat3, co.id, 'PARTS', 'Spare Parts');
+            INSERT INTO item_categories (id, company_id, code, name) VALUES (cat3, co.id, 'VET', 'Medicines & Vaccines');
           END IF;
 
           -- get or create warehouse
@@ -1354,22 +1354,20 @@ export async function POST(request: NextRequest) {
           it4 := gen_random_uuid(); it5 := gen_random_uuid(); it6 := gen_random_uuid();
 
           INSERT INTO items (id, company_id, category_id, sku, name, uom, item_type, costing_method, standard_cost, selling_price, is_active) VALUES
-            (it1, co.id, cat1, 'DIESEL',     'Diesel Fuel',       'liter', 'product', 'AVERAGE', 55.00,  65.00,  true),
-            (it2, co.id, cat1, 'GAS91',      'Gasoline 91',       'liter', 'product', 'AVERAGE', 58.00,  68.00,  true),
-            (it3, co.id, cat1, 'GAS95',      'Gasoline 95',       'liter', 'product', 'AVERAGE', 62.00,  72.00,  true),
-            (it4, co.id, cat2, 'OIL-10W40',  'Engine Oil 10W-40', 'liter', 'product', 'FIFO',    350.00, 450.00, true),
-            (it5, co.id, cat2, 'OIL-20W50',  'Engine Oil 20W-50', 'liter', 'product', 'FIFO',    320.00, 420.00, true),
-            (it6, co.id, cat3, 'FILTER-OIL', 'Oil Filter',        'pcs',   'product', 'FIFO',    85.00,  120.00, true)
+            (it1, co.id, cat1, 'DOC-ROSS308',  'Ross 308 Day-Old Chicks',    'heads', 'product', 'AVERAGE',  45.00,   0.00, true),
+            (it2, co.id, cat1, 'DOC-COBB500',  'Cobb 500 Day-Old Chicks',    'heads', 'product', 'AVERAGE',  42.00,   0.00, true),
+            (it3, co.id, cat2, 'FEED-STARTER', 'Starter Mash (50kg bag)',    'bags',  'product', 'AVERAGE', 850.00,   0.00, true),
+            (it4, co.id, cat2, 'FEED-GROWER',  'Grower Pellets (50kg bag)',  'bags',  'product', 'AVERAGE', 820.00,   0.00, true),
+            (it5, co.id, cat2, 'FEED-FINISH',  'Finisher Pellets (50kg bag)','bags',  'product', 'AVERAGE', 800.00,   0.00, true),
+            (it6, co.id, cat3, 'VAC-ND',       'Newcastle Disease Vaccine',  'vials', 'product', 'FIFO',     25.00,   0.00, true)
           ON CONFLICT DO NOTHING;
 
-          -- stock balances
+          -- stock balances (feeds only; chick batches managed separately)
           INSERT INTO stock_balances (item_id, warehouse_id, qty_on_hand, avg_cost) VALUES
-            (it1, wh, 50000, 55.00),
-            (it2, wh, 20000, 58.00),
-            (it3, wh, 15000, 62.00),
-            (it4, wh,   500, 350.00),
-            (it5, wh,   300, 320.00),
-            (it6, wh,   200, 85.00)
+            (it3, wh, 500, 850.00),
+            (it4, wh, 300, 820.00),
+            (it5, wh, 200, 800.00),
+            (it6, wh, 100,  25.00)
           ON CONFLICT (item_id, warehouse_id) DO NOTHING;
         END LOOP;
       END;
@@ -1826,15 +1824,147 @@ export async function POST(request: NextRequest) {
     catch (e) { results.push(`023 ${tbl}: ${(e as Error).message}`); }
   }
 
+  // 024 — Link chick_batches to GRN and PO
+  const chick024 = [
+    `ALTER TABLE chick_batches ADD COLUMN IF NOT EXISTS grn_id        uuid REFERENCES goods_receipts(id)`,
+    `ALTER TABLE chick_batches ADD COLUMN IF NOT EXISTS grn_line_id   uuid REFERENCES goods_receipt_lines(id)`,
+    `ALTER TABLE chick_batches ADD COLUMN IF NOT EXISTS po_id         uuid REFERENCES purchase_orders(id)`,
+    `ALTER TABLE chick_batches ADD COLUMN IF NOT EXISTS price_per_head numeric(14,6) DEFAULT 0`,
+    `ALTER TABLE grow_cycles   ADD COLUMN IF NOT EXISTS po_id         uuid REFERENCES purchase_orders(id)`,
+    `ALTER TABLE grow_cycles   ADD COLUMN IF NOT EXISTS grn_id        uuid REFERENCES goods_receipts(id)`,
+  ];
+  for (const sql of chick024) {
+    const label = sql.trim().split(/\s+/).slice(0, 6).join(' ').substring(0, 60);
+    try { await query(sql); results.push(`024 ${label}: ok`); }
+    catch (e) { results.push(`024 ${label}: ${(e as Error).message}`); }
+  }
+
+  // 025 — Poultry master data: farm buildings + grow references
+  try {
+    await query(`
+      INSERT INTO farm_buildings (id, company_id, branch_id, code, name, capacity_heads, building_type, is_active) VALUES
+        ('mmmm0001-0000-0000-0000-000000000001', $1, '22222222-2222-2222-2222-222222222202', 'BLD-A', 'Building A', 5000, 'broiler', true),
+        ('mmmm0001-0000-0000-0000-000000000002', $1, '22222222-2222-2222-2222-222222222202', 'BLD-B', 'Building B', 5000, 'broiler', true),
+        ('mmmm0001-0000-0000-0000-000000000003', $1, '22222222-2222-2222-2222-222222222203', 'BLD-C', 'Building C', 3000, 'broiler', true),
+        ('mmmm0001-0000-0000-0000-000000000004', $1, '22222222-2222-2222-2222-222222222203', 'BLD-D', 'Building D', 3000, 'broiler', true)
+      ON CONFLICT DO NOTHING`, [CO]);
+    results.push('025 farm_buildings: ok');
+  } catch (e) { results.push(`025 farm_buildings: ${(e as Error).message}`); }
+
+  try {
+    await query(`
+      INSERT INTO grow_references (id, company_id, code, name, description, is_active) VALUES
+        ('nnnn0001-0000-0000-0000-000000000001', $1, 'GR-001', 'Grow 1', 'First grow cycle of the season',  true),
+        ('nnnn0001-0000-0000-0000-000000000002', $1, 'GR-002', 'Grow 2', 'Second grow cycle of the season', true),
+        ('nnnn0001-0000-0000-0000-000000000003', $1, 'GR-003', 'Grow 3', 'Third grow cycle of the season',  true)
+      ON CONFLICT DO NOTHING`, [CO]);
+    results.push('025 grow_references: ok');
+  } catch (e) { results.push(`025 grow_references: ${(e as Error).message}`); }
+
+  // 026 — Sample purchase orders for chick procurement (approved, ready to receive)
+  try {
+    await query(`
+      INSERT INTO purchase_orders
+        (id, company_id, branch_id, po_no, supplier_id, po_date, expected_date,
+         subtotal, vat_amount, total, status, created_by)
+      SELECT
+        v.id::uuid, $1, $2,
+        v.po_no,
+        (SELECT id FROM suppliers WHERE company_id = $1 AND code = v.scode LIMIT 1),
+        v.po_date::date, v.exp_date::date,
+        v.sub::numeric, v.vat::numeric, v.tot::numeric,
+        'received', $3
+      FROM (VALUES
+        ('pppp0001-0000-0000-0000-000000000001','PO-2026-000001','TEST-S001','2026-04-01','2026-04-05', 225000.00, 27000.00, 252000.00),
+        ('pppp0001-0000-0000-0000-000000000002','PO-2026-000002','TEST-S001','2026-04-08','2026-04-12', 126000.00, 15120.00, 141120.00)
+      ) AS v(id, po_no, scode, po_date, exp_date, sub, vat, tot)
+      WHERE (SELECT id FROM suppliers WHERE company_id = $1 AND code = v.scode LIMIT 1) IS NOT NULL
+      ON CONFLICT DO NOTHING`, [CO, HO, USR]);
+    results.push('026 purchase_orders: ok');
+  } catch (e) { results.push(`026 purchase_orders: ${(e as Error).message}`); }
+
+  try {
+    await query(`
+      INSERT INTO purchase_order_lines
+        (id, po_id, line_no, item_id, description, quantity, qty_received, unit_price, subtotal, vat_amount, total)
+      SELECT
+        v.id::uuid, v.po_id::uuid, v.ln::int,
+        (SELECT id FROM items WHERE company_id = $1 AND sku = v.sku LIMIT 1),
+        v.dsc, v.qty::numeric, v.qty::numeric, v.price::numeric, v.sub::numeric, v.vat::numeric, v.tot::numeric
+      FROM (VALUES
+        ('pppp0002-0000-0000-0000-000000000001','pppp0001-0000-0000-0000-000000000001',1,'DOC-ROSS308','Ross 308 Day-Old Chicks',5000,45.00,225000.00,27000.00,252000.00),
+        ('pppp0002-0000-0000-0000-000000000002','pppp0001-0000-0000-0000-000000000002',1,'DOC-COBB500','Cobb 500 Day-Old Chicks',3000,42.00,126000.00,15120.00,141120.00)
+      ) AS v(id, po_id, ln, sku, dsc, qty, price, sub, vat, tot)
+      WHERE (SELECT id FROM items WHERE company_id = $1 AND sku = v.sku LIMIT 1) IS NOT NULL
+      ON CONFLICT DO NOTHING`, [CO]);
+    results.push('026 po_lines: ok');
+  } catch (e) { results.push(`026 po_lines: ${(e as Error).message}`); }
+
+  // 027 — Posted goods receipts for the sample POs (creates chick batches)
+  try {
+    await query(`
+      INSERT INTO goods_receipts
+        (id, company_id, grn_no, po_id, warehouse_id, receipt_date, delivery_no, status, posted_at, created_by)
+      SELECT
+        v.id::uuid, $1, v.grn_no, v.po_id::uuid,
+        'bbbb0001-0000-0000-0000-000000000001',
+        v.rx_date::date, v.dr_no, 'posted', v.rx_date::date, $2
+      FROM (VALUES
+        ('gggg0001-0000-0000-0000-000000000001','GRN-2026-000001','pppp0001-0000-0000-0000-000000000001','2026-04-05','AVIAGEN-DR-0501'),
+        ('gggg0001-0000-0000-0000-000000000002','GRN-2026-000002','pppp0001-0000-0000-0000-000000000002','2026-04-12','AVIAGEN-DR-0512')
+      ) AS v(id, grn_no, po_id, rx_date, dr_no)
+      ON CONFLICT DO NOTHING`, [CO, USR]);
+    results.push('027 goods_receipts: ok');
+  } catch (e) { results.push(`027 goods_receipts: ${(e as Error).message}`); }
+
+  try {
+    await query(`
+      INSERT INTO goods_receipt_lines (id, grn_id, po_line_id, line_no, qty_received, unit_cost)
+      VALUES
+        ('hhhh0001-0000-0000-0000-000000000001',
+         'gggg0001-0000-0000-0000-000000000001',
+         'pppp0002-0000-0000-0000-000000000001',
+         1, 5000, 45.00),
+        ('hhhh0001-0000-0000-0000-000000000002',
+         'gggg0001-0000-0000-0000-000000000002',
+         'pppp0002-0000-0000-0000-000000000002',
+         1, 3000, 42.00)
+      ON CONFLICT DO NOTHING`);
+    results.push('027 grn_lines: ok');
+  } catch (e) { results.push(`027 grn_lines: ${(e as Error).message}`); }
+
+  // Chick batches — auto-created when GRN is posted (seeded directly to match posted GRNs)
+  try {
+    await query(`
+      INSERT INTO chick_batches
+        (id, company_id, batch_no, grn_id, grn_line_id, po_id, item_id,
+         heads_in, heads_available, price_per_head, date_received, status)
+      SELECT
+        v.id::uuid, $1, v.batch_no, v.grn_id::uuid, v.grn_line_id::uuid, v.po_id::uuid,
+        (SELECT id FROM items WHERE company_id = $1 AND sku = v.sku LIMIT 1),
+        v.heads::numeric, v.heads::numeric, v.price::numeric, v.rx_date::date, 'available'
+      FROM (VALUES
+        ('kkkk0001-0000-0000-0000-000000000001','BATCH-2026-00001',
+         'gggg0001-0000-0000-0000-000000000001','hhhh0001-0000-0000-0000-000000000001',
+         'pppp0001-0000-0000-0000-000000000001','DOC-ROSS308',5000,45.00,'2026-04-05'),
+        ('kkkk0001-0000-0000-0000-000000000002','BATCH-2026-00002',
+         'gggg0001-0000-0000-0000-000000000002','hhhh0001-0000-0000-0000-000000000002',
+         'pppp0001-0000-0000-0000-000000000002','DOC-COBB500',3000,42.00,'2026-04-12')
+      ) AS v(id, batch_no, grn_id, grn_line_id, po_id, sku, heads, price, rx_date)
+      WHERE (SELECT id FROM items WHERE company_id = $1 AND sku = v.sku LIMIT 1) IS NOT NULL
+      ON CONFLICT DO NOTHING`, [CO]);
+    results.push('027 chick_batches: ok');
+  } catch (e) { results.push(`027 chick_batches: ${(e as Error).message}`); }
+
   // Customers — use code prefix TEST-C so they don't conflict with API-generated CUST-xxxxxx
   try {
     await query(`
       INSERT INTO customers (id, company_id, code, name, customer_type, tin, address, contact_person, email, phone, payment_terms_days, credit_limit, is_active) VALUES
-        ('dddd0001-0000-0000-0000-000000000001', $1, 'TEST-C001', 'ABC Transport Corp.',    'fleet',     '123-456-789-000', 'Quezon City', 'Juan Dela Cruz', 'juan@abc.com',   '09171234567', 30, 500000, true),
-        ('dddd0001-0000-0000-0000-000000000002', $1, 'TEST-C002', 'XYZ Logistics Inc.',     'wholesale', '987-654-321-000', 'Makati City', 'Maria Santos',   'maria@xyz.com',  '09281234567', 15, 1000000, true),
-        ('dddd0001-0000-0000-0000-000000000003', $1, 'TEST-C003', 'Dela Cruz Construction', 'wholesale', '111-222-333-000', 'Pasig City',  'Pedro Reyes',    'pedro@dc.com',   '09391234567', 45, 750000, true),
-        ('dddd0001-0000-0000-0000-000000000004', $1, 'TEST-C004', 'Metro Bus Lines',        'fleet',     '444-555-666-000', 'Manila',      'Ana Villanueva', 'ana@mbl.com',    '09451234567', 30, 2000000, true),
-        ('dddd0001-0000-0000-0000-000000000005', $1, 'TEST-C005', 'Govt Infra Dept.',       'gov',       '777-888-999-000', 'Intramuros',  'Dir. Ramos',     'ramos@gov.ph',   '09561234567', 60, 5000000, true)
+        ('dddd0001-0000-0000-0000-000000000001', $1, 'TEST-C001', 'Bounty Agro Ventures Inc.',  'wholesale', '123-456-789-000', 'Cainta, Rizal',     'Ramon Cruz',    'ramon@bounty.com',  '09171234567', 30,  500000, true),
+        ('dddd0001-0000-0000-0000-000000000002', $1, 'TEST-C002', 'Magnolia Inc.',              'wholesale', '987-654-321-000', 'Mandaluyong City',  'Cathy Reyes',   'cathy@magnolia.com','09281234567', 15, 1000000, true),
+        ('dddd0001-0000-0000-0000-000000000003', $1, 'TEST-C003', 'Metro Wet Market Assoc.',   'trade',     '111-222-333-000', 'Divisoria, Manila', 'Nestor Garcia', 'nestor@mwm.com',    '09391234567', 7,   250000, true),
+        ('dddd0001-0000-0000-0000-000000000004', $1, 'TEST-C004', 'Jollibee Foods Corp.',      'wholesale', '444-555-666-000', 'Ortigas, Pasig',    'Karen Santos',  'karen@jfc.com',     '09451234567', 30, 2000000, true),
+        ('dddd0001-0000-0000-0000-000000000005', $1, 'TEST-C005', 'SM Supermarket Inc.',       'wholesale', '777-888-999-000', 'SM Mall of Asia',   'Leo Tan',       'leo@sm.com.ph',     '09561234567', 30, 3000000, true)
       ON CONFLICT (id) DO UPDATE SET code = EXCLUDED.code, name = EXCLUDED.name`, [CO]);
     results.push('seed customers: ok');
   } catch (e) { results.push(`seed customers: ${(e as Error).message}`); }
@@ -1843,10 +1973,10 @@ export async function POST(request: NextRequest) {
   try {
     await query(`
       INSERT INTO suppliers (id, company_id, code, name, supplier_type, tin, address, contact_person, email, phone, payment_terms_days, is_active) VALUES
-        ('eeee0001-0000-0000-0000-000000000001', $1, 'TEST-S001', 'Petron Corp.',       'refinery', '000-111-222-000', 'Bonifacio Global City', 'Sales Team',    'sales@petron.com',   '025551001', 30, true),
-        ('eeee0001-0000-0000-0000-000000000002', $1, 'TEST-S002', 'Shell Philippines',  'refinery', '000-222-333-000', 'Makati City',           'Key Accounts',  'keyaccts@shell.com', '025551002', 30, true),
-        ('eeee0001-0000-0000-0000-000000000003', $1, 'TEST-S003', 'Castrol Philippines','trade',    '000-333-444-000', 'Mandaluyong',           'Lube Sales',    'sales@castrol.com',  '025551003', 30, true),
-        ('eeee0001-0000-0000-0000-000000000004', $1, 'TEST-S004', 'Auto Parts Depot',   'trade',    '000-444-555-000', 'Caloocan',              'Parts Manager', 'parts@apd.com',      '025551004', 15, true)
+        ('eeee0001-0000-0000-0000-000000000001', $1, 'TEST-S001', 'Aviagen Philippines Inc.',    'trade', '000-111-222-000', 'Laguna Technopark, Biñan',   'Sales Team',     'sales@aviagen.ph',   '025551001', 30, true),
+        ('eeee0001-0000-0000-0000-000000000002', $1, 'TEST-S002', 'Cargill Philippines Inc.',    'trade', '000-222-333-000', 'Bonifacio Global City',      'Feed Sales',     'feed@cargill.ph',    '025551002', 30, true),
+        ('eeee0001-0000-0000-0000-000000000003', $1, 'TEST-S003', 'San Miguel Foods Inc.',       'trade', '000-333-444-000', 'San Fernando, Pampanga',     'Accounts Mgr',   'accts@smfi.com',     '025551003', 30, true),
+        ('eeee0001-0000-0000-0000-000000000004', $1, 'TEST-S004', 'Intervet Philippines Inc.',   'trade', '000-444-555-000', 'Makati City',                'Vet Sales',      'vet@intervet.ph',    '025551004', 15, true)
       ON CONFLICT (company_id, code) DO NOTHING`, [CO]);
     results.push('seed suppliers: ok');
   } catch (e) { results.push(`seed suppliers: ${(e as Error).message}`); }
@@ -1864,11 +1994,11 @@ export async function POST(request: NextRequest) {
         v.subtotal::numeric, v.vat::numeric, v.total::numeric,
         v.paid::numeric, v.bal::numeric, 0, v.status, $3
       FROM (VALUES
-        ('ffff0001-0000-0000-0000-000000000001','SI-2026-000001','TEST-C001','2026-04-10','2026-05-10',30, 89285.71,10714.29,100000.00,     0,100000.00,'open'),
-        ('ffff0001-0000-0000-0000-000000000002','SI-2026-000002','TEST-C002','2026-04-15','2026-04-30',15,178571.43,21428.57,200000.00, 50000,150000.00,'partially_paid'),
-        ('ffff0001-0000-0000-0000-000000000003','SI-2026-000003','TEST-C003','2026-03-01','2026-04-15',45,267857.14,32142.86,300000.00,     0,300000.00,'overdue'),
-        ('ffff0001-0000-0000-0000-000000000004','SI-2026-000004','TEST-C004','2026-05-01','2026-05-31',30,446428.57,53571.43,500000.00,     0,500000.00,'open'),
-        ('ffff0001-0000-0000-0000-000000000005','SI-2026-000005','TEST-C001','2026-04-20','2026-04-30',10, 44642.86, 5357.14, 50000.00, 50000,      0,'paid')
+        ('ffff0001-0000-0000-0000-000000000001','SI-2026-000001','TEST-C001','2026-04-10','2026-05-10',30,133928.57,16071.43,150000.00,      0,150000.00,'open'),
+        ('ffff0001-0000-0000-0000-000000000002','SI-2026-000002','TEST-C002','2026-04-15','2026-04-30',15,267857.14,32142.86,300000.00,100000,200000.00,'partially_paid'),
+        ('ffff0001-0000-0000-0000-000000000003','SI-2026-000003','TEST-C003','2026-03-15','2026-04-14', 7, 44642.86, 5357.14, 50000.00,      0, 50000.00,'overdue'),
+        ('ffff0001-0000-0000-0000-000000000004','SI-2026-000004','TEST-C004','2026-05-01','2026-05-31',30,446428.57,53571.43,500000.00,      0,500000.00,'open'),
+        ('ffff0001-0000-0000-0000-000000000005','SI-2026-000005','TEST-C001','2026-04-20','2026-04-30',10, 89285.71,10714.29,100000.00,100000,      0,'paid')
       ) AS v(id, invoice_no, ccode, inv_date, due_date, terms, subtotal, vat, total, paid, bal, status)
       WHERE (SELECT id FROM customers WHERE company_id = $1 AND code = v.ccode LIMIT 1) IS NOT NULL
       ON CONFLICT DO NOTHING`, [CO, HO, USR]);
@@ -1882,11 +2012,11 @@ export async function POST(request: NextRequest) {
         (invoice_id, line_no, item_id, description, quantity, unit_price, discount_pct, vat_rate, line_subtotal, line_vat, line_total)
       SELECT v.inv_id::uuid, v.line_no::int, v.item_id::uuid, v.dsc, v.qty::numeric, v.price::numeric, 0, 12, v.sub::numeric, v.vat::numeric, v.tot::numeric
       FROM (VALUES
-        ('ffff0001-0000-0000-0000-000000000001',1,'cccc0001-0000-0000-0000-000000000001','Diesel Fuel',   1373.66,65.00, 89285.71,10714.29,100000.00),
-        ('ffff0001-0000-0000-0000-000000000002',1,'cccc0001-0000-0000-0000-000000000002','Gasoline 91',   2625.66,68.00,178571.43,21428.57,200000.00),
-        ('ffff0001-0000-0000-0000-000000000003',1,'cccc0001-0000-0000-0000-000000000001','Diesel Fuel',   4122.45,65.00,267857.14,32142.86,300000.00),
-        ('ffff0001-0000-0000-0000-000000000004',1,'cccc0001-0000-0000-0000-000000000001','Diesel Fuel',   6868.91,65.00,446428.57,53571.43,500000.00),
-        ('ffff0001-0000-0000-0000-000000000005',1,'cccc0001-0000-0000-0000-000000000002','Gasoline 91',    735.29,68.00, 44642.86, 5357.14, 50000.00)
+        ('ffff0001-0000-0000-0000-000000000001',1,'cccc0001-0000-0000-0000-000000000007','Live Broiler Chicken',1163.79,115.00,133928.57,16071.43,150000.00),
+        ('ffff0001-0000-0000-0000-000000000002',1,'cccc0001-0000-0000-0000-000000000007','Live Broiler Chicken',2329.19,115.00,267857.14,32142.86,300000.00),
+        ('ffff0001-0000-0000-0000-000000000003',1,'cccc0001-0000-0000-0000-000000000007','Live Broiler Chicken', 387.93,115.00, 44642.86, 5357.14, 50000.00),
+        ('ffff0001-0000-0000-0000-000000000004',1,'cccc0001-0000-0000-0000-000000000008','Dressed Chicken',    2547.97,175.00,446428.57,53571.43,500000.00),
+        ('ffff0001-0000-0000-0000-000000000005',1,'cccc0001-0000-0000-0000-000000000007','Live Broiler Chicken', 775.59,115.00, 89285.71,10714.29,100000.00)
       ) AS v(inv_id, line_no, item_id, dsc, qty, price, sub, vat, tot)
       WHERE EXISTS (SELECT 1 FROM sales_invoices WHERE id = v.inv_id::uuid)
       ON CONFLICT DO NOTHING`);
@@ -1906,9 +2036,9 @@ export async function POST(request: NextRequest) {
         v.subtotal::numeric, v.vat::numeric, 0, v.total::numeric,
         v.paid::numeric, v.bal::numeric, v.status, $3
       FROM (VALUES
-        ('a1b20001-0000-0000-0000-000000000001','PETRON-INV-001','BL-2026-000001','TEST-S001','2026-04-05','2026-05-05',2232142.86,267857.14,2500000.00,1000000,1500000.00,'approved'),
-        ('a1b20001-0000-0000-0000-000000000002','SHELL-INV-002', 'BL-2026-000002','TEST-S002','2026-04-12','2026-05-12', 892857.14,107142.86,1000000.00,      0,1000000.00,'approved'),
-        ('a1b20001-0000-0000-0000-000000000003','CASTROL-INV-003','BL-2026-000003','TEST-S003','2026-03-15','2026-04-14',178571.43, 21428.57, 200000.00,      0, 200000.00,'approved')
+        ('a1b20001-0000-0000-0000-000000000001','AVIAGEN-INV-001','BL-2026-000001','TEST-S001','2026-04-01','2026-05-01', 357142.86, 42857.14, 400000.00,400000,       0,'approved'),
+        ('a1b20001-0000-0000-0000-000000000002','AVIAGEN-INV-002','BL-2026-000002','TEST-S001','2026-04-10','2026-05-10', 223214.29, 26785.71, 250000.00,     0,250000.00,'approved'),
+        ('a1b20001-0000-0000-0000-000000000003','CARGILL-INV-001','BL-2026-000003','TEST-S002','2026-04-05','2026-05-05', 446428.57, 53571.43, 500000.00,200000,300000.00,'approved')
       ) AS v(id, bill_no, internal_no, scode, bill_date, due_date, subtotal, vat, total, paid, bal, status)
       WHERE (SELECT id FROM suppliers WHERE company_id = $1 AND code = v.scode LIMIT 1) IS NOT NULL
       ON CONFLICT DO NOTHING`, [CO, HO, USR]);
@@ -1921,10 +2051,9 @@ export async function POST(request: NextRequest) {
       INSERT INTO bill_lines (bill_id, line_no, item_id, description, quantity, unit_price, vat_rate, line_subtotal, line_vat, line_total)
       SELECT v.bill_id::uuid, v.ln::int, v.item_id::uuid, v.dsc, v.qty::numeric, v.price::numeric, 12, v.sub::numeric, v.vat::numeric, v.tot::numeric
       FROM (VALUES
-        ('a1b20001-0000-0000-0000-000000000001',1,'cccc0001-0000-0000-0000-000000000001','Diesel Fuel',     40000,55.00,2200000.00,264000.00,2464000.00),
-        ('a1b20001-0000-0000-0000-000000000001',2,'cccc0001-0000-0000-0000-000000000002','Gasoline 91',       600,55.00,  33000.00,  3960.00,  36960.00),
-        ('a1b20001-0000-0000-0000-000000000002',1,'cccc0001-0000-0000-0000-000000000002','Gasoline 91',     15000,58.00, 870000.00,104400.00, 974400.00),
-        ('a1b20001-0000-0000-0000-000000000003',1,'cccc0001-0000-0000-0000-000000000004','Engine Oil 10W-40', 500,350.00,175000.00, 21000.00, 196000.00)
+        ('a1b20001-0000-0000-0000-000000000001',1,'cccc0001-0000-0000-0000-000000000001','Ross 308 Day-Old Chicks', 5000, 63.78, 318900.00, 38268.00, 357168.00),
+        ('a1b20001-0000-0000-0000-000000000002',1,'cccc0001-0000-0000-0000-000000000001','Ross 308 Day-Old Chicks', 3000, 66.96, 200880.00, 24105.60, 224985.60),
+        ('a1b20001-0000-0000-0000-000000000003',1,'cccc0001-0000-0000-0000-000000000003','Starter Mash (50kg bag)',  500,800.00, 400000.00, 48000.00, 448000.00)
       ) AS v(bill_id, ln, item_id, dsc, qty, price, sub, vat, tot)
       WHERE EXISTS (SELECT 1 FROM bills WHERE id = v.bill_id::uuid)
       ON CONFLICT DO NOTHING`);
@@ -1956,9 +2085,9 @@ export async function POST(request: NextRequest) {
         (id, company_id, branch_id, entry_no, entry_date, memo, source_module, status, posted_at, posted_by, created_by)
       VALUES
         ('a1b40001-0000-0000-0000-000000000001', $1, $2, 'JV-2026-000001', '2026-04-10',
-         'Sales invoice SI-2026-000001 - ABC Transport', 'ar', 'posted', '2026-04-10 08:00:00+08', $3, $3),
+         'Sales invoice SI-2026-000001 - Bounty Agro Ventures', 'ar', 'posted', '2026-04-10 08:00:00+08', $3, $3),
         ('a1b40001-0000-0000-0000-000000000002', $1, $2, 'JV-2026-000002', '2026-04-15',
-         'Sales invoice SI-2026-000002 - XYZ Logistics', 'ar', 'posted', '2026-04-15 08:00:00+08', $3, $3)
+         'Sales invoice SI-2026-000002 - Magnolia Inc.', 'ar', 'posted', '2026-04-15 08:00:00+08', $3, $3)
       ON CONFLICT DO NOTHING`, [CO, HO, USR]);
     results.push('seed journal_entries: ok');
   } catch (e) { results.push(`seed journal_entries: ${(e as Error).message}`); }
@@ -2113,6 +2242,219 @@ export async function POST(request: NextRequest) {
     `, [CO, USR]);
     results.push('019 wht_certificates: ok');
   } catch (e) { results.push(`019 wht_certificates: ${(e as Error).message}`); }
+
+  // --- 020: Updated Chart of Accounts (5-digit codes) ---
+  try {
+    const COA_COMPANY = '11111111-1111-1111-1111-111111111111';
+    await query(`
+      INSERT INTO accounts (company_id, code, name, account_type, is_control)
+      VALUES
+        -- Current Assets: Cash and Cash Equivalents
+        ($1,'10040','Cash in Bank - Social Custodian (0031)',      'ASSET',false),
+        ($1,'10045','Cash in Bank - BDO Fillment Account (0762)',  'ASSET',false),
+        ($1,'10060','Cash in Bank - SBC (9932)',                   'ASSET',false),
+        ($1,'10075','Cash in Bank - BDO Ayala Rockville (1780)',   'ASSET',false),
+        ($1,'10090','Cash in Bank - SBC Dollar Account (678-1)',   'ASSET',false),
+        ($1,'10501','Petty Cash Fund',                             'ASSET',false),
+        ($1,'10502','Revolving Fund',                              'ASSET',false),
+        ($1,'11000','Undisputed Funds',                            'ASSET',false),
+        -- Current Assets: Trade and Other Receivables
+        ($1,'11001','Accounts Receivable',                                    'ASSET',true),
+        ($1,'11012','Accounts Receivable - Others',                           'ASSET',false),
+        ($1,'11015','Advances to Officers and Employees - Operations',        'ASSET',false),
+        ($1,'11016','Advances to Officers and Employees - H.O',               'ASSET',false),
+        ($1,'11017','Advances to Liquidation',                                'ASSET',false),
+        ($1,'11018','Advances to Related Parties',                            'ASSET',false),
+        ($1,'11019','Advances to Stockholders',                               'ASSET',false),
+        ($1,'11020','Other Receivables',                                      'ASSET',false),
+        ($1,'11039','Due From BBQ',                                           'ASSET',false),
+        ($1,'12001','Goods Invoiced Not Yet Received',                        'ASSET',false),
+        -- Current Assets: Inventories
+        ($1,'12005','LPG',                               'ASSET',false),
+        ($1,'12020','Live Inventory',                    'ASSET',false),
+        ($1,'12021','Dressed Chicken',                   'ASSET',false),
+        ($1,'12022','By Products',                       'ASSET',false),
+        ($1,'12023','Chicks',                            'ASSET',false),
+        ($1,'12024','Feeds',                             'ASSET',false),
+        ($1,'12025','Medicine',                          'ASSET',false),
+        ($1,'12026','Fly Control',                       'ASSET',false),
+        ($1,'12027','Vaccine',                           'ASSET',false),
+        ($1,'12028','Tolling Fee',                       'ASSET',false),
+        ($1,'12029','Other Live Inventory',              'ASSET',false),
+        ($1,'12030','RM Inventory - Packaging Supplies', 'ASSET',false),
+        ($1,'12031','RM Inventory - Food',               'ASSET',false),
+        ($1,'12032','Fuel Inventory - Diesel',           'ASSET',false),
+        ($1,'12102','Eggs',                              'ASSET',false),
+        -- Current Assets: Other Current Assets
+        ($1,'13001','Prepaid Expenses',                 'ASSET',false),
+        ($1,'13004','Input VAT',                        'ASSET',true),
+        ($1,'13005','Deferred Input VAT - Current',     'ASSET',false),
+        ($1,'13006','Creditable Withholding Taxes',     'ASSET',false),
+        ($1,'13007','Creditable Withholding Tax - VAT', 'ASSET',false),
+        -- Noncurrent Assets: Property and Equipment
+        ($1,'14001','Land - cost',                       'ASSET',false),
+        ($1,'14003','Land Improvements - cost',          'ASSET',false),
+        ($1,'14004','Building - cost',                   'ASSET',false),
+        ($1,'14005','Leasehold Improvement',             'ASSET',false),
+        ($1,'14008','Construction in Progress',          'ASSET',false),
+        ($1,'14009','Machinery Equipment',               'ASSET',false),
+        ($1,'14010','Transportation Equipment',          'ASSET',false),
+        ($1,'14012','Station Tools and Equipment',       'ASSET',false),
+        ($1,'14014','Furniture and Fixtures',            'ASSET',false),
+        ($1,'14015','Office Equipment',                  'ASSET',false),
+        ($1,'14016','Computer Equipment',                'ASSET',false),
+        ($1,'14017','Computer Software and Development', 'ASSET',false),
+        ($1,'15001','Franchise',                         'ASSET',false),
+        -- Noncurrent Assets: Accumulated Depreciation
+        ($1,'14501','Accumulated Depreciation - Land Improvements',         'ASSET',false),
+        ($1,'14502','Accumulated Depreciation - Building',                  'ASSET',false),
+        ($1,'14503','Accumulated Depreciation - Leasehold Improvements',    'ASSET',false),
+        ($1,'14504','Accumulated Depreciation - Machinery Equipment',       'ASSET',false),
+        ($1,'14507','Accumulated Depreciation - Transportation Equipment',  'ASSET',false),
+        ($1,'14508','Accumulated Depreciation - Station Tools and Equipment','ASSET',false),
+        ($1,'14510','Accumulated Depreciation - Furniture and Fixtures',    'ASSET',false),
+        ($1,'14511','Accumulated Depreciation - Office Equipment',          'ASSET',false),
+        ($1,'14512','Accumulated Depreciation - Computer Equipment',        'ASSET',false),
+        ($1,'14521','Accumulated Amortization - Franchise Fees',            'ASSET',false),
+        -- Noncurrent Assets: Other Noncurrent Assets
+        ($1,'15010','Deferred Input VAT - Noncurrent', 'ASSET',false),
+        ($1,'15011','Refundable Deposits',             'ASSET',false),
+        ($1,'15014','Prepaid Rent',                    'ASSET',false),
+        -- Current Liabilities
+        ($1,'20001','Accounts Payable - Trade',              'LIABILITY',true),
+        ($1,'20011','Accounts Payable - Others',             'LIABILITY',false),
+        ($1,'20013','Advances from Customers',               'LIABILITY',false),
+        ($1,'20014','Output VAT',                            'LIABILITY',true),
+        ($1,'20015','Advances from Stockholders',            'LIABILITY',false),
+        ($1,'20016','Goods Received Not Yet Invoiced',       'LIABILITY',false),
+        ($1,'20017','Accrued Expenses',                      'LIABILITY',false),
+        ($1,'20019','SSS Premium Payable',                   'LIABILITY',false),
+        ($1,'20020','SSS Loan Payable',                      'LIABILITY',false),
+        ($1,'20021','Philhealth Premium Payable',            'LIABILITY',false),
+        ($1,'20023','Pag-Ibig Premium Payable',              'LIABILITY',false),
+        ($1,'20025','Pag-Ibig Loan Payable',                 'LIABILITY',false),
+        ($1,'20026','Loan Payable - Current',                'LIABILITY',false),
+        ($1,'20027','Loan Payable - AFCC',                   'LIABILITY',false),
+        ($1,'20028','Replenishment Fund - AFCC',             'LIABILITY',false),
+        ($1,'20029','Reimbursement - AFCC',                  'LIABILITY',false),
+        ($1,'20030','Withholding Tax Payable - Compensation','LIABILITY',false),
+        ($1,'20031','Withholding Tax Payable - Expanded',    'LIABILITY',false),
+        -- Non-Current Liabilities
+        ($1,'21006','Deposits for Future Stock Subscription','LIABILITY',false),
+        ($1,'21007','Loan Payable - Non-Current',            'LIABILITY',false),
+        ($1,'21008','Deferred Tax Liability',                'LIABILITY',false),
+        ($1,'21009','Income Tax Payable',                    'LIABILITY',false),
+        -- Capital and Reserves
+        ($1,'30001','Capital Stock',    'EQUITY',false),
+        ($1,'30005','Opening Balances', 'EQUITY',false),
+        -- Sales / Revenue
+        ($1,'40001','Sales - Fruits',                    'REVENUE',false),
+        ($1,'40002','Distribution',                      'REVENUE',false),
+        ($1,'40004','Sales - Live Chicken',              'REVENUE',false),
+        ($1,'40005','Sales - Five Star',                 'REVENUE',false),
+        ($1,'40009','Logistic',                          'REVENUE',false),
+        ($1,'40014','Sales',                             'REVENUE',false),
+        ($1,'40015','Sales Discount',                    'REVENUE',false),
+        ($1,'40016','Fair Value Adjustment on Livestock','REVENUE',false),
+        ($1,'40027','Service Revenue',                   'REVENUE',false),
+        ($1,'40030','Sales - Dressed Chicken',           'REVENUE',false),
+        ($1,'40031','Sales - By Products',               'REVENUE',false),
+        ($1,'40035','Sales Discount - PWD',              'REVENUE',false),
+        ($1,'40036','Sales Discount - Senior Citizen',   'REVENUE',false),
+        -- Direct Cost / Cost of Sales
+        ($1,'50001','Day Old Chicken',                   'EXPENSE',false),
+        ($1,'50002','Live Buying',                       'EXPENSE',false),
+        ($1,'50003','Feeds',                             'EXPENSE',false),
+        ($1,'50004','Tolling Fees',                      'EXPENSE',false),
+        ($1,'50005','Medicines',                         'EXPENSE',false),
+        ($1,'50006','Vaccines',                          'EXPENSE',false),
+        ($1,'50023','Freight Charges',                   'EXPENSE',false),
+        ($1,'50026','Cost of Sales - Dressed Chicken',   'EXPENSE',false),
+        ($1,'50028','Loading Fee',                       'EXPENSE',false),
+        ($1,'50029','Fly Control Fee',                   'EXPENSE',false),
+        ($1,'50030','Harvest Fee',                       'EXPENSE',false),
+        ($1,'50031','Cleaning Fee',                      'EXPENSE',false),
+        ($1,'50032','Other Direct Costs',                'EXPENSE',false),
+        ($1,'50033','Gas',                               'EXPENSE',false),
+        ($1,'50034','Incentives',                        'EXPENSE',false),
+        ($1,'50037','Hauling - Salaries',                'EXPENSE',false),
+        ($1,'50038','Hauling - Gas and Oil',             'EXPENSE',false),
+        ($1,'50039','Hauling - Freight Charge',          'EXPENSE',false),
+        ($1,'50040','CDS - Fivestar',                    'EXPENSE',false),
+        ($1,'50041','Eggs',                              'EXPENSE',false),
+        ($1,'50044','Depreciation Expense',              'EXPENSE',false),
+        ($1,'50056','Cost of Sales - Service Charge',    'EXPENSE',false),
+        ($1,'50057','Cost of Sales - Food',              'EXPENSE',false),
+        ($1,'50058','Cost of Sales - Remuneration',      'EXPENSE',false),
+        -- Operating Cost: Salaries and Related Expenses
+        ($1,'60001','Salaries and Wages - Headquarter',  'EXPENSE',false),
+        ($1,'60002','Salaries and Wages - Operations',   'EXPENSE',false),
+        ($1,'60003','13th Month Bonus',                  'EXPENSE',false),
+        ($1,'60005','SSS Premium Contribution',          'EXPENSE',false),
+        ($1,'60006','Philhealth Premium Contribution',   'EXPENSE',false),
+        ($1,'60007','Pag-Ibig Premium Contribution',     'EXPENSE',false),
+        ($1,'60008','Employees Benefits',                'EXPENSE',false),
+        ($1,'60009','Retirement Expense',                'EXPENSE',false),
+        -- Operating Cost: Premises and Utilities
+        ($1,'61001','Rental Expense',                    'EXPENSE',false),
+        ($1,'61002','Light and Water',                   'EXPENSE',false),
+        -- Operating Cost: Transportation and Travel
+        ($1,'62001','Transportation Expense',            'EXPENSE',false),
+        ($1,'62002','Gas and Oil',                       'EXPENSE',false),
+        ($1,'62003','Courier Services',                  'EXPENSE',false),
+        ($1,'62004','Toll Fees',                         'EXPENSE',false),
+        -- Operating Cost: Advertising and Representation
+        ($1,'62007','Seminars and Trainings',            'EXPENSE',false),
+        ($1,'63002','Representation Expense',            'EXPENSE',false),
+        -- Operating Cost: Depreciation and Amortization
+        ($1,'64001','Depreciation Expense',              'EXPENSE',false),
+        ($1,'64002','Amortization Expense',              'EXPENSE',false),
+        -- Operating Cost: Other Expenses
+        ($1,'66002','Bank Charges',                      'EXPENSE',false),
+        ($1,'66011','Insurance',                         'EXPENSE',false),
+        ($1,'66012','Interest Expense',                  'EXPENSE',false),
+        ($1,'66017','Membership and Dues',               'EXPENSE',false),
+        ($1,'66018','Office Supplies',                   'EXPENSE',false),
+        ($1,'66020','Processing Costs',                  'EXPENSE',false),
+        ($1,'66021','Professional Fees',                 'EXPENSE',false),
+        ($1,'66022','Repairs and Maintenance',           'EXPENSE',false),
+        ($1,'66023','Seminars and Trainings',            'EXPENSE',false),
+        ($1,'66024','Station Supplies',                  'EXPENSE',false),
+        ($1,'66025','Taxes and Licenses',                'EXPENSE',false),
+        ($1,'66026','Telephone and Communication',       'EXPENSE',false),
+        ($1,'67000','Miscellaneous Expense',             'EXPENSE',false),
+        ($1,'67001','Farm Supplies',                     'EXPENSE',false),
+        ($1,'70003','Input VAT - Non-Applicable to Exempt Sales','EXPENSE',false),
+        -- Other Income
+        ($1,'70001','Interest Income',                   'REVENUE',false),
+        ($1,'70002','Other Income - Commercial Growing', 'REVENUE',false),
+        ($1,'70010','Other Income - Income at Operator', 'REVENUE',false)
+      ON CONFLICT (company_id, code) DO UPDATE
+        SET name         = EXCLUDED.name,
+            account_type = EXCLUDED.account_type,
+            is_control   = EXCLUDED.is_control
+    `, [COA_COMPANY]);
+    results.push('020 chart_of_accounts upsert: ok');
+  } catch (e) { results.push(`020 chart_of_accounts FAILED: ${(e as Error).message}`); }
+
+  // Deactivate legacy 4-digit accounts that are no longer in use
+  try {
+    const COA_COMPANY = '11111111-1111-1111-1111-111111111111';
+    await query(`
+      UPDATE accounts
+         SET is_active = false
+       WHERE company_id = $1
+         AND length(code) = 4
+         AND is_active = true
+    `, [COA_COMPANY]);
+    results.push('020 legacy 4-digit accounts deactivated: ok');
+  } catch (e) { results.push(`020 legacy deactivate FAILED: ${(e as Error).message}`); }
+
+  // 028 — Link order_ins to purchase_orders
+  try {
+    await query(`ALTER TABLE order_ins ADD COLUMN IF NOT EXISTS purchase_order_id uuid REFERENCES purchase_orders(id)`);
+    results.push('028 order_ins.purchase_order_id: ok');
+  } catch (e) { results.push(`028 order_ins.purchase_order_id: ${(e as Error).message}`); }
 
   return ok({ results });
 }

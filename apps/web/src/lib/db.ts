@@ -9,9 +9,9 @@ export function getPool(): Pool {
     pool = new Pool({
       connectionString: url,
       ssl: { rejectUnauthorized: false },
-      max: 3,
+      max: 1,                      // one connection per serverless instance
       connectionTimeoutMillis: 10000,
-      idleTimeoutMillis: 20000,
+      idleTimeoutMillis: 5000,     // release idle connections quickly
       query_timeout: 15000,
     });
     pool.on('error', () => { pool = undefined; });

@@ -14,11 +14,11 @@ VALUES (
   'PHP'
 ) ON CONFLICT (id) DO NOTHING;
 
--- Branches: head office + sample depot + sample retail station
+-- Branches: head office + farm sites
 INSERT INTO branches (id, company_id, code, name, branch_type, address) VALUES
-  ('22222222-2222-2222-2222-222222222201', '11111111-1111-1111-1111-111111111111', 'HO',    'Head Office',          'office',          'Manila'),
-  ('22222222-2222-2222-2222-222222222202', '11111111-1111-1111-1111-111111111111', 'DEPOT-CAL', 'Calamba Fuel Depot', 'depot',           'Calamba, Laguna'),
-  ('22222222-2222-2222-2222-222222222203', '11111111-1111-1111-1111-111111111111', 'STN-001',   'Perpet Station SLEX',  'retail_station', 'SLEX, Calamba')
+  ('22222222-2222-2222-2222-222222222201', '11111111-1111-1111-1111-111111111111', 'HO',     'Head Office',              'office', 'Manila'),
+  ('22222222-2222-2222-2222-222222222202', '11111111-1111-1111-1111-111111111111', 'FARM-1', 'Farm Site 1 - San Pablo',  'farm',   'San Pablo, Laguna'),
+  ('22222222-2222-2222-2222-222222222203', '11111111-1111-1111-1111-111111111111', 'FARM-2', 'Farm Site 2 - Calamba',    'farm',   'Calamba, Laguna')
 ON CONFLICT DO NOTHING;
 
 -- Fiscal periods for 2026
