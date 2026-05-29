@@ -20,10 +20,10 @@ export function useTaggingData(): TaggingData {
   useEffect(() => {
     const cid = localStorage.getItem('company_id');
     if (!cid) return;
-    api.get<{ data: TagRef[] }>(`/admin/branches?company_id=${cid}&limit=100`).then(r => setBranches(r.data ?? [])).catch(() => {});
-    api.get<{ data: TagRef[] }>(`/poultry/buildings?company_id=${cid}&limit=100`).then(r => setBuildings(r.data ?? [])).catch(() => {});
-    api.get<{ data: TagRef[] }>(`/admin/cost-centers?company_id=${cid}&limit=100`).then(r => setCostCenters(r.data ?? [])).catch(() => {});
-    api.get<{ data: TagRef[] }>(`/poultry/grow-references?company_id=${cid}&limit=100`).then(r => setGrowRefs(r.data ?? [])).catch(() => {});
+    api.get<TagRef[]>(`/admin/branches?company_id=${cid}&limit=100`).then(r => setBranches(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<TagRef[]>(`/poultry/buildings?company_id=${cid}&limit=100`).then(r => setBuildings(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<TagRef[]>(`/admin/cost-centers?company_id=${cid}&limit=100`).then(r => setCostCenters(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<TagRef[]>(`/poultry/grow-references?company_id=${cid}&limit=100`).then(r => setGrowRefs(Array.isArray(r) ? r : [])).catch(() => {});
   }, []);
 
   return { branches, buildings, costCenters, growRefs };

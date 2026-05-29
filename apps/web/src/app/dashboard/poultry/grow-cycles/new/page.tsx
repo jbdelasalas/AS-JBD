@@ -41,7 +41,7 @@ export default function NewGrowCyclePage() {
     api.get<Building[]>(`/poultry/buildings?company_id=${cid}`).then(setBuildings).catch(() => {});
     api.get<Branch[]>(`/admin/branches?company_id=${cid}`).then(r => setBranches(Array.isArray(r) ? r : [])).catch(() => {});
     api.get<GrowRef[]>(`/poultry/grow-references?company_id=${cid}`).then(r => setGrowRefs(Array.isArray(r) ? r : [])).catch(() => {});
-    api.get<{ data: CostCenter[] }>(`/admin/cost-centers?company_id=${cid}&limit=100`).then(r => setCostCenters(r.data ?? [])).catch(() => {});
+    api.get<CostCenter[]>(`/admin/cost-centers?company_id=${cid}&limit=100`).then(r => setCostCenters(Array.isArray(r) ? r : [])).catch(() => {});
   }, []);
 
   // Filter buildings by selected location
