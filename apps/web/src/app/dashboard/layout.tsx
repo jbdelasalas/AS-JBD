@@ -9,6 +9,7 @@ import { loadBranding } from '@/lib/branding';
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -17,6 +18,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!token) {
       router.replace('/login');
     } else {
+      // Default open on desktop, closed on mobile
+      setSidebarOpen(window.innerWidth >= 768);
       setReady(true);
     }
   }, [router]);
@@ -30,10 +33,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex h-screen">
-      <Sidebar />
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopBar />
+        <TopBar onMenuToggle={() => setSidebarOpen((o) => !o)} />
         <main className="flex-1 overflow-y-auto bg-slate-50 p-6 dark:bg-slate-800">{children}</main>
       </div>
     </div>

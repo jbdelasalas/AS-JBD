@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useTheme } from '@/lib/theme';
 
-export function TopBar() {
+export function TopBar({ onMenuToggle }: { onMenuToggle: () => void }) {
   const [userName, setUserName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const { theme, setTheme } = useTheme();
@@ -20,8 +20,19 @@ export function TopBar() {
   }, []);
 
   return (
-    <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3 dark:border-slate-500 dark:bg-slate-600">
-      <div className="text-sm text-slate-500 dark:text-slate-200">{companyName}</div>
+    <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-500 dark:bg-slate-600">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onMenuToggle}
+          aria-label="Toggle menu"
+          className="flex h-8 w-8 items-center justify-center rounded text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <div className="text-sm text-slate-500 dark:text-slate-200">{companyName}</div>
+      </div>
       <div className="flex items-center gap-3">
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
