@@ -13,6 +13,7 @@ const NAV = [
   { href: '/dashboard/sales',       label: 'Sales & CRM' },
   { href: '/dashboard/purchasing',  label: 'Purchasing' },
   { href: '/dashboard/inventory',   label: 'Inventory' },
+  { href: '/dashboard/poultry',     label: 'Poultry Operations' },
 
   { href: '/dashboard/reports',     label: 'Reports' },
   { href: '/dashboard/bir',         label: 'BIR compliance' },
