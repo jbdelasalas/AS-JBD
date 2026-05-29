@@ -122,8 +122,8 @@ export async function POST(request: NextRequest) {
     const unapplied = amount - appTotal;
 
     const headerRows = await client.query(
-      `INSERT INTO customer_payments (company_id, branch_id, receipt_no, customer_id, payment_date, payment_method, reference, bank_ref, check_date, amount, unapplied_amount, is_advance, bank_account_id, notes, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'draft',$15) RETURNING *`,
+      `INSERT INTO customer_payments (company_id, branch_id, receipt_no, customer_id, payment_date, payment_method, reference, bank_ref, check_date, amount, unapplied_amount, is_advance, bank_account_id, notes, status, created_by, building_id, cost_center_id, grow_reference_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'draft',$15,$16,$17,$18) RETURNING *`,
       [
         companyId, dto.branch_id ?? null, receiptNo, customerId,
         dto.payment_date, dto.payment_method,
@@ -131,6 +131,7 @@ export async function POST(request: NextRequest) {
         amount.toFixed(2), unapplied.toFixed(2),
         dto.is_advance ?? (appTotal === 0),
         dto.bank_account_id ?? null, dto.notes ?? null, auth.userId,
+        dto.building_id ?? null, dto.cost_center_id ?? null, dto.grow_reference_id ?? null,
       ],
     );
     const header = headerRows.rows[0];

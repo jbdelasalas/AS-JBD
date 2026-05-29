@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { formatPHP, formatDate } from '@/lib/format';
+import { TaggingPanel, type TaggingValues } from '@/components/TaggingPanel';
 
 interface Supplier { id: string; code: string; name: string; }
 interface Account { id: string; code: string; name: string; account_type: string; }
@@ -38,6 +39,7 @@ function NewPaymentForm() {
     amount: '',
     bank_account_id: '',
   });
+  const [tags, setTags] = useState<TaggingValues>({ branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '' });
 
   useEffect(() => {
     const companyId = localStorage.getItem('company_id');
@@ -90,6 +92,10 @@ function NewPaymentForm() {
         amount,
         bank_account_id: form.bank_account_id || undefined,
         bill_ids: [...selectedBills],
+        branch_id: tags.branch_id || undefined,
+        building_id: tags.building_id || undefined,
+        cost_center_id: tags.cost_center_id || undefined,
+        grow_reference_id: tags.grow_reference_id || undefined,
       });
       router.push(`/dashboard/ap/payments/${pmt.id}`);
     } catch (e: unknown) {
@@ -213,6 +219,8 @@ function NewPaymentForm() {
             )}
           </div>
         )}
+
+        <TaggingPanel value={tags} onChange={(f, v) => setTags(t => ({ ...t, [f]: v }))} />
 
         <div className="flex gap-3">
           <button type="submit" disabled={saving}

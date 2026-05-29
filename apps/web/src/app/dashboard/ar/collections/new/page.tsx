@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { formatPHP } from '@/lib/format';
+import { TaggingPanel, type TaggingValues } from '@/components/TaggingPanel';
 
 interface Customer { id: string; code: string; name: string; }
 interface InvoiceRow { id: string; invoice_no: string; due_date: string; balance: number; status: string; }
@@ -36,6 +37,7 @@ function NewCollectionForm() {
   });
 
   const [apps, setApps] = useState<Application[]>([]);
+  const [tags, setTags] = useState<TaggingValues>({ branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '' });
 
   useEffect(() => {
     const companyId = localStorage.getItem('company_id');
@@ -99,6 +101,10 @@ function NewCollectionForm() {
         amount: form.amount,
         bank_account_id: form.bank_account_id || undefined,
         notes: form.notes || undefined,
+        branch_id: tags.branch_id || undefined,
+        building_id: tags.building_id || undefined,
+        cost_center_id: tags.cost_center_id || undefined,
+        grow_reference_id: tags.grow_reference_id || undefined,
         applications: apps.length > 0 ? apps.map((a) => ({ invoice_id: a.invoice_id, amount_applied: a.amount_applied })) : undefined,
       });
       router.push(`/dashboard/ar/collections/${pmt.id}`);
@@ -252,6 +258,8 @@ function NewCollectionForm() {
             </table>
           </div>
         )}
+
+        <TaggingPanel value={tags} onChange={(f, v) => setTags(t => ({ ...t, [f]: v }))} />
 
         <div className="flex gap-3">
           <button type="submit" disabled={saving}

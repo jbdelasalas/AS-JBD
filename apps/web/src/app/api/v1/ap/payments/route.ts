@@ -117,14 +117,16 @@ export async function POST(request: NextRequest) {
     const headerRows = await client.query(
       `INSERT INTO supplier_payments
          (company_id, voucher_no, supplier_id, payment_date, payment_method,
-          reference, amount, bank_account_id, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'draft',$9)
+          reference, amount, bank_account_id, status, created_by,
+          branch_id, building_id, cost_center_id, grow_reference_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'draft',$9,$10,$11,$12,$13)
        RETURNING *`,
       [
         companyId, voucherNo, supplierId,
         dto.payment_date, dto.payment_method ?? 'bank_transfer',
         dto.reference ?? null, amount.toFixed(2),
         dto.bank_account_id ?? null, auth.userId,
+        dto.branch_id ?? null, dto.building_id ?? null, dto.cost_center_id ?? null, dto.grow_reference_id ?? null,
       ],
     );
     const header = headerRows.rows[0];

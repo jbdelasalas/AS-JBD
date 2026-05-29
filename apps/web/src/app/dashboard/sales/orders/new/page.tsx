@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { TaggingPanel, type TaggingValues } from '@/components/TaggingPanel';
 
 interface Customer { id: string; code: string; name: string; payment_terms_days: number; credit_limit: number; }
 interface Item { id: string; sku: string; name: string; selling_price: number; }
@@ -42,6 +43,7 @@ export default function NewSalesOrderPage() {
   const [lines, setLines] = useState<Line[]>([
     { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12 },
   ]);
+  const [tags, setTags] = useState<TaggingValues>({ branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '' });
 
   useEffect(() => {
     const companyId = localStorage.getItem('company_id');
@@ -105,6 +107,10 @@ export default function NewSalesOrderPage() {
       const order = await api.post<{ id: string }>('/sales/orders', {
         company_id: companyId,
         ...form,
+        branch_id: tags.branch_id || undefined,
+        building_id: tags.building_id || undefined,
+        cost_center_id: tags.cost_center_id || undefined,
+        grow_reference_id: tags.grow_reference_id || undefined,
         warehouse_id: form.warehouse_id || undefined,
         delivery_date: form.delivery_date || undefined,
         lines: lines.map((l) => ({ ...l, item_id: l.line_type === 'item' ? l.item_id || undefined : undefined })),
@@ -347,6 +353,8 @@ export default function NewSalesOrderPage() {
             </tfoot>
           </table>
         </div>
+
+        <TaggingPanel value={tags} onChange={(f, v) => setTags(t => ({ ...t, [f]: v }))} />
 
         <div className="flex gap-3">
           <button

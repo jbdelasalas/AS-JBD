@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { TaggingPanel, type TaggingValues } from '@/components/TaggingPanel';
 
 interface Supplier { id: string; code: string; name: string; payment_terms_days: number; }
 interface Item { id: string; sku: string; name: string; selling_price: number; }
@@ -32,6 +33,7 @@ export default function NewPurchaseOrderPage() {
     expected_date: '',
     reference: '',
   });
+  const [tags, setTags] = useState<TaggingValues>({ branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '' });
 
   const [lines, setLines] = useState<Line[]>([
     { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12 },
@@ -92,6 +94,11 @@ export default function NewPurchaseOrderPage() {
       const po = await api.post<{ id: string }>('/purchasing/purchase-orders', {
         company_id: companyId,
         ...form,
+        ...tags,
+        branch_id: tags.branch_id || undefined,
+        building_id: tags.building_id || undefined,
+        cost_center_id: tags.cost_center_id || undefined,
+        grow_reference_id: tags.grow_reference_id || undefined,
         expected_date: form.expected_date || undefined,
         reference: form.reference || undefined,
         lines: lines.map((l) => ({ ...l, item_id: l.line_type === 'item' ? l.item_id || undefined : undefined })),
@@ -236,6 +243,8 @@ export default function NewPurchaseOrderPage() {
             </tfoot>
           </table>
         </div>
+
+        <TaggingPanel value={tags} onChange={(f, v) => setTags(t => ({ ...t, [f]: v }))} />
 
         <div className="flex gap-3">
           <button type="submit" disabled={saving}

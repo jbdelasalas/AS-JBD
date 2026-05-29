@@ -2456,5 +2456,37 @@ export async function POST(request: NextRequest) {
     results.push('028 order_ins.purchase_order_id: ok');
   } catch (e) { results.push(`028 order_ins.purchase_order_id: ${(e as Error).message}`); }
 
+  // 029 — P&L tagging columns: branch, building, cost_center, grow_reference on all transactional tables
+  const tag029: [string, string][] = [
+    ['purchase_orders.building_id',      `ALTER TABLE purchase_orders     ADD COLUMN IF NOT EXISTS building_id      uuid REFERENCES farm_buildings(id)`],
+    ['purchase_orders.cost_center_id',   `ALTER TABLE purchase_orders     ADD COLUMN IF NOT EXISTS cost_center_id   uuid REFERENCES cost_centers(id)`],
+    ['purchase_orders.grow_reference_id',`ALTER TABLE purchase_orders     ADD COLUMN IF NOT EXISTS grow_reference_id uuid REFERENCES grow_references(id)`],
+    ['bills.branch_id',                  `ALTER TABLE bills               ADD COLUMN IF NOT EXISTS branch_id         uuid REFERENCES branches(id)`],
+    ['bills.building_id',                `ALTER TABLE bills               ADD COLUMN IF NOT EXISTS building_id      uuid REFERENCES farm_buildings(id)`],
+    ['bills.cost_center_id',             `ALTER TABLE bills               ADD COLUMN IF NOT EXISTS cost_center_id   uuid REFERENCES cost_centers(id)`],
+    ['bills.grow_reference_id',          `ALTER TABLE bills               ADD COLUMN IF NOT EXISTS grow_reference_id uuid REFERENCES grow_references(id)`],
+    ['supplier_payments.branch_id',      `ALTER TABLE supplier_payments   ADD COLUMN IF NOT EXISTS branch_id         uuid REFERENCES branches(id)`],
+    ['supplier_payments.building_id',    `ALTER TABLE supplier_payments   ADD COLUMN IF NOT EXISTS building_id      uuid REFERENCES farm_buildings(id)`],
+    ['supplier_payments.cost_center_id', `ALTER TABLE supplier_payments   ADD COLUMN IF NOT EXISTS cost_center_id   uuid REFERENCES cost_centers(id)`],
+    ['supplier_payments.grow_ref_id',    `ALTER TABLE supplier_payments   ADD COLUMN IF NOT EXISTS grow_reference_id uuid REFERENCES grow_references(id)`],
+    ['goods_receipts.branch_id',         `ALTER TABLE goods_receipts      ADD COLUMN IF NOT EXISTS branch_id         uuid REFERENCES branches(id)`],
+    ['goods_receipts.building_id',       `ALTER TABLE goods_receipts      ADD COLUMN IF NOT EXISTS building_id      uuid REFERENCES farm_buildings(id)`],
+    ['goods_receipts.cost_center_id',    `ALTER TABLE goods_receipts      ADD COLUMN IF NOT EXISTS cost_center_id   uuid REFERENCES cost_centers(id)`],
+    ['goods_receipts.grow_ref_id',       `ALTER TABLE goods_receipts      ADD COLUMN IF NOT EXISTS grow_reference_id uuid REFERENCES grow_references(id)`],
+    ['sales_orders.building_id',         `ALTER TABLE sales_orders        ADD COLUMN IF NOT EXISTS building_id      uuid REFERENCES farm_buildings(id)`],
+    ['sales_orders.cost_center_id',      `ALTER TABLE sales_orders        ADD COLUMN IF NOT EXISTS cost_center_id   uuid REFERENCES cost_centers(id)`],
+    ['sales_orders.grow_reference_id',   `ALTER TABLE sales_orders        ADD COLUMN IF NOT EXISTS grow_reference_id uuid REFERENCES grow_references(id)`],
+    ['sales_invoices.building_id',       `ALTER TABLE sales_invoices      ADD COLUMN IF NOT EXISTS building_id      uuid REFERENCES farm_buildings(id)`],
+    ['sales_invoices.cost_center_id',    `ALTER TABLE sales_invoices      ADD COLUMN IF NOT EXISTS cost_center_id   uuid REFERENCES cost_centers(id)`],
+    ['sales_invoices.grow_reference_id', `ALTER TABLE sales_invoices      ADD COLUMN IF NOT EXISTS grow_reference_id uuid REFERENCES grow_references(id)`],
+    ['customer_payments.building_id',    `ALTER TABLE customer_payments   ADD COLUMN IF NOT EXISTS building_id      uuid REFERENCES farm_buildings(id)`],
+    ['customer_payments.cost_center_id', `ALTER TABLE customer_payments   ADD COLUMN IF NOT EXISTS cost_center_id   uuid REFERENCES cost_centers(id)`],
+    ['customer_payments.grow_ref_id',    `ALTER TABLE customer_payments   ADD COLUMN IF NOT EXISTS grow_reference_id uuid REFERENCES grow_references(id)`],
+  ];
+  for (const [label, sql] of tag029) {
+    try { await query(sql); results.push(`029 ${label}: ok`); }
+    catch (e) { results.push(`029 ${label}: ${(e as Error).message}`); }
+  }
+
   return ok({ results });
 }

@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { TaggingPanel, type TaggingValues } from '@/components/TaggingPanel';
 
 interface Supplier { id: string; code: string; name: string; payment_terms_days: number; ewt_rate: number; }
 interface Account { id: string; code: string; name: string; }
@@ -41,6 +42,7 @@ function NewBillForm() {
   const [lines, setLines] = useState<Line[]>([
     { line_type: 'gl', item_id: '', description: '', quantity: 1, unit_price: 0, vat_rate: 12, ewt_rate: 0, expense_account_id: '' },
   ]);
+  const [tags, setTags] = useState<TaggingValues>({ branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '' });
 
   useEffect(() => {
     const companyId = localStorage.getItem('company_id');
@@ -89,6 +91,10 @@ function NewBillForm() {
       const bill = await api.post<{ id: string }>('/ap/bills', {
         company_id: companyId,
         ...form,
+        branch_id: tags.branch_id || undefined,
+        building_id: tags.building_id || undefined,
+        cost_center_id: tags.cost_center_id || undefined,
+        grow_reference_id: tags.grow_reference_id || undefined,
         due_date: form.due_date || undefined,
         po_id: form.po_id || undefined,
         lines: lines.map((l) => ({
@@ -278,6 +284,8 @@ function NewBillForm() {
             </tfoot>
           </table>
         </div>
+
+        <TaggingPanel value={tags} onChange={(f, v) => setTags(t => ({ ...t, [f]: v }))} />
 
         <div className="flex gap-3">
           <button type="submit" disabled={saving}

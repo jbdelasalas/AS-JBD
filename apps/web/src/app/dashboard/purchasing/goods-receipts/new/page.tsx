@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { TaggingPanel, type TaggingValues } from '@/components/TaggingPanel';
 
 interface POOption { id: string; po_no: string; supplier_name: string; }
 interface POLine {
@@ -43,6 +44,7 @@ function NewGoodsReceiptForm() {
     delivery_no: '',
     notes: '',
   });
+  const [tags, setTags] = useState<TaggingValues>({ branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '' });
 
   useEffect(() => {
     const companyId = localStorage.getItem('company_id');
@@ -94,6 +96,10 @@ function NewGoodsReceiptForm() {
         delivery_no: form.delivery_no || undefined,
         notes: form.notes || undefined,
         warehouse_id: form.warehouse_id || undefined,
+        branch_id: tags.branch_id || undefined,
+        building_id: tags.building_id || undefined,
+        cost_center_id: tags.cost_center_id || undefined,
+        grow_reference_id: tags.grow_reference_id || undefined,
         lines: lines.map((l) => ({
           po_line_id: l.po_line_id,
           qty_received: l.qty_received,
@@ -195,6 +201,8 @@ function NewGoodsReceiptForm() {
             )}
           </div>
         )}
+
+        <TaggingPanel value={tags} onChange={(f, v) => setTags(t => ({ ...t, [f]: v }))} />
 
         <div className="flex gap-3">
           <button type="submit" disabled={saving}

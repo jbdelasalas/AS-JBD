@@ -144,8 +144,9 @@ export async function POST(request: NextRequest) {
       `INSERT INTO sales_invoices
          (company_id, branch_id, invoice_no, customer_id, so_id, dr_id,
           invoice_date, due_date, payment_terms_days, reference, notes,
-          subtotal, vat_amount, total, amount_paid, balance, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,0,$14,'draft',$15)
+          subtotal, vat_amount, total, amount_paid, balance, status, created_by,
+          building_id, cost_center_id, grow_reference_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,0,$14,'draft',$15,$16,$17,$18)
        RETURNING *`,
       [
         companyId, dto.branch_id ?? null, invoiceNo, customerId,
@@ -153,6 +154,7 @@ export async function POST(request: NextRequest) {
         dto.invoice_date, dueDate.toISOString().split('T')[0], terms,
         dto.reference ?? null, dto.notes ?? null,
         totSubtotal.toFixed(2), totVat.toFixed(2), totTotal.toFixed(2), auth.userId,
+        dto.building_id ?? null, dto.cost_center_id ?? null, dto.grow_reference_id ?? null,
       ],
     );
     const header = headerRows.rows[0];
