@@ -3,7 +3,8 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
-import { TaggingPanel, type TaggingValues } from '@/components/TaggingPanel';
+import { useTaggingData } from '@/hooks/useTaggingData';
+import { TaggingFields, GrowSelect, type TaggingValues } from '@/components/TaggingPanel';
 
 interface Customer { id: string; code: string; name: string; payment_terms_days: number; }
 interface Item { id: string; sku: string; name: string; selling_price: number; }
@@ -18,11 +19,13 @@ interface Line {
   unit_price: number;
   discount_pct: number;
   vat_rate: number;
+  grow_reference_id: string;
 }
 
 function NewInvoiceForm() {
   const router = useRouter();
   const params = useSearchParams();
+  const tagData = useTaggingData();
   const preCustomerId = params.get('customer_id') ?? '';
   const preSoId = params.get('so_id') ?? '';
 
@@ -41,7 +44,7 @@ function NewInvoiceForm() {
   });
 
   const [lines, setLines] = useState<Line[]>([
-    { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12 },
+    { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12, grow_reference_id: '' },
   ]);
   const [tags, setTags] = useState<TaggingValues>({ branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '' });
 
@@ -55,8 +58,13 @@ function NewInvoiceForm() {
     ]).then(([c, i, a]) => { setCustomers(c.data); setItems(i); setAccounts(a.data ?? []); }).catch(() => {});
   }, []);
 
+  function handleTagChange(field: keyof TaggingValues, val: string) {
+    setTags(t => ({ ...t, [field]: val }));
+    if (field === 'grow_reference_id') setLines(prev => prev.map(l => ({ ...l, grow_reference_id: val })));
+  }
+
   function addLine() {
-    setLines((l) => [...l, { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12 }]);
+    setLines((l) => [...l, { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12, grow_reference_id: tags.grow_reference_id }]);
   }
 
   function updateLine(idx: number, field: keyof Line, val: string | number) {
@@ -164,6 +172,7 @@ function NewInvoiceForm() {
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
+            <TaggingFields value={tags} data={tagData} onChange={handleTagChange} />
           </div>
         </div>
 
@@ -175,14 +184,15 @@ function NewInvoiceForm() {
           <table className="min-w-full text-xs">
             <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
               <tr>
-                <th className="px-2 py-1.5 text-left font-medium w-28">Type</th>
-                <th className="px-2 py-1.5 text-left font-medium w-44">Account / Item</th>
+                <th className="px-2 py-1.5 text-left font-medium w-24">Type</th>
+                <th className="px-2 py-1.5 text-left font-medium w-40">Account / Item</th>
                 <th className="px-2 py-1.5 text-left font-medium">Description *</th>
-                <th className="px-2 py-1.5 text-right font-medium w-20">Qty</th>
-                <th className="px-2 py-1.5 text-right font-medium w-28">Unit Price</th>
-                <th className="px-2 py-1.5 text-right font-medium w-16">Disc %</th>
-                <th className="px-2 py-1.5 text-right font-medium w-16">VAT %</th>
-                <th className="px-2 py-1.5 text-right font-medium w-28">Total</th>
+                <th className="px-2 py-1.5 text-right font-medium w-16">Qty</th>
+                <th className="px-2 py-1.5 text-right font-medium w-24">Unit Price</th>
+                <th className="px-2 py-1.5 text-right font-medium w-14">Disc %</th>
+                <th className="px-2 py-1.5 text-right font-medium w-14">VAT %</th>
+                <th className="px-2 py-1.5 text-right font-medium w-24">Total</th>
+                <th className="px-2 py-1.5 text-left font-medium w-28">Grow</th>
                 <th className="w-6" />
               </tr>
             </thead>
@@ -239,6 +249,9 @@ function NewInvoiceForm() {
                   <td className="px-2 py-1 text-right font-mono">
                     {lineTotal(l).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                   </td>
+                  <td className="px-2 py-1">
+                    <GrowSelect value={l.grow_reference_id} data={tagData} onChange={v => updateLine(idx, 'grow_reference_id', v)} />
+                  </td>
                   <td className="px-1 py-1 text-center">
                     {lines.length > 1 && (
                       <button type="button" onClick={() => setLines((l) => l.filter((_, i) => i !== idx))}
@@ -250,7 +263,7 @@ function NewInvoiceForm() {
             </tbody>
             <tfoot>
               <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-                <td colSpan={7} className="px-2 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Grand Total (incl. VAT)</td>
+                <td colSpan={8} className="px-2 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Grand Total (incl. VAT)</td>
                 <td className="px-2 py-2 text-right font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">
                   ₱{grandTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </td>
@@ -259,8 +272,6 @@ function NewInvoiceForm() {
             </tfoot>
           </table>
         </div>
-
-        <TaggingPanel value={tags} onChange={(f, v) => setTags(t => ({ ...t, [f]: v }))} />
 
         <div className="flex gap-3">
           <button type="submit" disabled={saving}

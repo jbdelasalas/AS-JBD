@@ -2488,5 +2488,18 @@ export async function POST(request: NextRequest) {
     catch (e) { results.push(`029 ${label}: ${(e as Error).message}`); }
   }
 
+  // 030 — grow_reference_id on all line-item tables for per-line P&L tagging
+  const lineTags030: [string, string][] = [
+    ['purchase_order_lines.grow_reference_id', `ALTER TABLE purchase_order_lines  ADD COLUMN IF NOT EXISTS grow_reference_id uuid REFERENCES grow_references(id)`],
+    ['bill_lines.grow_reference_id',           `ALTER TABLE bill_lines            ADD COLUMN IF NOT EXISTS grow_reference_id uuid REFERENCES grow_references(id)`],
+    ['sales_order_lines.grow_reference_id',    `ALTER TABLE sales_order_lines     ADD COLUMN IF NOT EXISTS grow_reference_id uuid REFERENCES grow_references(id)`],
+    ['sales_invoice_lines.grow_reference_id',  `ALTER TABLE sales_invoice_lines   ADD COLUMN IF NOT EXISTS grow_reference_id uuid REFERENCES grow_references(id)`],
+    ['goods_receipt_lines.grow_reference_id',  `ALTER TABLE goods_receipt_lines   ADD COLUMN IF NOT EXISTS grow_reference_id uuid REFERENCES grow_references(id)`],
+  ];
+  for (const [label, sql] of lineTags030) {
+    try { await query(sql); results.push(`030 ${label}: ok`); }
+    catch (e) { results.push(`030 ${label}: ${(e as Error).message}`); }
+  }
+
   return ok({ results });
 }

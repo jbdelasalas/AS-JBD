@@ -159,13 +159,13 @@ export async function POST(request: NextRequest) {
       await client.query(
         `INSERT INTO bill_lines
            (bill_id, line_no, item_id, description, quantity, unit_price, vat_rate, ewt_rate,
-            line_subtotal, line_vat, line_total, ewt_amount, expense_account_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+            line_subtotal, line_vat, line_total, ewt_amount, expense_account_id, grow_reference_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
         [
           header.id, l.line_no, l.item_id ?? null, l.description,
           l.qty, l.price, l.vatRate, l.ewtRate,
           l.lineSubtotal.toFixed(2), l.lineVat.toFixed(2), l.lineTotal.toFixed(2), l.ewtAmount.toFixed(2),
-          l.expense_account_id ?? null,
+          l.expense_account_id ?? null, (l as Record<string,unknown>).grow_reference_id ?? null,
         ],
       );
     }

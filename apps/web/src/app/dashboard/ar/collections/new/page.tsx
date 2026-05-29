@@ -4,7 +4,8 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { formatPHP } from '@/lib/format';
-import { TaggingPanel, type TaggingValues } from '@/components/TaggingPanel';
+import { useTaggingData } from '@/hooks/useTaggingData';
+import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
 
 interface Customer { id: string; code: string; name: string; }
 interface InvoiceRow { id: string; invoice_no: string; due_date: string; balance: number; status: string; }
@@ -37,6 +38,7 @@ function NewCollectionForm() {
   });
 
   const [apps, setApps] = useState<Application[]>([]);
+  const tagData = useTaggingData();
   const [tags, setTags] = useState<TaggingValues>({ branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '' });
 
   useEffect(() => {
@@ -259,7 +261,9 @@ function NewCollectionForm() {
           </div>
         )}
 
-        <TaggingPanel value={tags} onChange={(f, v) => setTags(t => ({ ...t, [f]: v }))} />
+        <div className="grid grid-cols-4 gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+          <TaggingFields value={tags} data={tagData} onChange={(f, v) => setTags(t => ({ ...t, [f]: v }))} />
+        </div>
 
         <div className="flex gap-3">
           <button type="submit" disabled={saving}

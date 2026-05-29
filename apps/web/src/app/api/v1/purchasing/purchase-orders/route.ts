@@ -135,11 +135,12 @@ export async function POST(request: NextRequest) {
     for (const l of mappedLines) {
       await client.query(
         `INSERT INTO purchase_order_lines
-           (po_id, line_no, item_id, description, quantity, qty_received, unit_price, vat_rate, line_total)
-         VALUES ($1,$2,$3,$4,$5,0,$6,$7,$8)`,
+           (po_id, line_no, item_id, description, quantity, qty_received, unit_price, vat_rate, line_total, grow_reference_id)
+         VALUES ($1,$2,$3,$4,$5,0,$6,$7,$8,$9)`,
         [
           header.id, l.line_no, l.item_id ?? null, l.description,
           l.qty, l.price, l.vatRate, l.lineTotal.toFixed(2),
+          (l as Record<string,unknown>).grow_reference_id ?? null,
         ],
       );
     }

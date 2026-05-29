@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { TaggingPanel, type TaggingValues } from '@/components/TaggingPanel';
+import { useTaggingData } from '@/hooks/useTaggingData';
+import { TaggingFields, GrowSelect, type TaggingValues } from '@/components/TaggingPanel';
 
 interface Customer { id: string; code: string; name: string; payment_terms_days: number; credit_limit: number; }
 interface Item { id: string; sku: string; name: string; selling_price: number; }
@@ -19,10 +20,12 @@ interface Line {
   unit_price: number;
   discount_pct: number;
   vat_rate: number;
+  grow_reference_id: string;
 }
 
 export default function NewSalesOrderPage() {
   const router = useRouter();
+  const tagData = useTaggingData();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -41,7 +44,7 @@ export default function NewSalesOrderPage() {
   });
 
   const [lines, setLines] = useState<Line[]>([
-    { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12 },
+    { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12, grow_reference_id: '' },
   ]);
   const [tags, setTags] = useState<TaggingValues>({ branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '' });
 
@@ -58,8 +61,13 @@ export default function NewSalesOrderPage() {
       .then((r) => setAccounts(r.data ?? [])).catch(() => {});
   }, []);
 
+  function handleTagChange(field: keyof TaggingValues, val: string) {
+    setTags(t => ({ ...t, [field]: val }));
+    if (field === 'grow_reference_id') setLines(prev => prev.map(l => ({ ...l, grow_reference_id: val })));
+  }
+
   function addLine() {
-    setLines((l) => [...l, { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12 }]);
+    setLines((l) => [...l, { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12, grow_reference_id: tags.grow_reference_id }]);
   }
 
   function removeLine(idx: number) {
@@ -225,6 +233,7 @@ export default function NewSalesOrderPage() {
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               />
             </div>
+            <TaggingFields value={tags} data={tagData} onChange={handleTagChange} />
           </div>
         </div>
 
@@ -240,14 +249,15 @@ export default function NewSalesOrderPage() {
           <table className="min-w-full text-xs">
             <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
               <tr>
-                <th className="px-2 py-1.5 text-left font-medium w-28">Type</th>
-                <th className="px-2 py-1.5 text-left font-medium w-44">Account / Item</th>
+                <th className="px-2 py-1.5 text-left font-medium w-24">Type</th>
+                <th className="px-2 py-1.5 text-left font-medium w-40">Account / Item</th>
                 <th className="px-2 py-1.5 text-left font-medium">Description</th>
-                <th className="px-2 py-1.5 text-right font-medium w-20">Qty</th>
-                <th className="px-2 py-1.5 text-right font-medium w-28">Unit Price</th>
-                <th className="px-2 py-1.5 text-right font-medium w-16">Disc %</th>
-                <th className="px-2 py-1.5 text-right font-medium w-16">VAT %</th>
-                <th className="px-2 py-1.5 text-right font-medium w-28">Total</th>
+                <th className="px-2 py-1.5 text-right font-medium w-16">Qty</th>
+                <th className="px-2 py-1.5 text-right font-medium w-24">Unit Price</th>
+                <th className="px-2 py-1.5 text-right font-medium w-14">Disc %</th>
+                <th className="px-2 py-1.5 text-right font-medium w-14">VAT %</th>
+                <th className="px-2 py-1.5 text-right font-medium w-24">Total</th>
+                <th className="px-2 py-1.5 text-left font-medium w-28">Grow</th>
                 <th className="w-6" />
               </tr>
             </thead>
@@ -328,15 +338,12 @@ export default function NewSalesOrderPage() {
                   <td className="px-2 py-1 text-right font-mono">
                     {lineTotal(l).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                   </td>
+                  <td className="px-2 py-1">
+                    <GrowSelect value={l.grow_reference_id} data={tagData} onChange={v => updateLine(idx, 'grow_reference_id', v)} />
+                  </td>
                   <td className="px-1 py-1 text-center">
                     {lines.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeLine(idx)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        ×
-                      </button>
+                      <button type="button" onClick={() => removeLine(idx)} className="text-red-500 hover:text-red-700">×</button>
                     )}
                   </td>
                 </tr>
@@ -344,7 +351,7 @@ export default function NewSalesOrderPage() {
             </tbody>
             <tfoot>
               <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-                <td colSpan={7} className="px-2 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Grand Total</td>
+                <td colSpan={8} className="px-2 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Grand Total</td>
                 <td className="px-2 py-2 text-right font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">
                   ₱{grandTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </td>
@@ -353,8 +360,6 @@ export default function NewSalesOrderPage() {
             </tfoot>
           </table>
         </div>
-
-        <TaggingPanel value={tags} onChange={(f, v) => setTags(t => ({ ...t, [f]: v }))} />
 
         <div className="flex gap-3">
           <button
