@@ -90,6 +90,7 @@ export default function AdminHomePage() {
   );
 
   const MODULES = [
+    { href: '/dashboard/admin/master-data', title: 'Master Data', desc: 'Items, customers, suppliers, locations, buildings, departments, grow references', highlight: true },
     { href: '/dashboard/admin/users', title: 'Users', desc: 'Manage system users, passwords, and roles' },
     { href: '/dashboard/admin/roles', title: 'Roles & Permissions', desc: 'Define roles and assign permissions per module' },
     { href: '/dashboard/admin/companies', title: 'Companies', desc: 'Company profile and BIR registration' },
@@ -113,8 +114,12 @@ export default function AdminHomePage() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {MODULES.map((m) => (
           <a key={m.href} href={m.href}
-            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 hover:border-brand-300 dark:hover:border-brand-600 hover:shadow-sm transition-all">
-            <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{m.title}</div>
+            className={`rounded-lg border p-3 hover:shadow-sm transition-all ${
+              (m as { highlight?: boolean }).highlight
+                ? 'border-brand-300 bg-brand-50 dark:border-brand-700 dark:bg-slate-800 hover:border-brand-400'
+                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-brand-300 dark:hover:border-brand-600'
+            }`}>
+            <div className={`text-sm font-medium ${(m as { highlight?: boolean }).highlight ? 'text-brand-700 dark:text-brand-400' : 'text-slate-900 dark:text-slate-100'}`}>{m.title}</div>
             <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{m.desc}</div>
           </a>
         ))}

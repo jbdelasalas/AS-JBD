@@ -6,12 +6,14 @@ import { api } from '@/lib/api';
 interface Batch { id: string; batch_no: string; heads_available: number; item_name: string; date_received: string; }
 interface Building { id: string; code: string; name: string; }
 interface Branch { id: string; name: string; code: string; }
+interface GrowRef { id: string; code: string; name: string; }
 
 export default function NewGrowCyclePage() {
   const router = useRouter();
   const [batches, setBatches] = useState<Batch[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [growRefs, setGrowRefs] = useState<GrowRef[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,7 +32,8 @@ export default function NewGrowCyclePage() {
     const cid = localStorage.getItem('company_id'); if (!cid) return;
     api.get<Batch[]>(`/poultry/chick-batches?company_id=${cid}&status=available`).then(setBatches).catch(() => {});
     api.get<Building[]>(`/poultry/buildings?company_id=${cid}`).then(setBuildings).catch(() => {});
-    api.get<{ data: Branch[] }>(`/admin/branches?company_id=${cid}`).then(r => setBranches(r.data ?? [])).catch(() => {});
+    api.get<Branch[]>(`/admin/branches?company_id=${cid}`).then(r => setBranches(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<GrowRef[]>(`/poultry/grow-references?company_id=${cid}`).then(r => setGrowRefs(Array.isArray(r) ? r : [])).catch(() => {});
   }, []);
 
   const selectedBatch = batches.find(b => b.id === form.batch_id);
@@ -130,8 +133,16 @@ export default function NewGrowCyclePage() {
             </div>
             <div className="col-span-2">
               <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Grow Reference</label>
-              <input type="text" placeholder="e.g. Grow 1" value={form.grow_reference} onChange={e => setField('grow_reference', e.target.value)}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+              {growRefs.length > 0 ? (
+                <select value={form.grow_reference} onChange={e => setField('grow_reference', e.target.value)}
+                  className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                  <option value="">Select grow reference…</option>
+                  {growRefs.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
+                </select>
+              ) : (
+                <input type="text" placeholder="e.g. Grow 1" value={form.grow_reference} onChange={e => setField('grow_reference', e.target.value)}
+                  className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+              )}
             </div>
 
             {/* Row 4 */}

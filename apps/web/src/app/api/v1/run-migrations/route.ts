@@ -1798,6 +1798,34 @@ export async function POST(request: NextRequest) {
     catch (e) { results.push(`022 ${label}: ${(e as Error).message}`); }
   }
 
+  // 023 — Master Data: departments + grow_references
+  const master023 = [
+    [`departments`, `CREATE TABLE IF NOT EXISTS departments (
+      id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      company_id  uuid NOT NULL REFERENCES companies(id),
+      code        text NOT NULL,
+      name        text NOT NULL,
+      description text,
+      is_active   boolean DEFAULT true,
+      created_at  timestamptz DEFAULT now(),
+      UNIQUE (company_id, code)
+    )`],
+    [`grow_references`, `CREATE TABLE IF NOT EXISTS grow_references (
+      id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      company_id  uuid NOT NULL REFERENCES companies(id),
+      code        text NOT NULL,
+      name        text NOT NULL,
+      description text,
+      is_active   boolean DEFAULT true,
+      created_at  timestamptz DEFAULT now(),
+      UNIQUE (company_id, code)
+    )`],
+  ] as [string, string][];
+  for (const [tbl, sql] of master023) {
+    try { await query(sql); results.push(`023 ${tbl}: ok`); }
+    catch (e) { results.push(`023 ${tbl}: ${(e as Error).message}`); }
+  }
+
   // Customers — use code prefix TEST-C so they don't conflict with API-generated CUST-xxxxxx
   try {
     await query(`
