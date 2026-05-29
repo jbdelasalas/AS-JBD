@@ -5,7 +5,7 @@ const MASTER_DATA = [
   {
     group: 'Inventory',
     items: [
-      { href: '/dashboard/inventory/items', title: 'Items', desc: 'SKUs, pricing, costing, and item catalog', icon: '📦' },
+      { href: '/dashboard/admin/master-data/items', title: 'Items', desc: 'SKUs, pricing, costing, and item catalog', icon: '📦' },
     ],
   },
   {
@@ -18,8 +18,8 @@ const MASTER_DATA = [
   {
     group: 'Parties',
     items: [
-      { href: '/dashboard/ar/customers', title: 'Customers', desc: 'Customer accounts and contact details', icon: '👥' },
-      { href: '/dashboard/ap/suppliers', title: 'Suppliers', desc: 'Supplier accounts and payment terms', icon: '🏭' },
+      { href: '/dashboard/admin/master-data/customers', title: 'Customers', desc: 'Customer accounts, credit limits, and payment terms', icon: '👥' },
+      { href: '/dashboard/admin/master-data/suppliers', title: 'Suppliers', desc: 'Supplier accounts, TIN, payment terms, and EWT rates', icon: '🏭' },
     ],
   },
   {

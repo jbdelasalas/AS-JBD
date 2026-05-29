@@ -10,7 +10,7 @@ const MODULES = [
   { href: '/dashboard/ar/invoices',    label: 'Sales Invoices',   desc: 'Issue, post, and track customer invoices.',    color: 'border-blue-200 bg-blue-50 text-blue-800' },
   { href: '/dashboard/ar/collections', label: 'Collections',      desc: 'Record payments and issue official receipts.',  color: 'border-emerald-200 bg-emerald-50 text-emerald-800' },
   { href: '/dashboard/ar/credit-memos',label: 'Credit Memos',     desc: 'Issue and apply AR credit adjustments.',        color: 'border-amber-200 bg-amber-50 text-amber-800' },
-  { href: '/dashboard/ar/customers',   label: 'Customers',        desc: 'Manage customer accounts and credit limits.',   color: 'border-purple-200 bg-purple-50 text-purple-800' },
+  { href: '/dashboard/admin/master-data/customers', label: 'Customers', desc: 'Manage customer accounts and credit limits.', color: 'border-purple-200 bg-purple-50 text-purple-800' },
 ];
 
 export default function ARPage() {

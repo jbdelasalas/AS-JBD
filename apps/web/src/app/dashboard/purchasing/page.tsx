@@ -13,7 +13,7 @@ interface PurchasingSummary {
 }
 
 const MODULES = [
-  { href: '/dashboard/purchasing/suppliers',      label: 'Suppliers',       desc: 'Manage vendor master records, TIN, EWT rates, and payment terms.',  color: 'border-brand-200 bg-brand-50 text-brand-800' },
+  { href: '/dashboard/admin/master-data/suppliers', label: 'Suppliers',       desc: 'Manage vendor master records, TIN, EWT rates, and payment terms.',  color: 'border-brand-200 bg-brand-50 text-brand-800' },
   { href: '/dashboard/purchasing/purchase-orders', label: 'Purchase Orders', desc: 'Create, submit, and track POs through approval and receipt.',        color: 'border-amber-200 bg-amber-50 text-amber-800' },
   { href: '/dashboard/purchasing/goods-receipts',  label: 'Goods Receipts',  desc: 'Record goods received against approved purchase orders.',           color: 'border-emerald-200 bg-emerald-50 text-emerald-800' },
 ];
