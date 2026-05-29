@@ -2,6 +2,8 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { useTaggingData } from '@/hooks/useTaggingData';
+import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
 
 interface Cycle { id: string; doc_no: string; heads_available: number; item_name: string; }
 interface Item { id: string; sku: string; name: string; }
@@ -16,6 +18,8 @@ function NewTallySheetForm() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const taggingData = useTaggingData();
+  const [tagging, setTagging] = useState<TaggingValues>({ branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '' });
   const [form, setForm] = useState({ grow_cycle_id: params.get('grow_cycle_id') ?? '', warehouse_id: '', transfer_date: new Date().toISOString().split('T')[0], tally_type: 'harvest', reject_kgs: 0, reject_heads: 0, received_by: '', issued_by: '', checked_by: '', delivery_method: '', plate_number: '', driver: '', helper: '', start_time: '', end_time: '', remarks: '' });
   const [lines, setLines] = useState<Line[]>([{ item_id: '', heads: 0, gross_kgs: 0, crate_kgs: 0, remarks: '' }]);
 
@@ -38,7 +42,7 @@ function NewTallySheetForm() {
     try {
       const cid = localStorage.getItem('company_id')!;
       const linesWithNet = lines.map(l => ({ ...l, net_kgs: Math.max(0, l.gross_kgs - l.crate_kgs) }));
-      const rec = await api.post<{ id: string }>('/poultry/tally-sheets', { company_id: cid, ...form, lines: linesWithNet });
+      const rec = await api.post<{ id: string }>('/poultry/tally-sheets', { company_id: cid, ...form, ...tagging, lines: linesWithNet });
       router.push(`/dashboard/poultry/tally-sheets/${rec.id}`);
     } catch (e: unknown) { setError((e as Error).message); } finally { setSaving(false); }
   }
@@ -109,6 +113,7 @@ function NewTallySheetForm() {
               <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Remarks</label>
               <input type="text" value={form.remarks} onChange={e => setForm(f => ({ ...f, remarks: e.target.value }))} className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
+            <TaggingFields value={tagging} data={taggingData} onChange={(f, v) => setTagging(t => ({ ...t, [f]: v }))} />
           </div>
         </div>
 

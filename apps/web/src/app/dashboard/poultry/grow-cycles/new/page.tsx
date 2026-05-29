@@ -12,6 +12,7 @@ interface Batch {
 interface Building { id: string; code: string; name: string; branch_id: string | null; }
 interface Branch { id: string; name: string; code: string; }
 interface GrowRef { id: string; code: string; name: string; }
+interface CostCenter { id: string; code: string; name: string; }
 
 export default function NewGrowCyclePage() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function NewGrowCyclePage() {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [growRefs, setGrowRefs] = useState<GrowRef[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,7 +28,7 @@ export default function NewGrowCyclePage() {
   const endDefault = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
   const [form, setForm] = useState({
     batch_id: '', branch_id: '', building_id: '',
-    grow_reference: '', year: new Date().getFullYear().toString(),
+    grow_reference: '', cost_center_id: '', year: new Date().getFullYear().toString(),
     start_date: now, expected_end_date: endDefault,
     heads: '', approx_heads: '', est_harvest_recovery: '70',
     chick_price_per_head: '', approx_chick_price_per_head: '',
@@ -39,6 +41,7 @@ export default function NewGrowCyclePage() {
     api.get<Building[]>(`/poultry/buildings?company_id=${cid}`).then(setBuildings).catch(() => {});
     api.get<Branch[]>(`/admin/branches?company_id=${cid}`).then(r => setBranches(Array.isArray(r) ? r : [])).catch(() => {});
     api.get<GrowRef[]>(`/poultry/grow-references?company_id=${cid}`).then(r => setGrowRefs(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<{ data: CostCenter[] }>(`/admin/cost-centers?company_id=${cid}&limit=100`).then(r => setCostCenters(r.data ?? [])).catch(() => {});
   }, []);
 
   // Filter buildings by selected location
@@ -76,6 +79,7 @@ export default function NewGrowCyclePage() {
         branch_id: form.branch_id || undefined,
         building_id: form.building_id || undefined,
         grow_reference: form.grow_reference || undefined,
+        cost_center_id: form.cost_center_id || undefined,
         start_date: form.start_date,
         expected_end_date: form.expected_end_date || undefined,
         heads: form.heads ? parseFloat(form.heads) : undefined,
@@ -146,7 +150,7 @@ export default function NewGrowCyclePage() {
               <input readOnly value="Active" className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-400 dark:border-slate-700 dark:bg-slate-800" />
             </div>
 
-            {/* Row 3 — Location + Grow Reference */}
+            {/* Row 3 — Location + Grow Reference + Cost Center */}
             <div className="col-span-2">
               <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Location *</label>
               <select required value={form.branch_id} onChange={e => handleLocationChange(e.target.value)}
@@ -155,18 +159,21 @@ export default function NewGrowCyclePage() {
                 {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             </div>
-            <div className="col-span-2">
+            <div>
               <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Grow Reference</label>
-              {growRefs.length > 0 ? (
-                <select value={form.grow_reference} onChange={e => setField('grow_reference', e.target.value)}
-                  className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
-                  <option value="">Select grow reference…</option>
-                  {growRefs.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
-                </select>
-              ) : (
-                <input type="text" placeholder="e.g. Grow 1" value={form.grow_reference} onChange={e => setField('grow_reference', e.target.value)}
-                  className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
-              )}
+              <select value={form.grow_reference} onChange={e => setField('grow_reference', e.target.value)}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                <option value="">— none —</option>
+                {growRefs.map(g => <option key={g.id} value={g.name}>{g.code} — {g.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Cost Center</label>
+              <select value={form.cost_center_id} onChange={e => setField('cost_center_id', e.target.value)}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                <option value="">— none —</option>
+                {costCenters.map(c => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+              </select>
             </div>
 
             {/* Row 4 — Building + Chick Batch (with PO tag) */}

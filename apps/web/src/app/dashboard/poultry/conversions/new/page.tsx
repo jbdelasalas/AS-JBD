@@ -2,6 +2,8 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { useTaggingData } from '@/hooks/useTaggingData';
+import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
 
 interface Item { id: string; sku: string; name: string; }
 interface Warehouse { id: string; code: string; name: string; }
@@ -14,6 +16,8 @@ function NewConversionForm() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const taggingData = useTaggingData();
+  const [tagging, setTagging] = useState<TaggingValues>({ branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '' });
   const [form, setForm] = useState({ source_item_id: '', source_heads: 0, source_kgs: 0, warehouse_id: '', transaction_date: new Date().toISOString().split('T')[0], tally_sheet_id: params.get('tally_sheet_id') ?? '', remarks: '' });
   const [outputs, setOutputs] = useState<Output[]>([{ output_item_id: '', heads: 0, kgs: 0, unit_cost: 0, remarks: '' }]);
 
@@ -32,7 +36,7 @@ function NewConversionForm() {
     setSaving(true);
     try {
       const cid = localStorage.getItem('company_id')!;
-      const rec = await api.post<{ id: string }>('/poultry/conversions', { company_id: cid, ...form, tally_sheet_id: form.tally_sheet_id || undefined, outputs });
+      const rec = await api.post<{ id: string }>('/poultry/conversions', { company_id: cid, ...form, ...tagging, tally_sheet_id: form.tally_sheet_id || undefined, outputs });
       router.push(`/dashboard/poultry/conversions/${rec.id}`);
     } catch (e: unknown) { setError((e as Error).message); } finally { setSaving(false); }
   }
@@ -61,6 +65,7 @@ function NewConversionForm() {
               <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Remarks</label>
               <input type="text" value={form.remarks} onChange={e => setForm(f => ({ ...f, remarks: e.target.value }))} className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
+            <TaggingFields value={tagging} data={taggingData} onChange={(f, v) => setTagging(t => ({ ...t, [f]: v }))} />
           </div>
           <div className="mt-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4">
             <div className="mb-2 text-xs font-medium text-slate-600 dark:text-slate-400">Source (Input)</div>

@@ -2,6 +2,8 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { useTaggingData } from '@/hooks/useTaggingData';
+import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
 
 interface Customer { id: string; code: string; name: string; address: string | null; }
 interface Item { id: string; sku: string; name: string; selling_price: number; }
@@ -16,6 +18,8 @@ function NewDeliveryForm() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const taggingData = useTaggingData();
+  const [tagging, setTagging] = useState<TaggingValues>({ branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '' });
   const [form, setForm] = useState({
     customer_id: '', warehouse_id: '', transaction_date: new Date().toISOString().split('T')[0],
     commitment_date: '', reference_no: '', delivery_method: '', delivery_address: '',
@@ -50,7 +54,7 @@ function NewDeliveryForm() {
     try {
       const cid = localStorage.getItem('company_id')!;
       const rec = await api.post<{ id: string }>('/poultry/deliveries', {
-        company_id: cid, ...form,
+        company_id: cid, ...form, ...tagging,
         sales_tally_id: form.sales_tally_id || undefined,
         conversion_id: form.conversion_id || undefined,
         commitment_date: form.commitment_date || undefined,
@@ -114,6 +118,7 @@ function NewDeliveryForm() {
               <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Delivery Address</label>
               <input type="text" value={form.delivery_address} onChange={e => setForm(f => ({ ...f, delivery_address: e.target.value }))} className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
+            <TaggingFields value={tagging} data={taggingData} onChange={(f, v) => setTagging(t => ({ ...t, [f]: v }))} />
           </div>
         </div>
 

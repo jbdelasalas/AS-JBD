@@ -2,6 +2,8 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { useTaggingData } from '@/hooks/useTaggingData';
+import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
 
 interface Customer { id: string; code: string; name: string; payment_terms_days: number; }
 interface Item { id: string; sku: string; name: string; selling_price: number; }
@@ -14,6 +16,8 @@ function NewInvoiceForm() {
   const [items, setItems] = useState<Item[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const taggingData = useTaggingData();
+  const [tagging, setTagging] = useState<TaggingValues>({ branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '' });
   const [form, setForm] = useState({ customer_id: '', invoice_date: new Date().toISOString().split('T')[0], payment_terms: 30, remarks: '', delivery_id: params.get('delivery_id') ?? '' });
   const [lines, setLines] = useState<Line[]>([{ item_id: '', description: '', heads: 0, kgs: 0, unit_price: 0, discount_pct: 0, vat_rate: 12 }]);
 
@@ -43,7 +47,7 @@ function NewInvoiceForm() {
     try {
       const cid = localStorage.getItem('company_id')!;
       const inv = await api.post<{ id: string }>('/poultry/invoices', {
-        company_id: cid, ...form, delivery_id: form.delivery_id || undefined, lines,
+        company_id: cid, ...form, ...tagging, delivery_id: form.delivery_id || undefined, lines,
       });
       router.push(`/dashboard/poultry/invoices/${inv.id}`);
     } catch (e: unknown) { setError((e as Error).message); } finally { setSaving(false); }
@@ -80,6 +84,7 @@ function NewInvoiceForm() {
               <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Remarks</label>
               <input type="text" value={form.remarks} onChange={e => setForm(f => ({ ...f, remarks: e.target.value }))} className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
+            <TaggingFields value={tagging} data={taggingData} onChange={(f, v) => setTagging(t => ({ ...t, [f]: v }))} />
           </div>
         </div>
 
