@@ -66,8 +66,8 @@ export default function PoultryDashboard() {
       {/* Quick links */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
-          { label: '+ Order In', href: '/dashboard/poultry/order-ins/new' },
-          { label: '+ Inventory In', href: '/dashboard/poultry/inventory-ins/new' },
+          { label: '+ Purchase Order', href: '/dashboard/purchasing/purchase-orders/new' },
+          { label: '+ Goods Receipt', href: '/dashboard/purchasing/goods-receipts/new' },
           { label: '+ Grow Cycle', href: '/dashboard/poultry/grow-cycles/new' },
           { label: '+ Tally Sheet', href: '/dashboard/poultry/tally-sheets/new' },
           { label: '+ Conversion', href: '/dashboard/poultry/conversions/new' },
