@@ -68,25 +68,13 @@ export async function POST(request: NextRequest) {
 
     const total = lines.reduce((s, l) => s + Number(l.quantity ?? 0) * Number(l.unit_price ?? 0), 0);
 
-    // Auto-create a linked Purchase Order
-    const poSeq = await client.query(`SELECT COUNT(*)::int AS c FROM purchase_orders WHERE company_id = $1`, [companyId]);
-    const poNo = `PO-${new Date().getFullYear()}-${String(poSeq.rows[0].c + 1).padStart(6, '0')}`;
-    const { rows: [po] } = await client.query(
-      `INSERT INTO purchase_orders (company_id, branch_id, po_no, supplier_id, po_date, expected_date, reference,
-         subtotal, vat_amount, total, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,$8,'draft',$9) RETURNING id, po_no`,
-      [companyId, dto.branch_id ?? null, poNo, dto.supplier_id,
-       dto.transaction_date, dto.date_needed ?? null, dto.reference_no ?? null,
-       total.toFixed(2), auth.userId],
-    );
-
     const { rows: [hdr] } = await client.query(
       `INSERT INTO order_ins (company_id, doc_no, supplier_id, branch_id, reference_no, transaction_date, date_needed,
-         delivery_method, payment_terms, remarks, notes, status, total_amount, purchase_order_id, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'saved',$12,$13,$14) RETURNING *`,
+         delivery_method, payment_terms, remarks, notes, status, total_amount, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'saved',$12,$13) RETURNING *`,
       [companyId, docNo, dto.supplier_id, dto.branch_id ?? null, dto.reference_no ?? null,
        dto.transaction_date, dto.date_needed ?? null, dto.delivery_method ?? null,
-       dto.payment_terms ?? null, dto.remarks ?? null, dto.notes ?? null, total, po.id, auth.userId],
+       dto.payment_terms ?? null, dto.remarks ?? null, dto.notes ?? null, total, auth.userId],
     );
 
     for (let i = 0; i < lines.length; i++) {
@@ -97,19 +85,48 @@ export async function POST(request: NextRequest) {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
         [hdr.id, i + 1, l.item_id, l.quantity, l.uom ?? 'heads', l.unit_price ?? 0, amt, l.remarks ?? null],
       );
-      // Mirror lines into the PO
-      const itemRow = await client.query(`SELECT name FROM items WHERE id = $1`, [l.item_id]);
-      const itemName = itemRow.rows[0]?.name ?? '';
-      await client.query(
-        `INSERT INTO purchase_order_lines (po_id, line_no, item_id, description, quantity, qty_received, unit_price, vat_rate, line_total)
-         VALUES ($1,$2,$3,$4,$5,0,$6,0,$7)`,
-        [po.id, i + 1, l.item_id, itemName, l.quantity, l.unit_price ?? 0, amt.toFixed(2)],
-      );
     }
+
+    // Auto-create a linked Purchase Order (requires migration 028)
+    let poNo: string | null = null;
+    let poId: string | null = null;
+    try {
+      const poSeq = await client.query(`SELECT COUNT(*)::int AS c FROM purchase_orders WHERE company_id = $1`, [companyId]);
+      poNo = `PO-${new Date().getFullYear()}-${String(poSeq.rows[0].c + 1).padStart(6, '0')}`;
+      const { rows: [po] } = await client.query(
+        `INSERT INTO purchase_orders (company_id, branch_id, po_no, supplier_id, po_date, expected_date, reference,
+           subtotal, vat_amount, total, status, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$8,'draft',$10) RETURNING id, po_no`,
+        [companyId, dto.branch_id ?? null, poNo, dto.supplier_id,
+         dto.transaction_date, dto.date_needed ?? null, dto.reference_no ?? null,
+         total.toFixed(2), '0.00', auth.userId],
+      );
+      poId = po.id;
+      poNo = po.po_no;
+
+      for (let i = 0; i < lines.length; i++) {
+        const l = lines[i];
+        const amt = Number(l.quantity ?? 0) * Number(l.unit_price ?? 0);
+        const itemRow = await client.query(`SELECT name FROM items WHERE id = $1`, [l.item_id]);
+        const itemName = itemRow.rows[0]?.name ?? '';
+        await client.query(
+          `INSERT INTO purchase_order_lines (po_id, line_no, item_id, description, quantity, qty_received, unit_price, vat_rate, line_total)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+          [po.id, i + 1, l.item_id, itemName, l.quantity, '0', l.unit_price ?? 0, '0', amt.toFixed(2)],
+        );
+      }
+
+      // Link the PO back to the order_in if column exists
+      await client.query(
+        `UPDATE order_ins SET purchase_order_id = $1 WHERE id = $2`,
+        [po.id, hdr.id],
+      );
+    } catch { /* PO creation is best-effort; column may not exist yet */ }
+
     await client.query('COMMIT');
     await query(`INSERT INTO audit_log (user_id, company_id, action, entity_type, entity_id, after_state) VALUES ($1,$2,'create','order_in',$3,$4)`,
-      [auth.userId, companyId, hdr.id, JSON.stringify({ ...hdr, po_no: po.po_no })]).catch(() => {});
-    return ok({ ...hdr, po_no: po.po_no }, 201);
+      [auth.userId, companyId, hdr.id, JSON.stringify({ ...hdr, po_no: poNo })]).catch(() => {});
+    return ok({ ...hdr, po_id: poId, po_no: poNo }, 201);
   } catch (e) { await client.query('ROLLBACK'); return err((e as Error).message, 500); }
   finally { client.release(); }
 }
