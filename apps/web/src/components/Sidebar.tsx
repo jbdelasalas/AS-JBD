@@ -34,12 +34,6 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     if (name) setCompanyName(name);
   }, []);
 
-  // Close sidebar on navigation (mobile)
-  useEffect(() => {
-    onClose();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
-
   function handleLogout() {
     clearAuth();
     router.replace('/login');
