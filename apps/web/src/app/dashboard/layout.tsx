@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/Sidebar';
 import { TopBar } from '@/components/TopBar';
+import { TableResizer } from '@/components/TableResizer';
 import { loadBranding } from '@/lib/branding';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -37,7 +38,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar onMenuToggle={() => setSidebarOpen((o) => !o)} />
-        <main className="flex-1 overflow-y-auto bg-slate-50 p-6 dark:bg-slate-800">{children}</main>
+        <main className="flex-1 overflow-y-auto bg-slate-50 p-6 dark:bg-slate-800">
+          <TableResizer />
+          {children}
+        </main>
       </div>
     </div>
   );
