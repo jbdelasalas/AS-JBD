@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useTaggingData } from '@/hooks/useTaggingData';
+import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
 
 interface Supplier { id: string; code: string; name: string; }
 interface Item     { id: string; sku: string; name: string; selling_price: number; }
@@ -42,6 +43,9 @@ export default function NewPurchaseOrderPage() {
     supplier_id: '', po_date: new Date().toISOString().split('T')[0],
     expected_date: '', reference: '',
   });
+  const [tags, setTags] = useState<TaggingValues>({
+    branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '',
+  });
   const [lines, setLines] = useState<Line[]>([{ ...EMPTY_LINE }]);
 
   useEffect(() => {
@@ -52,7 +56,15 @@ export default function NewPurchaseOrderPage() {
     api.get<{ data: Account[] }>(`/gl/accounts?company_id=${cid}&limit=500`).then(r => setAccounts(r.data ?? [])).catch(() => {});
   }, []);
 
-  function addLine() { setLines(l => [...l, { ...EMPTY_LINE }]); }
+  // When a header tag changes, propagate to all lines
+  function handleTagChange(field: keyof TaggingValues, val: string) {
+    setTags(t => ({ ...t, [field]: val }));
+    setLines(prev => prev.map(l => ({ ...l, [field]: val })));
+  }
+
+  function addLine() {
+    setLines(l => [...l, { ...EMPTY_LINE, ...tags }]);
+  }
 
   function updateLine(idx: number, field: keyof Line, val: string | number) {
     setLines(prev => {
@@ -86,15 +98,16 @@ export default function NewPurchaseOrderPage() {
       const po = await api.post<{ id: string }>('/purchasing/purchase-orders', {
         company_id: cid,
         ...form,
+        ...tags,
         expected_date: form.expected_date || undefined,
         reference: form.reference || undefined,
         lines: lines.map(l => ({
           ...l,
-          item_id:        l.line_type === 'item' ? l.item_id || undefined : undefined,
-          gl_account_id:  l.line_type === 'gl'   ? l.gl_account_id || undefined : undefined,
-          branch_id:      l.branch_id || undefined,
-          building_id:    l.building_id || undefined,
-          cost_center_id: l.cost_center_id || undefined,
+          item_id:           l.line_type === 'item' ? l.item_id || undefined : undefined,
+          gl_account_id:     l.line_type === 'gl'   ? l.gl_account_id || undefined : undefined,
+          branch_id:         l.branch_id || undefined,
+          building_id:       l.building_id || undefined,
+          cost_center_id:    l.cost_center_id || undefined,
           grow_reference_id: l.grow_reference_id || undefined,
         })),
       });
@@ -136,6 +149,8 @@ export default function NewPurchaseOrderPage() {
               <label className={lbl}>Reference</label>
               <input type="text" value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} className={inp} />
             </div>
+            {/* Header tagging — auto-fills all lines */}
+            <TaggingFields value={tags} data={tagData} onChange={handleTagChange} />
           </div>
         </div>
 
@@ -187,7 +202,8 @@ export default function NewPurchaseOrderPage() {
                       )}
                     </td>
                     <td className="px-2 py-1">
-                      <input required type="text" value={l.description} onChange={e => updateLine(idx, 'description', e.target.value)}
+                      <input required type="text" value={l.description}
+                        onChange={e => updateLine(idx, 'description', e.target.value)}
                         className="w-full rounded border border-slate-300 px-1 py-1 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
                     </td>
                     <td className="px-2 py-1">
@@ -208,7 +224,6 @@ export default function NewPurchaseOrderPage() {
                     <td className="px-2 py-1 text-right font-mono dark:text-slate-300">
                       {lineTotal(l).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                     </td>
-                    {/* Per-line tagging */}
                     <td className="px-2 py-1">
                       <select value={l.branch_id} onChange={e => updateLine(idx, 'branch_id', e.target.value)} className={sel}>
                         <option value="">—</option>
