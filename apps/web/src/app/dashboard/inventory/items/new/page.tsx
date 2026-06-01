@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { NumericInput } from '@/components/NumericInput';
 
 interface Category  { id: string; name: string; }
 interface UomRow    { id: string; code: string; name: string; }
@@ -142,18 +143,15 @@ export default function NewItemPage() {
             </div>
             <div>
               <label className={lbl}>Standard Cost</label>
-              <input type="number" min={0} step="any" value={form.standard_cost}
-                onChange={(e) => set('standard_cost', e.target.value)} className={inp} />
+              <NumericInput value={form.standard_cost} onChange={v => set('standard_cost', String(v))} min={0} decimals={4} className={inp} />
             </div>
             <div>
               <label className={lbl}>Selling Price</label>
-              <input type="number" min={0} step="any" value={form.selling_price}
-                onChange={(e) => set('selling_price', e.target.value)} className={inp} />
+              <NumericInput value={form.selling_price} onChange={v => set('selling_price', String(v))} min={0} decimals={4} className={inp} />
             </div>
             <div>
               <label className={lbl}>Reorder Point</label>
-              <input type="number" min={0} step="any" value={form.reorder_point}
-                onChange={(e) => set('reorder_point', e.target.value)} className={inp} />
+              <NumericInput value={form.reorder_point} onChange={v => set('reorder_point', String(v))} min={0} decimals={2} className={inp} />
             </div>
             <div className="flex items-end pb-1">
               <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">

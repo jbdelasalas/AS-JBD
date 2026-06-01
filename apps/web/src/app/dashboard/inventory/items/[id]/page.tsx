@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatPHP } from '@/lib/format';
+import { NumericInput } from '@/components/NumericInput';
 
 interface Transaction {
   txn_type: string; ref: string; txn_date: string | null;
@@ -184,18 +185,15 @@ export default function ItemDetailPage() {
               </div>
               <div>
                 <label className={lbl}>Standard Cost</label>
-                <input type="number" min={0} step="any" value={form.standard_cost ?? 0}
-                  onChange={(e) => set('standard_cost', e.target.value)} className={inp} />
+                <NumericInput value={form.standard_cost ?? 0} onChange={v => set('standard_cost', v)} min={0} decimals={4} className={inp} />
               </div>
               <div>
                 <label className={lbl}>Selling Price</label>
-                <input type="number" min={0} step="any" value={form.selling_price ?? 0}
-                  onChange={(e) => set('selling_price', e.target.value)} className={inp} />
+                <NumericInput value={form.selling_price ?? 0} onChange={v => set('selling_price', v)} min={0} decimals={4} className={inp} />
               </div>
               <div>
                 <label className={lbl}>Reorder Point</label>
-                <input type="number" min={0} step="any" value={form.reorder_point ?? 0}
-                  onChange={(e) => set('reorder_point', e.target.value)} className={inp} />
+                <NumericInput value={form.reorder_point ?? 0} onChange={v => set('reorder_point', v)} min={0} decimals={2} className={inp} />
               </div>
               <div className="flex items-end pb-1">
                 <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">

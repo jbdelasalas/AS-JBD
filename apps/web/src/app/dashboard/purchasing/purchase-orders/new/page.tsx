@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { useTaggingData } from '@/hooks/useTaggingData';
 import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
 import { SearchableSelect } from '@/components/SearchableSelect';
+import { NumericInput } from '@/components/NumericInput';
 
 interface Supplier { id: string; code: string; name: string; }
 interface Item     { id: string; sku: string; name: string; selling_price: number; }
@@ -216,18 +217,18 @@ export default function NewPurchaseOrderPage() {
                         className="w-full rounded border border-slate-300 px-1 py-1 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
                     </td>
                     <td className="px-2 py-1">
-                      <input type="number" min={0.0001} step="any" value={l.quantity}
-                        onChange={e => updateLine(idx, 'quantity', parseFloat(e.target.value) || 0)}
+                      <NumericInput value={l.quantity} onChange={v => updateLine(idx, 'quantity', v)}
+                        min={0} decimals={4}
                         className="w-full rounded border border-slate-300 px-1 py-1 text-right dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
                     </td>
                     <td className="px-2 py-1">
-                      <input type="number" min={0} step="any" value={l.unit_price}
-                        onChange={e => updateLine(idx, 'unit_price', parseFloat(e.target.value) || 0)}
+                      <NumericInput value={l.unit_price} onChange={v => updateLine(idx, 'unit_price', v)}
+                        min={0} decimals={4}
                         className="w-full rounded border border-slate-300 px-1 py-1 text-right dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
                     </td>
                     <td className="px-2 py-1">
-                      <input type="number" min={0} step="any" value={l.vat_rate}
-                        onChange={e => updateLine(idx, 'vat_rate', parseFloat(e.target.value) || 0)}
+                      <NumericInput value={l.vat_rate} onChange={v => updateLine(idx, 'vat_rate', v)}
+                        min={0} decimals={2}
                         className="w-full rounded border border-slate-300 px-1 py-1 text-right dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
                     </td>
                     <td className="px-2 py-1 text-right font-mono dark:text-slate-300">
