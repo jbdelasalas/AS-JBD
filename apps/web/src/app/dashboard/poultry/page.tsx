@@ -63,25 +63,6 @@ export default function PoultryDashboard() {
         ))}
       </div>
 
-      {/* Quick links */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {[
-          { label: '+ Purchase Order', href: '/dashboard/purchasing/purchase-orders/new' },
-          { label: '+ Goods Receipt', href: '/dashboard/purchasing/goods-receipts/new' },
-          { label: '+ Grow Cycle', href: '/dashboard/poultry/grow-cycles/new' },
-          { label: '+ Tally Sheet', href: '/dashboard/poultry/tally-sheets/new' },
-          { label: '+ Conversion', href: '/dashboard/poultry/conversions/new' },
-          { label: '+ Sales Tally', href: '/dashboard/poultry/sales-tallies/new' },
-          { label: '+ Delivery', href: '/dashboard/poultry/deliveries/new' },
-          { label: '+ Invoice', href: '/dashboard/poultry/invoices/new' },
-        ].map((q) => (
-          <Link key={q.href} href={q.href}
-            className="rounded border border-brand-200 bg-brand-50 px-3 py-2 text-center text-xs font-medium text-brand-700 hover:bg-brand-100 dark:border-brand-800 dark:bg-slate-800 dark:text-brand-400">
-            {q.label}
-          </Link>
-        ))}
-      </div>
-
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Active grow cycles */}
         <div className="rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
