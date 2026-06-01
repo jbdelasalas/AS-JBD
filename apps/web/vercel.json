@@ -3,5 +3,9 @@
   "installCommand": "cd ../.. && npm install",
   "buildCommand": "cd ../.. && npm run build:shared && npm run build --workspace=@perpet/web",
   "outputDirectory": ".next",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "functions": {
+    "src/app/api/v1/reset-data/route.ts": { "maxDuration": 60 },
+    "src/app/api/v1/run-migrations/route.ts": { "maxDuration": 60 }
+  }
 }
