@@ -206,43 +206,6 @@ export default function ItemDetailPage() {
             </div>
           </div>
 
-          {/* Location & Warehouse */}
-          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
-            <div className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Location / Warehouse</div>
-            <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
-              Select a location — the warehouse is set to the same value automatically. You can override it if needed.
-            </p>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className={lbl}>Location</label>
-                <select
-                  value={locations.find((l) => l.warehouse_id === form.default_warehouse_id)?.id ?? ''}
-                  onChange={(e) => {
-                    const loc = locations.find((l) => l.id === e.target.value);
-                    set('default_warehouse_id', loc?.warehouse_id ?? null);
-                  }}
-                  className={inp}
-                >
-                  <option value="">— none —</option>
-                  {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className={lbl}>Warehouse</label>
-                <select
-                  value={form.default_warehouse_id ?? ''}
-                  onChange={(e) => set('default_warehouse_id', e.target.value || null)}
-                  className={inp}
-                >
-                  <option value="">— none —</option>
-                  {locations.filter((l) => l.warehouse_id).map((l) => (
-                    <option key={l.warehouse_id!} value={l.warehouse_id!}>{l.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
           {/* Accounting Integration */}
           <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
             <div className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Accounting Integration</div>
@@ -327,22 +290,6 @@ export default function ItemDetailPage() {
                   </div>
                 ))}
               </dl>
-            </div>
-
-            {/* Location / Warehouse — full width */}
-            <div className="col-span-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
-              <div className="mb-3 text-xs font-medium text-slate-600 dark:text-slate-400">Location / Warehouse</div>
-              <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                {([
-                  ['Location',  item.default_warehouse_name],
-                  ['Warehouse', item.default_warehouse_name],
-                ] as [string, string | null][]).map(([k, v]) => (
-                  <div key={k} className="flex gap-2">
-                    <dt className="w-24 shrink-0 text-slate-500 dark:text-slate-400">{k}</dt>
-                    <dd className="font-medium text-slate-900 dark:text-slate-100">{v ?? <span className="text-slate-400">—</span>}</dd>
-                  </div>
-                ))}
-              </div>
             </div>
 
             {/* Accounting Integration — full width */}

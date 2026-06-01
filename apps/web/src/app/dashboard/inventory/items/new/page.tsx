@@ -164,43 +164,6 @@ export default function NewItemPage() {
           </div>
         </div>
 
-        {/* Location & Warehouse */}
-        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
-          <div className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Location / Warehouse</div>
-          <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
-            Select a location — the warehouse is set to the same value automatically. You can override it if needed.
-          </p>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={lbl}>Location</label>
-              <select
-                value={form.location_id}
-                onChange={(e) => {
-                  const loc = locations.find((l) => l.id === e.target.value);
-                  set('location_id', e.target.value);
-                  set('default_warehouse_id', loc?.warehouse_id ?? '');
-                }}
-                className={inp}
-              >
-                <option value="">— none —</option>
-                {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={lbl}>Warehouse</label>
-              <select
-                value={form.default_warehouse_id}
-                onChange={(e) => set('default_warehouse_id', e.target.value)}
-                className={inp}
-              >
-                <option value="">— none —</option>
-                {locations.filter((l) => l.warehouse_id).map((l) => (
-                  <option key={l.warehouse_id!} value={l.warehouse_id!}>{l.name}</option>
-                ))}</select>
-            </div>
-          </div>
-        </div>
-
         {/* Accounting Integration */}
         <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
           <div className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Accounting Integration</div>
