@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { SearchableSelect } from '@/components/SearchableSelect';
 import { useTaggingData } from '@/hooks/useTaggingData';
 import { TaggingFields, GrowSelect, type TaggingValues } from '@/components/TaggingPanel';
 
@@ -99,9 +100,22 @@ function NewBillForm() {
           <div className="grid grid-cols-4 gap-4">
             <div className="col-span-2">
               <label className={lbl}>Supplier *</label>
-              <select required value={form.supplier_id} onChange={e => { const s = suppliers.find(x => x.id === e.target.value); setForm(f => ({ ...f, supplier_id: e.target.value })); if (s && !form.due_date) { const d = new Date(form.bill_date); d.setDate(d.getDate() + s.payment_terms_days); setForm(f => ({ ...f, supplier_id: e.target.value, due_date: d.toISOString().split('T')[0] })); } if (s) setLines(prev => prev.map(l => ({ ...l, ewt_rate: s.ewt_rate ?? 0 }))); }} className={inp}>
-                <option value="">Select supplier…</option>{suppliers.map(s => <option key={s.id} value={s.id}>{s.code} — {s.name}</option>)}
-              </select>
+              <SearchableSelect
+                required
+                value={form.supplier_id}
+                onChange={v => {
+                  const s = suppliers.find(x => x.id === v);
+                  setForm(f => ({ ...f, supplier_id: v }));
+                  if (s && !form.due_date) {
+                    const d = new Date(form.bill_date);
+                    d.setDate(d.getDate() + s.payment_terms_days);
+                    setForm(f => ({ ...f, supplier_id: v, due_date: d.toISOString().split('T')[0] }));
+                  }
+                  if (s) setLines(prev => prev.map(l => ({ ...l, ewt_rate: s.ewt_rate ?? 0 })));
+                }}
+                placeholder="Select supplier…"
+                options={suppliers.map(s => ({ value: s.id, label: `${s.code} — ${s.name}` }))}
+              />
             </div>
             <div>
               <label className={lbl}>Supplier Invoice no. *</label>

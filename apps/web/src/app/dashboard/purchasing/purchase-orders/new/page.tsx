@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useTaggingData } from '@/hooks/useTaggingData';
 import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
+import { SearchableSelect } from '@/components/SearchableSelect';
 
 interface Supplier { id: string; code: string; name: string; }
 interface Item     { id: string; sku: string; name: string; selling_price: number; }
@@ -132,10 +133,13 @@ export default function NewPurchaseOrderPage() {
           <div className="grid grid-cols-4 gap-4">
             <div className="col-span-2">
               <label className={lbl}>Supplier *</label>
-              <select required value={form.supplier_id} onChange={e => setForm(f => ({ ...f, supplier_id: e.target.value }))} className={inp}>
-                <option value="">Select supplier…</option>
-                {suppliers.map(s => <option key={s.id} value={s.id}>{s.code} — {s.name}</option>)}
-              </select>
+              <SearchableSelect
+                required
+                value={form.supplier_id}
+                onChange={v => setForm(f => ({ ...f, supplier_id: v }))}
+                placeholder="Select supplier…"
+                options={suppliers.map(s => ({ value: s.id, label: `${s.code} — ${s.name}` }))}
+              />
             </div>
             <div>
               <label className={lbl}>PO Date *</label>
@@ -191,15 +195,19 @@ export default function NewPurchaseOrderPage() {
                     </td>
                     <td className="px-2 py-1">
                       {l.line_type === 'item' ? (
-                        <select value={l.item_id} onChange={e => updateLine(idx, 'item_id', e.target.value)} className={sel}>
-                          <option value="">Select…</option>
-                          {items.map(i => <option key={i.id} value={i.id}>{i.sku} — {i.name}</option>)}
-                        </select>
+                        <SearchableSelect
+                          value={l.item_id}
+                          onChange={v => updateLine(idx, 'item_id', v)}
+                          placeholder="Select item…"
+                          options={items.map(i => ({ value: i.id, label: `${i.sku} — ${i.name}` }))}
+                        />
                       ) : (
-                        <select value={l.gl_account_id} onChange={e => updateLine(idx, 'gl_account_id', e.target.value)} className={sel}>
-                          <option value="">Select account…</option>
-                          {accounts.map(a => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
-                        </select>
+                        <SearchableSelect
+                          value={l.gl_account_id}
+                          onChange={v => updateLine(idx, 'gl_account_id', v)}
+                          placeholder="Select account…"
+                          options={accounts.map(a => ({ value: a.id, label: `${a.code} ${a.name}` }))}
+                        />
                       )}
                     </td>
                     <td className="px-2 py-1">
