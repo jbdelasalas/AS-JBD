@@ -21,11 +21,13 @@ interface Item {
   cogs_account_id: string | null;            cogs_account_name: string | null;
   revenue_account_id: string | null;         revenue_account_name: string | null;
   purchase_variance_account_id: string | null; purchase_variance_account_name: string | null;
+  default_warehouse_id: string | null; default_warehouse_name: string | null;
 }
 
-interface Category { id: string; name: string; }
-interface UomRow   { id: string; code: string; name: string; }
-interface Account  { id: string; code: string; name: string; }
+interface Category  { id: string; name: string; }
+interface UomRow    { id: string; code: string; name: string; }
+interface Account   { id: string; code: string; name: string; }
+interface Warehouse { id: string; code: string; name: string; }
 
 const ITEM_TYPES      = ['stock', 'service', 'bundle'];
 const COSTING_METHODS = ['weighted_avg', 'fifo', 'standard'];
@@ -37,6 +39,7 @@ export default function ItemDetailPage() {
   const [categories, setCategories]   = useState<Category[]>([]);
   const [uoms, setUoms]               = useState<UomRow[]>([]);
   const [accounts, setAccounts]       = useState<Account[]>([]);
+  const [warehouses, setWarehouses]   = useState<Warehouse[]>([]);
   const [editing, setEditing]         = useState(false);
   const [form, setForm]               = useState<Partial<Item>>({});
   const [saving, setSaving]           = useState(false);
@@ -65,6 +68,7 @@ export default function ItemDetailPage() {
     api.get<Category[]>(`/inventory/categories?company_id=${companyId}`).then(setCategories).catch(() => {});
     api.get<UomRow[]>(`/admin/uoms?company_id=${companyId}`).then(setUoms).catch(() => {});
     api.get<Account[]>(`/gl/accounts?company_id=${companyId}&active_only=true`).then(setAccounts).catch(() => {});
+    api.get<Warehouse[]>(`/inventory/locations?company_id=${companyId}`).then(setWarehouses).catch(() => {});
   }, []);
 
   function set(field: string, val: unknown) {
@@ -87,6 +91,7 @@ export default function ItemDetailPage() {
         cogs_account_id: form.cogs_account_id || null,
         revenue_account_id: form.revenue_account_id || null,
         purchase_variance_account_id: form.purchase_variance_account_id || null,
+        default_warehouse_id: form.default_warehouse_id || null,
       });
       setSaved(true); setEditing(false); load();
       setTimeout(() => setSaved(false), 2000);
@@ -201,6 +206,41 @@ export default function ItemDetailPage() {
             </div>
           </div>
 
+          {/* Location & Warehouse */}
+          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+            <div className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Location / Warehouse</div>
+            <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
+              Select a location — the warehouse is set to the same value automatically. You can override it if needed.
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={lbl}>Location</label>
+                <select
+                  value={form.default_warehouse_id ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value || null;
+                    setForm((f) => ({ ...f, default_warehouse_id: val }));
+                  }}
+                  className={inp}
+                >
+                  <option value="">— none —</option>
+                  {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lbl}>Warehouse</label>
+                <select
+                  value={form.default_warehouse_id ?? ''}
+                  onChange={(e) => set('default_warehouse_id', e.target.value || null)}
+                  className={inp}
+                >
+                  <option value="">— none —</option>
+                  {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
           {/* Accounting Integration */}
           <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
             <div className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Accounting Integration</div>
@@ -285,6 +325,22 @@ export default function ItemDetailPage() {
                   </div>
                 ))}
               </dl>
+            </div>
+
+            {/* Location / Warehouse — full width */}
+            <div className="col-span-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+              <div className="mb-3 text-xs font-medium text-slate-600 dark:text-slate-400">Location / Warehouse</div>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                {([
+                  ['Location',  item.default_warehouse_name],
+                  ['Warehouse', item.default_warehouse_name],
+                ] as [string, string | null][]).map(([k, v]) => (
+                  <div key={k} className="flex gap-2">
+                    <dt className="w-24 shrink-0 text-slate-500 dark:text-slate-400">{k}</dt>
+                    <dd className="font-medium text-slate-900 dark:text-slate-100">{v ?? <span className="text-slate-400">—</span>}</dd>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Accounting Integration — full width */}

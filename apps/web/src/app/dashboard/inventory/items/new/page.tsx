@@ -4,18 +4,20 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 
-interface Category { id: string; name: string; }
-interface UomRow { id: string; code: string; name: string; }
-interface Account { id: string; code: string; name: string; account_type: string; }
+interface Category  { id: string; name: string; }
+interface UomRow    { id: string; code: string; name: string; }
+interface Account   { id: string; code: string; name: string; account_type: string; }
+interface Warehouse { id: string; code: string; name: string; }
 
 const ITEM_TYPES = ['stock', 'service', 'bundle'];
 const COSTING_METHODS = ['weighted_avg', 'fifo', 'standard'];
 
 export default function NewItemPage() {
   const router = useRouter();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [uoms, setUoms] = useState<UomRow[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [categories, setCategories]   = useState<Category[]>([]);
+  const [uoms, setUoms]               = useState<UomRow[]>([]);
+  const [accounts, setAccounts]       = useState<Account[]>([]);
+  const [warehouses, setWarehouses]   = useState<Warehouse[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,6 +29,8 @@ export default function NewItemPage() {
     cogs_account_id: '',
     revenue_account_id: '',
     purchase_variance_account_id: '',
+    location_id: '',
+    default_warehouse_id: '',
   });
 
   useEffect(() => {
@@ -35,6 +39,7 @@ export default function NewItemPage() {
     api.get<Category[]>(`/inventory/categories?company_id=${companyId}`).then(setCategories).catch(() => {});
     api.get<UomRow[]>(`/admin/uoms?company_id=${companyId}`).then(setUoms).catch(() => {});
     api.get<Account[]>(`/gl/accounts?company_id=${companyId}&active_only=true`).then(setAccounts).catch(() => {});
+    api.get<Warehouse[]>(`/inventory/locations?company_id=${companyId}`).then(setWarehouses).catch(() => {});
   }, []);
 
   function set(field: string, val: unknown) {
@@ -60,6 +65,7 @@ export default function NewItemPage() {
         cogs_account_id: form.cogs_account_id || null,
         revenue_account_id: form.revenue_account_id || null,
         purchase_variance_account_id: form.purchase_variance_account_id || null,
+        default_warehouse_id: form.default_warehouse_id || null,
       });
       router.push('/dashboard/inventory/items');
     } catch (e: unknown) {
@@ -154,6 +160,42 @@ export default function NewItemPage() {
                 <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
                 Active
               </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Location & Warehouse */}
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+          <div className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Location / Warehouse</div>
+          <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
+            Select a location — the warehouse is set to the same value automatically. You can override it if needed.
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={lbl}>Location</label>
+              <select
+                value={form.location_id}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  set('location_id', val);
+                  set('default_warehouse_id', val); // auto-sync
+                }}
+                className={inp}
+              >
+                <option value="">— none —</option>
+                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={lbl}>Warehouse</label>
+              <select
+                value={form.default_warehouse_id}
+                onChange={(e) => set('default_warehouse_id', e.target.value)}
+                className={inp}
+              >
+                <option value="">— none —</option>
+                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
             </div>
           </div>
         </div>

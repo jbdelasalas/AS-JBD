@@ -21,5 +21,14 @@ export async function POST(request: NextRequest) {
       results.push(`items.${col}: ${(e as Error).message}`);
     }
   }
+
+  // default_warehouse_id — used as both Location and Warehouse on item forms
+  try {
+    await query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS default_warehouse_id uuid REFERENCES warehouses(id)`);
+    results.push('items.default_warehouse_id: ok');
+  } catch (e) {
+    results.push(`items.default_warehouse_id: ${(e as Error).message}`);
+  }
+
   return ok({ results });
 }
