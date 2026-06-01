@@ -32,14 +32,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
+  const timer = setTimeout(() => controller.abort(), 30000);
 
   let res: Response;
   try {
     res = await fetch(`${BASE_URL}${path}`, { ...init, headers, signal: controller.signal });
   } catch (e) {
-    if ((e as Error).name === 'AbortError') throw new ApiError(0, null, 'Request timed out');
-    throw e;
+    if ((e as Error).name === 'AbortError') throw new ApiError(0, null, 'Server is slow to respond — please try again');
+    throw new ApiError(0, null, 'Network error — check your connection');
   } finally {
     clearTimeout(timer);
   }
@@ -55,12 +55,18 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const body = isJson ? await res.json() : await res.text();
 
   if (!res.ok) {
+    const friendlyStatus: Record<number, string> = {
+      500: 'Server error — please try again',
+      502: 'Server is unavailable — please try again',
+      503: 'Service temporarily unavailable — please try again in a moment',
+      504: 'Server timed out — please try again',
+    };
     const message =
       typeof body === 'object' && body !== null
         ? Array.isArray((body as { message?: unknown }).message)
-          ? ((body as { message: string[] }).message.join(', '))
-          : ((body as { message?: string }).message ?? `HTTP ${res.status}`)
-        : `HTTP ${res.status}`;
+          ? (body as { message: string[] }).message.join(', ')
+          : (body as { message?: string }).message ?? friendlyStatus[res.status] ?? `HTTP ${res.status}`
+        : friendlyStatus[res.status] ?? `HTTP ${res.status}`;
     throw new ApiError(res.status, body, message);
   }
 

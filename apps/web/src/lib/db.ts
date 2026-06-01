@@ -9,10 +9,10 @@ export function getPool(): Pool {
     pool = new Pool({
       connectionString: url,
       ssl: { rejectUnauthorized: false },
-      max: 1,                      // one connection per serverless instance
-      connectionTimeoutMillis: 10000,
-      idleTimeoutMillis: 5000,     // release idle connections quickly
-      query_timeout: 15000,
+      max: 3,
+      connectionTimeoutMillis: 20000,  // wait up to 20s for a connection on cold start
+      idleTimeoutMillis: 10000,
+      query_timeout: 25000,
     });
     pool.on('error', () => { pool = undefined; });
   }
