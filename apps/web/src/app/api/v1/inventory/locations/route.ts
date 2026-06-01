@@ -4,17 +4,7 @@ import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
 
-function mapRow(r: Record<string, unknown>) {
-  return {
-    id: String(r.id),
-    code: String(r.code),
-    name: String(r.name),
-    address: r.address ? String(r.address) : null,
-    is_active: Boolean(r.is_active),
-    item_count: Number(r.item_count ?? 0),
-  };
-}
-
+// Locations = Branches. Returns branches joined with their auto-synced warehouse.
 export async function GET(request: NextRequest) {
   try { await requireAuth(request); } catch (e) { return e as Response; }
 
@@ -23,19 +13,27 @@ export async function GET(request: NextRequest) {
   if (!companyId) return err('company_id is required', 400);
 
   const rows = await query(
-    `SELECT w.id, w.code, w.name, w.address, w.is_active,
-            COUNT(DISTINCT sb.item_id) AS item_count
-       FROM warehouses w
-       LEFT JOIN stock_balances sb ON sb.warehouse_id = w.id AND sb.qty_on_hand > 0
-      WHERE w.company_id = $1
-      GROUP BY w.id
-      ORDER BY w.name`,
+    `SELECT b.id, b.code, b.name, b.address, b.is_active,
+            w.id AS warehouse_id, w.name AS warehouse_name
+       FROM branches b
+       LEFT JOIN warehouses w ON w.branch_id = b.id AND w.company_id = $1
+      WHERE b.company_id = $1
+      ORDER BY b.name`,
     [companyId],
   );
 
-  return ok(rows.map((r) => mapRow(r as Record<string, unknown>)));
+  return ok(rows.map((r) => ({
+    id:            String(r.id),
+    code:          String(r.code),
+    name:          String(r.name),
+    address:       r.address ? String(r.address) : null,
+    is_active:     Boolean(r.is_active),
+    warehouse_id:  r.warehouse_id ? String(r.warehouse_id) : null,
+    warehouse_name: r.warehouse_name ? String(r.warehouse_name) : null,
+  })));
 }
 
+// Creating a location here creates a branch + auto-synced warehouse.
 export async function POST(request: NextRequest) {
   let auth: Awaited<ReturnType<typeof requireAuth>>;
   try { auth = await requireAuth(request); } catch (e) { return e as Response; }
@@ -48,13 +46,23 @@ export async function POST(request: NextRequest) {
   if (!dto.code || !dto.name) return err('code and name are required', 400);
 
   try {
-    const rows = await query(
-      `INSERT INTO warehouses (company_id, code, name, address, is_active)
+    const [branch] = await query<{ id: string; code: string; name: string }>(
+      `INSERT INTO branches (company_id, code, name, address, created_by)
        VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [companyId, String(dto.code).toUpperCase(), dto.name, dto.address ?? null, dto.is_active ?? true],
+       RETURNING id, code, name`,
+      [companyId, String(dto.code).toUpperCase(), dto.name, dto.address ?? null, auth.userId],
     );
-    return ok(mapRow(rows[0] as Record<string, unknown>), 201);
+
+    // Auto-create matching warehouse
+    const [wh] = await query<{ id: string }>(
+      `INSERT INTO warehouses (company_id, branch_id, code, name, address, is_active)
+       VALUES ($1, $2, $3, $4, $5, true)
+       ON CONFLICT (company_id, code) DO UPDATE SET name = EXCLUDED.name, branch_id = EXCLUDED.branch_id
+       RETURNING id`,
+      [companyId, branch.id, branch.code, branch.name, dto.address ?? null],
+    );
+
+    return ok({ ...branch, warehouse_id: wh?.id ?? null }, 201);
   } catch (e: unknown) {
     return err((e as Error).message ?? 'Failed to create location', 500);
   }

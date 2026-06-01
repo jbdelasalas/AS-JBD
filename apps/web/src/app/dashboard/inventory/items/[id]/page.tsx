@@ -27,7 +27,7 @@ interface Item {
 interface Category  { id: string; name: string; }
 interface UomRow    { id: string; code: string; name: string; }
 interface Account   { id: string; code: string; name: string; }
-interface Warehouse { id: string; code: string; name: string; }
+interface Location  { id: string; code: string; name: string; warehouse_id: string | null; }
 
 const ITEM_TYPES      = ['stock', 'service', 'bundle'];
 const COSTING_METHODS = ['weighted_avg', 'fifo', 'standard'];
@@ -39,7 +39,7 @@ export default function ItemDetailPage() {
   const [categories, setCategories]   = useState<Category[]>([]);
   const [uoms, setUoms]               = useState<UomRow[]>([]);
   const [accounts, setAccounts]       = useState<Account[]>([]);
-  const [warehouses, setWarehouses]   = useState<Warehouse[]>([]);
+  const [locations, setLocations]     = useState<Location[]>([]);
   const [editing, setEditing]         = useState(false);
   const [form, setForm]               = useState<Partial<Item>>({});
   const [saving, setSaving]           = useState(false);
@@ -68,7 +68,7 @@ export default function ItemDetailPage() {
     api.get<Category[]>(`/inventory/categories?company_id=${companyId}`).then(setCategories).catch(() => {});
     api.get<UomRow[]>(`/admin/uoms?company_id=${companyId}`).then(setUoms).catch(() => {});
     api.get<Account[]>(`/gl/accounts?company_id=${companyId}&active_only=true`).then(setAccounts).catch(() => {});
-    api.get<Warehouse[]>(`/inventory/locations?company_id=${companyId}`).then(setWarehouses).catch(() => {});
+    api.get<Location[]>(`/inventory/locations?company_id=${companyId}`).then(setLocations).catch(() => {});
   }, []);
 
   function set(field: string, val: unknown) {
@@ -216,15 +216,15 @@ export default function ItemDetailPage() {
               <div>
                 <label className={lbl}>Location</label>
                 <select
-                  value={form.default_warehouse_id ?? ''}
+                  value={locations.find((l) => l.warehouse_id === form.default_warehouse_id)?.id ?? ''}
                   onChange={(e) => {
-                    const val = e.target.value || null;
-                    setForm((f) => ({ ...f, default_warehouse_id: val }));
+                    const loc = locations.find((l) => l.id === e.target.value);
+                    set('default_warehouse_id', loc?.warehouse_id ?? null);
                   }}
                   className={inp}
                 >
                   <option value="">— none —</option>
-                  {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                  {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                 </select>
               </div>
               <div>
@@ -235,7 +235,9 @@ export default function ItemDetailPage() {
                   className={inp}
                 >
                   <option value="">— none —</option>
-                  {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                  {locations.filter((l) => l.warehouse_id).map((l) => (
+                    <option key={l.warehouse_id!} value={l.warehouse_id!}>{l.name}</option>
+                  ))}
                 </select>
               </div>
             </div>

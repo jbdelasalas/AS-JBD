@@ -47,6 +47,14 @@ export async function POST(req: NextRequest) {
       [company_id, code, name, address ?? null, phone ?? null, auth.userId]
     );
 
+    // Auto-create a matching warehouse so Inventory Locations stays in sync
+    await query(
+      `INSERT INTO warehouses (company_id, branch_id, code, name, address, is_active)
+       VALUES ($1, $2, $3, $4, $5, true)
+       ON CONFLICT (company_id, code) DO UPDATE SET name = EXCLUDED.name, branch_id = EXCLUDED.branch_id`,
+      [company_id, branch.id, code, name, address ?? null]
+    ).catch(() => {}); // non-fatal if warehouse already exists
+
     return ok(branch, 201);
   } catch (e: unknown) {
     return err((e as Error).message, 500);
