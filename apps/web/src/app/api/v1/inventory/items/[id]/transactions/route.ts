@@ -12,14 +12,7 @@ export async function GET(
 
   const itemId = params.id;
 
-  const [stockRows, salesRows, purchaseRows, adjRows] = await Promise.all([
-    query(
-      `SELECT sb.qty_on_hand, sb.avg_cost, w.name AS warehouse_name, w.id AS warehouse_id
-         FROM stock_balances sb
-         JOIN warehouses w ON w.id = sb.warehouse_id
-        WHERE sb.item_id = $1`,
-      [itemId],
-    ),
+  const [salesRows, purchaseRows, adjRows] = await Promise.all([
     query(
       `SELECT si.invoice_no AS ref, si.invoice_date AS txn_date, si.status,
               sil.quantity, sil.unit_price, sil.line_total,
@@ -66,12 +59,6 @@ export async function GET(
   ].sort((a, b) => String((b as TxnRow).txn_date ?? '').localeCompare(String((a as TxnRow).txn_date ?? '')));
 
   return ok({
-    stock_on_hand: stockRows.map((r) => ({
-      warehouse_name: String((r as Record<string, unknown>).warehouse_name),
-      warehouse_id: String((r as Record<string, unknown>).warehouse_id),
-      qty_on_hand: Number((r as Record<string, unknown>).qty_on_hand),
-      avg_cost: Number((r as Record<string, unknown>).avg_cost),
-    })),
     transactions: transactions.map((r) => ({
       txn_type: String(r.txn_type),
       ref: String(r.ref),

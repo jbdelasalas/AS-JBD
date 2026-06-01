@@ -44,9 +44,9 @@ function NewBillForm() {
     if (!cid) return;
     Promise.all([
       api.get<{ data: Supplier[] }>(`/ap/suppliers?company_id=${cid}&limit=500`),
-      api.get<{ data: Account[] }>(`/gl/accounts?company_id=${cid}&limit=500`),
+      api.get<Account[]>(`/gl/accounts?company_id=${cid}&limit=500`),
       api.get<{ data: POOption[] }>(`/purchasing/purchase-orders?company_id=${cid}&status=approved&limit=500`),
-    ]).then(([s, a, p]) => { setSuppliers(s.data); setAccounts(a.data); setPos(p.data); }).catch(() => {});
+    ]).then(([s, a, p]) => { setSuppliers(s.data); setAccounts(Array.isArray(a) ? a : []); setPos(p.data); }).catch(() => {});
   }, []);
 
   function handleTagChange(field: keyof TaggingValues, val: string) {

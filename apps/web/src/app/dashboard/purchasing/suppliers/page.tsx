@@ -25,6 +25,7 @@ export default function SuppliersPage() {
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [toggling, setToggling] = useState<string | null>(null);
   const PAGE_SIZE = 15;
 
   useEffect(() => {
@@ -40,6 +41,18 @@ export default function SuppliersPage() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [search]);
+
+  async function toggleActive(id: string, current: boolean) {
+    setToggling(id);
+    try {
+      await api.patch(`/ap/suppliers/${id}`, { is_active: !current });
+      setRows((prev) => prev.map((r) => r.id === id ? { ...r, is_active: !current } : r));
+    } catch (e: unknown) {
+      setError((e as Error).message ?? 'Failed to update supplier');
+    } finally {
+      setToggling(null);
+    }
+  }
 
   const paged = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -125,14 +138,15 @@ export default function SuppliersPage() {
               <th className="px-3 py-2 text-left font-medium">Terms</th>
               <th className="px-3 py-2 text-right font-medium">Open AP</th>
               <th className="px-3 py-2 text-left font-medium">Status</th>
+              <th className="px-3 py-2" />
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="px-3 py-6 text-center text-xs text-slate-500">Loading…</td></tr>
+              <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-slate-500">Loading…</td></tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-xs text-slate-500">
+                <td colSpan={7} className="px-3 py-8 text-center text-xs text-slate-500">
                   No suppliers found.
                 </td>
               </tr>
@@ -156,6 +170,19 @@ export default function SuppliersPage() {
                   <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300' : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'}`}>
                     {r.is_active ? 'active' : 'inactive'}
                   </span>
+                </td>
+                <td className="px-3 py-2 text-right">
+                  <button
+                    disabled={toggling === r.id}
+                    onClick={() => toggleActive(r.id, r.is_active)}
+                    className={`rounded border px-2.5 py-1 text-xs font-medium disabled:opacity-50 ${
+                      r.is_active
+                        ? 'border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950'
+                        : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950'
+                    }`}
+                  >
+                    {toggling === r.id ? '…' : r.is_active ? 'Deactivate' : 'Activate'}
+                  </button>
                 </td>
               </tr>
             ))}

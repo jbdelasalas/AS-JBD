@@ -6,13 +6,6 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatPHP } from '@/lib/format';
 
-interface StockBalance {
-  warehouse_name: string;
-  warehouse_id: string;
-  qty_on_hand: number;
-  avg_cost: number;
-}
-
 interface Transaction {
   txn_type: string;
   ref: string;
@@ -50,7 +43,6 @@ const COSTING_METHODS = ['weighted_avg', 'fifo', 'standard'];
 export default function ItemDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [item, setItem] = useState<Item | null>(null);
-  const [stockOnHand, setStockOnHand] = useState<StockBalance[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [uoms, setUoms] = useState<UomRow[]>([]);
@@ -65,13 +57,13 @@ export default function ItemDetailPage() {
     setLoading(true);
     Promise.all([
       api.get<Item>(`/inventory/items/${id}`),
-      api.get<{ stock_on_hand: StockBalance[]; transactions: Transaction[] }>(`/inventory/items/${id}/transactions`),
+      api.get<{ transactions: Transaction[] }>(`/inventory/items/${id}/transactions`)
+        .catch(() => ({ transactions: [] as Transaction[] })),
     ]).then(([it, txns]) => {
       setItem(it);
       setForm(it);
-      setStockOnHand(txns.stock_on_hand);
       setTransactions(txns.transactions);
-    }).finally(() => setLoading(false));
+    }).catch(() => {}).finally(() => setLoading(false));
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
@@ -261,35 +253,6 @@ export default function ItemDetailPage() {
               </dl>
             </div>
           </div>
-
-          {/* Stock on Hand */}
-          {stockOnHand.length > 0 && (
-            <div className="mt-5 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-              <div className="border-b border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300">
-                Stock on Hand by Location
-              </div>
-              <table className="min-w-full text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium">Location</th>
-                    <th className="px-3 py-2 text-right font-medium">Qty on Hand</th>
-                    <th className="px-3 py-2 text-right font-medium">Avg Cost</th>
-                    <th className="px-3 py-2 text-right font-medium">Total Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stockOnHand.map((s) => (
-                    <tr key={s.warehouse_id} className="border-t border-slate-100 dark:border-slate-700">
-                      <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-200">{s.warehouse_name}</td>
-                      <td className="px-3 py-2 text-right font-mono">{s.qty_on_hand}</td>
-                      <td className="px-3 py-2 text-right font-mono">{formatPHP(s.avg_cost)}</td>
-                      <td className="px-3 py-2 text-right font-mono font-semibold">{formatPHP(s.qty_on_hand * s.avg_cost)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
 
           {/* Recent Transactions */}
           <div className="mt-5 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
