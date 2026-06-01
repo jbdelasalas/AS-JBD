@@ -54,10 +54,13 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     if (name) setCompanyName(name);
   }, []);
 
-  // Auto-expand the group that contains the current page
+  // Auto-expand the group whose parent or children match the current page
   useEffect(() => {
     for (const item of NAV) {
-      if (item.children?.some((c) => pathname.startsWith(c.href))) {
+      if (!item.children) continue;
+      const parentMatch = pathname === item.href || pathname.startsWith(item.href + '/');
+      const childMatch = item.children.some((c) => pathname.startsWith(c.href));
+      if (parentMatch || childMatch) {
         setExpanded(item.href);
         break;
       }
@@ -124,26 +127,33 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             if (item.children) {
               return (
                 <div key={item.href}>
-                  {/* Group toggle button */}
-                  <button
-                    onClick={() => toggleGroup(item.href)}
-                    className={`mb-1 flex w-full items-center justify-between rounded px-3 py-2 text-sm ${
+                  {/* Label navigates; chevron toggles sub-list */}
+                  <div
+                    className={`mb-1 flex items-center rounded text-sm ${
                       isActive
                         ? 'bg-brand-50 text-brand-700 font-medium dark:bg-slate-800 dark:text-brand-400'
                         : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800'
                     }`}
                   >
-                    <span>{item.label}</span>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className={`h-3.5 w-3.5 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''}`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                    <Link href={item.href} className="flex-1 px-3 py-2">
+                      {item.label}
+                    </Link>
+                    <button
+                      onClick={() => toggleGroup(item.href)}
+                      aria-label="Toggle sub-menu"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className={`h-3.5 w-3.5 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
 
                   {/* Children */}
                   {isExpanded && (
