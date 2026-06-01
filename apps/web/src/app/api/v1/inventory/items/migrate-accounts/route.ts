@@ -30,5 +30,27 @@ export async function POST(request: NextRequest) {
     results.push(`items.default_warehouse_id: ${(e as Error).message}`);
   }
 
+  // purchase_order_lines: allow nullable item_id (GL-account lines have no item)
+  try {
+    await query(`ALTER TABLE purchase_order_lines ALTER COLUMN item_id DROP NOT NULL`);
+    results.push('purchase_order_lines.item_id nullable: ok');
+  } catch (e) {
+    results.push(`purchase_order_lines.item_id nullable: ${(e as Error).message}`);
+  }
+
+  // purchase_order_lines: per-line tagging columns
+  for (const [col, ref] of [
+    ['branch_id',      'branches(id)'],
+    ['building_id',    'farm_buildings(id)'],
+    ['cost_center_id', 'cost_centers(id)'],
+  ] as [string, string][]) {
+    try {
+      await query(`ALTER TABLE purchase_order_lines ADD COLUMN IF NOT EXISTS ${col} uuid REFERENCES ${ref}`);
+      results.push(`purchase_order_lines.${col}: ok`);
+    } catch (e) {
+      results.push(`purchase_order_lines.${col}: ${(e as Error).message}`);
+    }
+  }
+
   return ok({ results });
 }
