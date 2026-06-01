@@ -45,18 +45,5 @@ export function useColumnResize(
     };
   }, [storageKey]);
 
-  // Returns inline style + the drag-handle div for each <th>
-  function col(key: string, align: 'left' | 'right' | 'center' = 'left') {
-    return {
-      style: { width: widths[key], minWidth: widths[key] },
-      resizeHandle: (
-        <div
-          onMouseDown={(e) => onResizeStart(key, e)}
-          className="absolute inset-y-0 right-0 w-1.5 cursor-col-resize group-hover:bg-brand-300/60 hover:!bg-brand-500 active:!bg-brand-600"
-        />
-      ),
-    };
-  }
-
-  return { widths, col };
+  return { widths, onResizeStart };
 }
