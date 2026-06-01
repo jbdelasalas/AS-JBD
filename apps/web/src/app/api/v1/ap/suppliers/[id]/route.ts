@@ -14,13 +14,16 @@ export async function GET(
     return e as Response;
   }
 
-  const rows = await query(
-    `SELECT * FROM suppliers WHERE id = $1 LIMIT 1`,
-    [params.id],
-  );
-  if (!rows[0]) return err(`Supplier ${params.id} not found`, 404);
-
-  return ok(rows[0]);
+  try {
+    const rows = await query(
+      `SELECT * FROM suppliers WHERE id = $1 LIMIT 1`,
+      [params.id],
+    );
+    if (!rows[0]) return err(`Supplier ${params.id} not found`, 404);
+    return ok(rows[0]);
+  } catch (e: unknown) {
+    return err((e as Error).message, 500);
+  }
 }
 
 export async function PATCH(

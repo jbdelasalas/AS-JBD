@@ -74,9 +74,12 @@ export default function SupplierDetailPage() {
     setLoading(true);
     Promise.all([
       api.get<Supplier>(`/ap/suppliers/${id}`),
-      api.get<Outstanding>(`/ap/suppliers/${id}/outstanding`),
-      api.get<{ data: Payment[] }>(`/ap/payments?company_id=${companyId}&supplier_id=${id}&limit=20`),
+      api.get<Outstanding>(`/ap/suppliers/${id}/outstanding`)
+        .catch(() => ({ total_balance: 0, bills: [] as Outstanding['bills'] })),
+      api.get<{ data: Payment[] }>(`/ap/payments?company_id=${companyId}&supplier_id=${id}&limit=20`)
+        .catch(() => ({ data: [] as Payment[] })),
     ]).then(([s, o, pay]) => { setSupplier(s); setOutstanding(o); setPayments(pay.data); setForm(s); })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [id, companyId]);
 

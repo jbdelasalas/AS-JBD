@@ -14,35 +14,39 @@ export async function GET(
     return e as Response;
   }
 
-  const rows = await query(
-    `SELECT id FROM suppliers WHERE id = $1 LIMIT 1`,
-    [params.id],
-  );
-  if (!rows[0]) return err(`Supplier ${params.id} not found`, 404);
+  try {
+    const rows = await query(
+      `SELECT id FROM suppliers WHERE id = $1 LIMIT 1`,
+      [params.id],
+    );
+    if (!rows[0]) return err(`Supplier ${params.id} not found`, 404);
 
-  const bills = await query(
-    `SELECT b.id, b.internal_no, b.bill_no, b.bill_date, b.due_date,
-            b.total, b.amount_paid, b.balance, b.status
-       FROM bills b
-      WHERE b.supplier_id = $1
-        AND b.status IN ('approved','partial')
-      ORDER BY b.due_date ASC`,
-    [params.id],
-  );
+    const bills = await query(
+      `SELECT b.id, b.internal_no, b.bill_no, b.bill_date, b.due_date,
+              b.total, b.amount_paid, b.balance, b.status
+         FROM bills b
+        WHERE b.supplier_id = $1
+          AND b.status IN ('approved','partial','pending_approval')
+        ORDER BY b.due_date ASC`,
+      [params.id],
+    );
 
-  const totalBalance = bills.reduce((s, r) => s + Number((r as Record<string, unknown>).balance), 0);
+    const totalBalance = bills.reduce((s, r) => s + Number((r as Record<string, unknown>).balance), 0);
 
-  return ok({
-    supplier_id: params.id,
-    total_balance: totalBalance,
-    bills: bills.map((r) => {
-      const row = r as Record<string, unknown>;
-      return {
-        ...row,
-        total: Number(row.total),
-        amount_paid: Number(row.amount_paid),
-        balance: Number(row.balance),
-      };
-    }),
-  });
+    return ok({
+      supplier_id: params.id,
+      total_balance: totalBalance,
+      bills: bills.map((r) => {
+        const row = r as Record<string, unknown>;
+        return {
+          ...row,
+          total: Number(row.total),
+          amount_paid: Number(row.amount_paid),
+          balance: Number(row.balance),
+        };
+      }),
+    });
+  } catch (e: unknown) {
+    return err((e as Error).message, 500);
+  }
 }
