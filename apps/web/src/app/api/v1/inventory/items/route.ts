@@ -28,9 +28,18 @@ export async function GET(request: NextRequest) {
     const rows = await query(
       `SELECT i.id, i.sku, i.name, i.uom, i.item_type, i.costing_method,
               i.standard_cost, i.selling_price, i.reorder_point, i.is_active,
-              ic.name AS category_name
+              i.category_id,
+              ic.name AS category_name,
+              i.inventory_account_id, a1.code||' - '||a1.name AS inventory_account_name,
+              i.cogs_account_id,      a2.code||' - '||a2.name AS cogs_account_name,
+              i.revenue_account_id,   a3.code||' - '||a3.name AS revenue_account_name,
+              i.purchase_variance_account_id, a4.code||' - '||a4.name AS purchase_variance_account_name
          FROM items i
          LEFT JOIN item_categories ic ON ic.id = i.category_id
+         LEFT JOIN accounts a1 ON a1.id = i.inventory_account_id
+         LEFT JOIN accounts a2 ON a2.id = i.cogs_account_id
+         LEFT JOIN accounts a3 ON a3.id = i.revenue_account_id
+         LEFT JOIN accounts a4 ON a4.id = i.purchase_variance_account_id
         WHERE ${where}
         ORDER BY i.sku
         LIMIT $${params.length}`,
@@ -64,9 +73,11 @@ export async function POST(request: NextRequest) {
   const rows = await query(
     `INSERT INTO items
        (company_id, sku, name, uom, item_type, costing_method,
-        standard_cost, selling_price, reorder_point, category_id, is_active)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-     RETURNING id, sku, name, uom, item_type, costing_method, standard_cost, selling_price, reorder_point, is_active`,
+        standard_cost, selling_price, reorder_point, category_id, is_active,
+        inventory_account_id, cogs_account_id, revenue_account_id, purchase_variance_account_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+     RETURNING id, sku, name, uom, item_type, costing_method, standard_cost, selling_price, reorder_point, is_active,
+               inventory_account_id, cogs_account_id, revenue_account_id, purchase_variance_account_id`,
     [
       companyId, dto.sku, dto.name,
       dto.uom ?? 'PCS',
@@ -77,6 +88,10 @@ export async function POST(request: NextRequest) {
       dto.reorder_point ?? 0,
       dto.category_id ?? null,
       dto.is_active ?? true,
+      dto.inventory_account_id ?? null,
+      dto.cogs_account_id ?? null,
+      dto.revenue_account_id ?? null,
+      dto.purchase_variance_account_id ?? null,
     ],
   );
   const item = rows[0] as Record<string, unknown>;

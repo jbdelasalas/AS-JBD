@@ -2243,6 +2243,12 @@ export async function POST(request: NextRequest) {
     results.push('019 wht_certificates: ok');
   } catch (e) { results.push(`019 wht_certificates: ${(e as Error).message}`); }
 
+  // --- 020a: Add purchase_variance_account_id to items ---
+  try {
+    await query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS purchase_variance_account_id uuid REFERENCES accounts(id)`);
+    results.push('020a items.purchase_variance_account_id: ok');
+  } catch (e) { results.push(`020a items.purchase_variance_account_id: ${(e as Error).message}`); }
+
   // --- 020: Updated Chart of Accounts (5-digit codes) ---
   try {
     const COA_COMPANY = '11111111-1111-1111-1111-111111111111';

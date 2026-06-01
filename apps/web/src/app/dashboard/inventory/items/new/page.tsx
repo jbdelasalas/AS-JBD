@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 
 interface Category { id: string; name: string; }
 interface UomRow { id: string; code: string; name: string; }
+interface Account { id: string; code: string; name: string; account_type: string; }
 
 const ITEM_TYPES = ['stock', 'service', 'bundle'];
 const COSTING_METHODS = ['weighted_avg', 'fifo', 'standard'];
@@ -14,20 +15,18 @@ export default function NewItemPage() {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [uoms, setUoms] = useState<UomRow[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
-    sku: '',
-    name: '',
-    uom: 'PCS',
-    item_type: 'stock',
-    costing_method: 'weighted_avg',
-    standard_cost: '',
-    selling_price: '',
-    reorder_point: '',
-    category_id: '',
-    is_active: true,
+    sku: '', name: '', uom: 'PCS', item_type: 'stock',
+    costing_method: 'weighted_avg', standard_cost: '', selling_price: '',
+    reorder_point: '', category_id: '', is_active: true,
+    inventory_account_id: '',
+    cogs_account_id: '',
+    revenue_account_id: '',
+    purchase_variance_account_id: '',
   });
 
   useEffect(() => {
@@ -35,6 +34,7 @@ export default function NewItemPage() {
     if (!companyId) return;
     api.get<Category[]>(`/inventory/categories?company_id=${companyId}`).then(setCategories).catch(() => {});
     api.get<UomRow[]>(`/admin/uoms?company_id=${companyId}`).then(setUoms).catch(() => {});
+    api.get<Account[]>(`/gl/accounts?company_id=${companyId}&active_only=true`).then(setAccounts).catch(() => {});
   }, []);
 
   function set(field: string, val: unknown) {
@@ -49,16 +49,17 @@ export default function NewItemPage() {
       const companyId = localStorage.getItem('company_id')!;
       await api.post('/inventory/items', {
         company_id: companyId,
-        sku: form.sku,
-        name: form.name,
-        uom: form.uom,
-        item_type: form.item_type,
-        costing_method: form.costing_method,
+        sku: form.sku, name: form.name, uom: form.uom,
+        item_type: form.item_type, costing_method: form.costing_method,
         standard_cost: parseFloat(form.standard_cost) || 0,
         selling_price: parseFloat(form.selling_price) || 0,
         reorder_point: parseFloat(form.reorder_point) || 0,
         category_id: form.category_id || undefined,
         is_active: form.is_active,
+        inventory_account_id: form.inventory_account_id || null,
+        cogs_account_id: form.cogs_account_id || null,
+        revenue_account_id: form.revenue_account_id || null,
+        purchase_variance_account_id: form.purchase_variance_account_id || null,
       });
       router.push('/dashboard/inventory/items');
     } catch (e: unknown) {
@@ -71,6 +72,10 @@ export default function NewItemPage() {
   const inp = 'w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100';
   const lbl = 'mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400';
 
+  const accountOptions = (
+    <option value="">— none —</option>
+  );
+
   return (
     <div>
       <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">New Item</h1>
@@ -81,6 +86,7 @@ export default function NewItemPage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Item Details */}
         <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
           <div className="mb-4 text-sm font-medium text-slate-700 dark:text-slate-300">Item Details</div>
           <div className="grid grid-cols-3 gap-4">
@@ -118,6 +124,7 @@ export default function NewItemPage() {
           </div>
         </div>
 
+        {/* Pricing & Costing */}
         <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
           <div className="mb-4 text-sm font-medium text-slate-700 dark:text-slate-300">Pricing & Costing</div>
           <div className="grid grid-cols-3 gap-4">
@@ -147,6 +154,44 @@ export default function NewItemPage() {
                 <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
                 Active
               </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Accounting Integration */}
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+          <div className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Accounting Integration</div>
+          <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
+            Link GL accounts for automatic journal entry generation.
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={lbl}>Inventory Account</label>
+              <select value={form.inventory_account_id} onChange={(e) => set('inventory_account_id', e.target.value)} className={inp}>
+                {accountOptions}
+                {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={lbl}>COGS Account</label>
+              <select value={form.cogs_account_id} onChange={(e) => set('cogs_account_id', e.target.value)} className={inp}>
+                {accountOptions}
+                {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={lbl}>Sales Revenue Account</label>
+              <select value={form.revenue_account_id} onChange={(e) => set('revenue_account_id', e.target.value)} className={inp}>
+                {accountOptions}
+                {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={lbl}>Purchase Variance Account</label>
+              <select value={form.purchase_variance_account_id} onChange={(e) => set('purchase_variance_account_id', e.target.value)} className={inp}>
+                {accountOptions}
+                {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+              </select>
             </div>
           </div>
         </div>
