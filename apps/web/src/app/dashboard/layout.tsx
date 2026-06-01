@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/Sidebar';
 import { TopBar } from '@/components/TopBar';
 import { TableResizer } from '@/components/TableResizer';
+import { SelectEnhancer } from '@/components/SelectEnhancer';
 import { loadBranding } from '@/lib/branding';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -40,6 +41,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <TopBar onMenuToggle={() => setSidebarOpen((o) => !o)} />
         <main className="flex-1 overflow-y-auto bg-slate-50 p-6 dark:bg-slate-800">
           <TableResizer />
+          <SelectEnhancer />
           {children}
         </main>
       </div>
