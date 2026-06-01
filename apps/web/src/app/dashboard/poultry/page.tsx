@@ -46,23 +46,6 @@ export default function PoultryDashboard() {
         <p className="text-sm text-slate-500 dark:text-slate-400">Farm monitor, inventory, and sales overview.</p>
       </div>
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
-        {[
-          { label: 'Active Batches', value: data?.active_batches ?? 0, href: '/dashboard/poultry/grow-cycles' },
-          { label: 'Live Birds', value: (data?.total_birds ?? 0).toLocaleString(), href: '/dashboard/poultry/grow-cycles' },
-          { label: 'Mortality (7d)', value: (data?.mortality_this_week ?? 0).toLocaleString(), href: '/dashboard/poultry/grow-cycles' },
-          { label: 'Pending Deliveries', value: data?.pending_deliveries ?? 0, href: '/dashboard/poultry/deliveries' },
-          { label: 'Unpaid AR', value: formatPHP(data?.unpaid_invoices_amount ?? 0), href: '/dashboard/poultry/invoices' },
-        ].map((card) => (
-          <Link key={card.label} href={card.href}
-            className="rounded-lg border border-slate-200 bg-white p-4 hover:shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <div className="text-xs text-slate-500 dark:text-slate-400">{card.label}</div>
-            <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">{card.value}</div>
-          </Link>
-        ))}
-      </div>
-
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Active grow cycles */}
         <div className="rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
