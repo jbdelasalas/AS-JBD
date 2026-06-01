@@ -30,6 +30,14 @@ export async function POST(request: NextRequest) {
     results.push(`items.default_warehouse_id: ${(e as Error).message}`);
   }
 
+  // purchase_orders: add remarks column
+  try {
+    await query(`ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS remarks text`);
+    results.push('purchase_orders.remarks: ok');
+  } catch (e) {
+    results.push(`purchase_orders.remarks: ${(e as Error).message}`);
+  }
+
   // purchase_order_lines: allow nullable item_id (GL-account lines have no item)
   try {
     await query(`ALTER TABLE purchase_order_lines ALTER COLUMN item_id DROP NOT NULL`);

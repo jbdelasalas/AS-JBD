@@ -117,14 +117,14 @@ export async function POST(request: NextRequest) {
 
     const headerRows = await client.query(
       `INSERT INTO purchase_orders
-         (company_id, branch_id, po_no, supplier_id, po_date, expected_date, reference,
+         (company_id, branch_id, po_no, supplier_id, po_date, expected_date, remarks,
           subtotal, vat_amount, total, status, created_by,
           building_id, cost_center_id, grow_reference_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'draft',$11,$12,$13,$14)
        RETURNING *`,
       [
         companyId, dto.branch_id ?? null, poNo, supplierId,
-        dto.po_date, dto.expected_date ?? null, dto.reference ?? null,
+        dto.po_date, dto.expected_date ?? null, dto.remarks ?? null,
         totSubtotal.toFixed(2), totVat.toFixed(2), totTotal.toFixed(2),
         auth.userId,
         dto.building_id ?? null, dto.cost_center_id ?? null, dto.grow_reference_id ?? null,

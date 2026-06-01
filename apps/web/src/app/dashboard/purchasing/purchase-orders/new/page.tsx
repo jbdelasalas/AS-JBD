@@ -41,7 +41,7 @@ export default function NewPurchaseOrderPage() {
 
   const [form, setForm] = useState({
     supplier_id: '', po_date: new Date().toISOString().split('T')[0],
-    expected_date: '', reference: '',
+    expected_date: '', remarks: '',
   });
   const [tags, setTags] = useState<TaggingValues>({
     branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '',
@@ -100,7 +100,7 @@ export default function NewPurchaseOrderPage() {
         ...form,
         ...tags,
         expected_date: form.expected_date || undefined,
-        reference: form.reference || undefined,
+        remarks: form.remarks || undefined,
         lines: lines.map(l => ({
           ...l,
           item_id:           l.line_type === 'item' ? l.item_id || undefined : undefined,
@@ -145,9 +145,10 @@ export default function NewPurchaseOrderPage() {
               <label className={lbl}>Expected Delivery</label>
               <input type="date" value={form.expected_date} onChange={e => setForm(f => ({ ...f, expected_date: e.target.value }))} className={inp} />
             </div>
-            <div>
-              <label className={lbl}>Reference</label>
-              <input type="text" value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} className={inp} />
+            <div className="col-span-3">
+              <label className={lbl}>Remarks</label>
+              <input type="text" value={form.remarks} onChange={e => setForm(f => ({ ...f, remarks: e.target.value }))}
+                placeholder="Optional notes" className={inp} />
             </div>
             {/* Header tagging — auto-fills all lines */}
             <TaggingFields value={tags} data={tagData} onChange={handleTagChange} />
