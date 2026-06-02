@@ -35,8 +35,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   try { auth = await requireAuth(_req); } catch (e) { return e as Response; }
   if (!auth.isSuperadmin) return err('Forbidden — admin only', 403);
 
-  const [rec] = await query<{ id: string; status: string; company_id: string; warehouse_id: string | null; source_item_id: string; source_heads: number; source_kgs: number }>(
-    `SELECT id, status, company_id, warehouse_id, source_item_id, source_heads, source_kgs FROM conversions WHERE id = $1`, [params.id]);
+  const [rec] = await query<{ id: string; status: string; company_id: string; warehouse_id: string | null; source_item_id: string; source_heads: number; source_kgs: number; branch_id: string | null; target_branch_id: string | null }>(
+    `SELECT id, status, company_id, warehouse_id, source_item_id, source_heads, source_kgs, branch_id, target_branch_id FROM conversions WHERE id = $1`, [params.id]);
   if (!rec) return err('Not found', 404);
 
   const outputs = await query<{ output_item_id: string; heads: number; kgs: number }>(
@@ -47,6 +47,16 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     await client.query('BEGIN');
 
     if (rec.status === 'posted') {
+      // Resolve warehouses for stock_balances reversal
+      const cvSrcWhRow = rec.branch_id
+        ? await client.query(`SELECT id FROM warehouses WHERE branch_id = $1 LIMIT 1`, [rec.branch_id])
+        : { rows: [] };
+      const cvTgtWhRow = (rec.target_branch_id ?? rec.branch_id)
+        ? await client.query(`SELECT id FROM warehouses WHERE branch_id = $1 LIMIT 1`, [rec.target_branch_id ?? rec.branch_id])
+        : { rows: [] };
+      const cvSrcWhId: string | null = cvSrcWhRow.rows[0]?.id ?? null;
+      const cvTgtWhId: string | null = cvTgtWhRow.rows[0]?.id ?? null;
+
       // Add source inventory back
       await client.query(
         `INSERT INTO poultry_inventory_balance (company_id, warehouse_id, item_id, qty_heads, qty_kgs, last_updated)
@@ -57,6 +67,15 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
                last_updated = now()`,
         [rec.company_id, rec.warehouse_id, rec.source_item_id, Number(rec.source_heads), Number(rec.source_kgs)],
       );
+      if (cvSrcWhId) {
+        await client.query(
+          `UPDATE stock_balances SET
+             qty_on_hand = GREATEST(0, qty_on_hand + $1),
+             last_movement_at = now()
+           WHERE item_id = $2 AND warehouse_id = $3`,
+          [Number(rec.source_kgs), rec.source_item_id, cvSrcWhId],
+        );
+      }
 
       // Remove output inventory
       for (const o of outputs) {
@@ -68,6 +87,15 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
            WHERE company_id = $3 AND warehouse_id IS NOT DISTINCT FROM $4 AND item_id = $5`,
           [Number(o.heads), Number(o.kgs), rec.company_id, rec.warehouse_id, o.output_item_id],
         );
+        if (cvTgtWhId) {
+          await client.query(
+            `UPDATE stock_balances SET
+               qty_on_hand = GREATEST(0, qty_on_hand - $1),
+               last_movement_at = now()
+             WHERE item_id = $2 AND warehouse_id = $3`,
+            [Number(o.kgs), o.output_item_id, cvTgtWhId],
+          );
+        }
       }
 
       // Remove ledger entries

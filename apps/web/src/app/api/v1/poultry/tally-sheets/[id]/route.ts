@@ -153,8 +153,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   try { auth = await requireAuth(_req); } catch (e) { return e as Response; }
   if (!auth.isSuperadmin) return err('Forbidden — admin only', 403);
 
-  const [rec] = await query<{ id: string; status: string; grow_cycle_id: string | null; company_id: string; warehouse_id: string | null; net_heads: number; net_kgs: number }>(
-    `SELECT id, status, grow_cycle_id, company_id, warehouse_id, net_heads, net_kgs FROM tally_sheets WHERE id = $1`, [params.id]);
+  const [rec] = await query<{ id: string; status: string; grow_cycle_id: string | null; company_id: string; warehouse_id: string | null; net_heads: number; net_kgs: number; destination_id: string | null; branch_id: string | null }>(
+    `SELECT id, status, grow_cycle_id, company_id, warehouse_id, net_heads, net_kgs, destination_id, branch_id FROM tally_sheets WHERE id = $1`, [params.id]);
   if (!rec) return err('Not found', 404);
 
   const [{ cnt }] = await query<{ cnt: number }>(
@@ -182,7 +182,14 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
         );
       }
 
-      // Reverse poultry_inventory_balance for each tally line
+      // Resolve warehouse for stock_balances reversal
+      const tsBranchId = rec.destination_id ?? rec.branch_id;
+      const tsWhRow = tsBranchId
+        ? await client.query(`SELECT id FROM warehouses WHERE branch_id = $1 LIMIT 1`, [tsBranchId])
+        : { rows: [] };
+      const tsWarehouseId: string | null = tsWhRow.rows[0]?.id ?? null;
+
+      // Reverse poultry_inventory_balance and stock_balances for each tally line
       for (const l of lines) {
         await client.query(
           `UPDATE poultry_inventory_balance SET
@@ -192,6 +199,15 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
            WHERE company_id = $3 AND warehouse_id IS NOT DISTINCT FROM $4 AND item_id = $5`,
           [Number(l.heads), Number(l.net_kgs), rec.company_id, rec.warehouse_id, l.item_id],
         );
+        if (tsWarehouseId) {
+          await client.query(
+            `UPDATE stock_balances SET
+               qty_on_hand = GREATEST(0, qty_on_hand - $1),
+               last_movement_at = now()
+             WHERE item_id = $2 AND warehouse_id = $3`,
+            [Number(l.net_kgs), l.item_id, tsWarehouseId],
+          );
+        }
       }
 
       // Remove ledger entries

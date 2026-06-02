@@ -17,6 +17,18 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   try {
     await client.query('BEGIN');
 
+    // Resolve warehouses from branch_id / target_branch_id for stock_balances sync
+    const srcBranchId = rec.branch_id as string | null;
+    const tgtBranchId = (rec.target_branch_id ?? rec.branch_id) as string | null;
+    const srcWhRow = srcBranchId
+      ? await client.query(`SELECT id FROM warehouses WHERE branch_id = $1 LIMIT 1`, [srcBranchId])
+      : { rows: [] };
+    const tgtWhRow = tgtBranchId
+      ? await client.query(`SELECT id FROM warehouses WHERE branch_id = $1 LIMIT 1`, [tgtBranchId])
+      : { rows: [] };
+    const srcWarehouseId: string | null = srcWhRow.rows[0]?.id ?? null;
+    const tgtWarehouseId: string | null = tgtWhRow.rows[0]?.id ?? null;
+
     // Deduct source inventory
     const srcBal = await client.query(
       `SELECT qty_kgs, qty_heads, avg_cost FROM poultry_inventory_balance
@@ -40,6 +52,16 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
        ON CONFLICT (company_id, warehouse_id, item_id) DO UPDATE SET qty_heads=$4, qty_kgs=$5, last_updated=now()`,
       [rec.company_id, rec.warehouse_id, rec.source_item_id, newSrcHeads, newSrcKgs],
     );
+    // Mirror source deduction to stock_balances
+    if (srcWarehouseId) {
+      await client.query(
+        `UPDATE stock_balances SET
+           qty_on_hand = GREATEST(0, qty_on_hand - $1),
+           last_movement_at = now()
+         WHERE item_id = $2 AND warehouse_id = $3`,
+        [srcKgs, rec.source_item_id, srcWarehouseId],
+      );
+    }
 
     // Add output inventory
     for (const o of outputs) {
@@ -63,6 +85,21 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
          ON CONFLICT (company_id, warehouse_id, item_id) DO UPDATE SET qty_heads=$4, qty_kgs=$5, last_updated=now()`,
         [rec.company_id, rec.warehouse_id, o.output_item_id, newHeads, newKgs],
       );
+      // Mirror output addition to stock_balances
+      if (tgtWarehouseId && outKgs > 0) {
+        const unitCost = Number(o.unit_cost ?? 0);
+        await client.query(
+          `INSERT INTO stock_balances (item_id, warehouse_id, qty_on_hand, avg_cost, last_movement_at)
+           VALUES ($1,$2,$3,$4,now())
+           ON CONFLICT (item_id, warehouse_id) DO UPDATE SET
+             qty_on_hand = GREATEST(0, stock_balances.qty_on_hand + $3),
+             avg_cost = CASE WHEN stock_balances.qty_on_hand + $3 > 0
+                        THEN (stock_balances.qty_on_hand * stock_balances.avg_cost + $3 * $4) / (stock_balances.qty_on_hand + $3)
+                        ELSE $4 END,
+             last_movement_at = now()`,
+          [o.output_item_id, tgtWarehouseId, outKgs, unitCost],
+        );
+      }
     }
 
     await client.query(`UPDATE conversions SET status='posted', posted_by=$1, posted_at=now() WHERE id=$2`, [auth.userId, params.id]);

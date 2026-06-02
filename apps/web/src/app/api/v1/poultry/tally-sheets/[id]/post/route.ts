@@ -67,6 +67,13 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       }
     }
 
+    // Resolve warehouse from destination_id or branch_id so stock_balances stays in sync
+    const tsBranchId = (rec.destination_id ?? rec.branch_id) as string | null;
+    const tsWhRow = tsBranchId
+      ? await client.query(`SELECT id FROM warehouses WHERE branch_id = $1 LIMIT 1`, [tsBranchId])
+      : { rows: [] };
+    const tsWarehouseId: string | null = tsWhRow.rows[0]?.id ?? null;
+
     // Write inventory for each line
     for (const l of lines) {
       const netKgs = Number(l.net_kgs ?? 0);
@@ -87,7 +94,6 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
          SELECT $1,$2,$3,'in','tally_sheet',$4,doc_no,$5,$6,$7,$8,$9 FROM tally_sheets WHERE id=$4`,
         [rec.company_id, rec.warehouse_id, l.item_id, params.id, rec.transfer_date, heads, netKgs, newHeads, newKgs],
       );
-      // For the live chicken item, carry the computed avg cost
       const avgCost = l.item_id === liveItemId ? liveAvgCostPerKg : Number(bal.avg_cost ?? 0);
       await client.query(
         `INSERT INTO poultry_inventory_balance (company_id, warehouse_id, item_id, qty_heads, qty_kgs, avg_cost, last_updated)
@@ -95,6 +101,21 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
          ON CONFLICT (company_id, warehouse_id, item_id) DO UPDATE SET qty_heads=$4, qty_kgs=$5, avg_cost=$6, last_updated=now()`,
         [rec.company_id, rec.warehouse_id, l.item_id, newHeads, newKgs, avgCost],
       );
+
+      // Mirror to stock_balances so standard stock-on-hand stays in sync
+      if (tsWarehouseId && netKgs > 0) {
+        await client.query(
+          `INSERT INTO stock_balances (item_id, warehouse_id, qty_on_hand, avg_cost, last_movement_at)
+           VALUES ($1,$2,$3,$4,now())
+           ON CONFLICT (item_id, warehouse_id) DO UPDATE SET
+             qty_on_hand = GREATEST(0, stock_balances.qty_on_hand + $3),
+             avg_cost = CASE WHEN stock_balances.qty_on_hand + $3 > 0
+                        THEN (stock_balances.qty_on_hand * stock_balances.avg_cost + $3 * $4) / (stock_balances.qty_on_hand + $3)
+                        ELSE $4 END,
+             last_movement_at = now()`,
+          [l.item_id, tsWarehouseId, netKgs, avgCost],
+        );
+      }
     }
 
     await client.query(`UPDATE tally_sheets SET status='posted', posted_by=$1, posted_at=now() WHERE id=$2`, [auth.userId, params.id]);
