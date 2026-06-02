@@ -43,17 +43,33 @@ export async function GET(request: NextRequest) {
   params.push(limit, offset);
 
   try {
-    const rows = await query(
-      `SELECT b.id, b.internal_no, b.bill_no, b.bill_date, b.due_date,
-              b.subtotal, b.vat_amount, b.ewt_amount, b.total, b.amount_paid, b.balance, b.status,
-              s.name AS supplier_name, s.code AS supplier_code
-         FROM bills b
-         JOIN suppliers s ON s.id = b.supplier_id
-        WHERE ${where}
-        ORDER BY b.bill_date DESC, b.internal_no DESC
-        LIMIT $${params.length - 1} OFFSET $${params.length}`,
-      params,
-    );
+    // Try with ewt_amount; fall back without it if migration pending
+    let rows: unknown[];
+    try {
+      rows = await query(
+        `SELECT b.id, b.internal_no, b.bill_no, b.bill_date, b.due_date,
+                b.subtotal, b.vat_amount, b.ewt_amount, b.total, b.amount_paid, b.balance, b.status,
+                s.name AS supplier_name, s.code AS supplier_code
+           FROM bills b
+           JOIN suppliers s ON s.id = b.supplier_id
+          WHERE ${where}
+          ORDER BY b.bill_date DESC, b.internal_no DESC
+          LIMIT $${params.length - 1} OFFSET $${params.length}`,
+        params,
+      );
+    } catch {
+      rows = await query(
+        `SELECT b.id, b.internal_no, b.bill_no, b.bill_date, b.due_date,
+                b.subtotal, b.vat_amount, 0 AS ewt_amount, b.total, b.amount_paid, b.balance, b.status,
+                s.name AS supplier_name, s.code AS supplier_code
+           FROM bills b
+           JOIN suppliers s ON s.id = b.supplier_id
+          WHERE ${where}
+          ORDER BY b.bill_date DESC, b.internal_no DESC
+          LIMIT $${params.length - 1} OFFSET $${params.length}`,
+        params,
+      );
+    }
 
     const countRows = await query<{ c: number }>(
       `SELECT count(*)::int AS c FROM bills b WHERE ${where}`,
