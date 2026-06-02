@@ -33,7 +33,7 @@ export default function StockOnHandPage() {
     if (!companyId) return;
     setLoading(true);
     setPage(1);
-    const params = new URLSearchParams({ company_id: companyId });
+    const params = new URLSearchParams({ company_id: companyId, hide_zero: 'true' });
     if (search) params.set('search', search);
     if (lowStockOnly) params.set('low_stock', 'true');
     api.get<SOHRow[]>(`/inventory/stock-on-hand?${params}`)
