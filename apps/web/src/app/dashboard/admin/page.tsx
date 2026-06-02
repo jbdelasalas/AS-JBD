@@ -92,6 +92,7 @@ export default function AdminHomePage() {
   const MODULES = [
     { href: '/dashboard/admin/master-data', title: 'Master Data', desc: 'Items, customers, suppliers, locations, buildings, departments, grow references', highlight: true },
     { href: '/dashboard/admin/users', title: 'Users', desc: 'Manage system users, passwords, and roles' },
+    { href: '/dashboard/admin/employees', title: 'Employees', desc: 'Employee master data linked to user accounts' },
     { href: '/dashboard/admin/roles', title: 'Roles & Permissions', desc: 'Define roles and assign permissions per module' },
     { href: '/dashboard/admin/companies', title: 'Companies', desc: 'Company profile and BIR registration' },
     { href: '/dashboard/admin/fiscal-years', title: 'Fiscal Years', desc: 'Set up and close accounting periods' },

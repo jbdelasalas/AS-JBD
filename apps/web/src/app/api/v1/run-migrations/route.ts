@@ -2535,5 +2535,42 @@ export async function POST(request: NextRequest) {
     results.push('032 admin credentials: ok');
   } catch (e) { results.push(`032 admin credentials: ${(e as Error).message}`); }
 
+  // 033 — employees table
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS employees (
+        id               uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id       uuid NOT NULL REFERENCES companies(id) ON DELETE RESTRICT,
+        user_id          uuid REFERENCES users(id) ON DELETE SET NULL,
+        employee_no      varchar(30) NOT NULL,
+        full_name        varchar(200) NOT NULL,
+        email            varchar(200),
+        phone            varchar(50),
+        department_id    uuid REFERENCES departments(id) ON DELETE SET NULL,
+        position         varchar(100),
+        employment_type  varchar(20) NOT NULL DEFAULT 'full_time'
+                           CHECK (employment_type IN ('full_time','part_time','contractual','probationary')),
+        hire_date        date,
+        end_date         date,
+        is_active        boolean NOT NULL DEFAULT true,
+        notes            text,
+        created_at       timestamptz NOT NULL DEFAULT now(),
+        updated_at       timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, employee_no)
+      )
+    `);
+    await query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'employees_updated') THEN
+          CREATE TRIGGER employees_updated BEFORE UPDATE ON employees
+            FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+        END IF;
+      END $$
+    `);
+    await query(`CREATE INDEX IF NOT EXISTS idx_employees_company ON employees (company_id)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_employees_user ON employees (user_id)`);
+    results.push('033 employees table: ok');
+  } catch (e) { results.push(`033 employees FAILED: ${(e as Error).message}`); }
+
   return ok({ results });
 }
