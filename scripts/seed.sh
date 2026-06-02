@@ -12,4 +12,4 @@ for f in db/seeds/*.sql; do
   psql -U "$USER" -d "$DB" -v ON_ERROR_STOP=1 -f "$f"
 done
 
-echo "Seeding complete. Default login: admin@perpet.com.ph / Perpet2026!"
+echo "Seeding complete. Default login: admin@afcc.ph / artfresh2026"

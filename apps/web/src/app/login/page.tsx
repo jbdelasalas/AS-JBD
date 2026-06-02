@@ -103,7 +103,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-6 text-center text-xs text-white/40">
-          Default: admin@perpet.com.ph / Perpet2026!
+          Default: admin@afcc.ph / artfresh2026
         </p>
       </div>
     </div>

@@ -2524,5 +2524,16 @@ export async function POST(request: NextRequest) {
     catch (e) { results.push(`031 ${label}: ${(e as Error).message}`); }
   }
 
+  // 032 — update admin user credentials
+  try {
+    const bcrypt = await import('bcryptjs');
+    const hash = await bcrypt.hash('artfresh2026', 10);
+    await query(
+      `UPDATE users SET email = $1, password_hash = $2 WHERE email IN ($1, 'admin@perpet.com.ph')`,
+      ['admin@afcc.ph', hash],
+    );
+    results.push('032 admin credentials: ok');
+  } catch (e) { results.push(`032 admin credentials: ${(e as Error).message}`); }
+
   return ok({ results });
 }
