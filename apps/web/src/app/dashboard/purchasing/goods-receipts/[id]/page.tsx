@@ -27,6 +27,7 @@ interface GRN {
   status: string;
   po_no: string;
   po_id: string;
+  je_id: string | null;
   supplier_name: string;
   supplier_code: string;
   branch_code: string | null;    branch_name: string | null;
@@ -85,6 +86,18 @@ export default function GRNDetailPage() {
             className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
             View PO: {grn.po_no}
           </Link>
+          {grn.je_id && (
+            <Link href={`/dashboard/gl/journal-entries/${grn.je_id}`}
+              className="rounded border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-sm text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+              View Journal Entry
+            </Link>
+          )}
+          {grn.status === 'posted' && (
+            <Link href={`/dashboard/ap/bills/new?po_id=${grn.po_id}`}
+              className="rounded bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700">
+              Process to Bill
+            </Link>
+          )}
           {isAdmin && (
             <button onClick={handleDelete} disabled={busy}
               className="rounded border border-red-300 bg-red-50 px-3 py-1.5 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-700 dark:bg-red-950 dark:text-red-400">
