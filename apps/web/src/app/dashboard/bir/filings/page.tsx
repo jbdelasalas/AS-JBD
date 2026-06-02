@@ -55,7 +55,7 @@ export default function BirFilingsPage() {
   async function load() {
     setLoading(true);
     try {
-      const res = await api.get(`/api/v1/bir/filings?company_id=${companyId}&year=${filterYear}`) as BirFiling[];
+      const res = await api.get(`/bir/filings?company_id=${companyId}&year=${filterYear}`) as BirFiling[];
       setRows(Array.isArray(res) ? res : []);
     } catch { setRows([]); } finally { setLoading(false); }
   }
@@ -63,7 +63,7 @@ export default function BirFilingsPage() {
   async function createFiling() {
     setSaving(true); setError('');
     try {
-      await api.post('/api/v1/bir/filings', {
+      await api.post('/bir/filings', {
         ...form,
         company_id: companyId,
         period_month: form.period_month ? parseInt(form.period_month) : null,
@@ -79,7 +79,7 @@ export default function BirFilingsPage() {
     if (!selected) return;
     setFiling(true); setError('');
     try {
-      await api.patch(`/api/v1/bir/filings/${selected.id}`, {
+      await api.patch(`/bir/filings/${selected.id}`, {
         ...patchForm,
         total_paid: patchForm.total_paid ? Number(patchForm.total_paid) : undefined,
       });

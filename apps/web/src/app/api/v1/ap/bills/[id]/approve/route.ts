@@ -17,11 +17,11 @@ export async function POST(
 
     const rows = await client.query(
       `SELECT b.*, s.ap_account_id, s.name AS supplier_name, s.ewt_rate AS supplier_ewt_rate,
-              COALESCE(s.bir_atc_code, tc.bir_atc_code) AS supplier_atc_code
+              COALESCE(s.bir_atc_code, etc.bir_atc_code) AS supplier_atc_code,
+              etc.account_id AS ewt_account_id, etc.code AS ewt_code, etc.rate_pct AS ewt_code_rate
          FROM bills b
          JOIN suppliers s ON s.id = b.supplier_id
-         LEFT JOIN tax_codes tc ON tc.company_id = b.company_id AND tc.tax_type = 'ewt'
-                                AND ROUND(tc.rate_pct::numeric, 2) = ROUND(s.ewt_rate::numeric, 2)
+         LEFT JOIN tax_codes etc ON etc.id = b.ewt_code_id
         WHERE b.id = $1 FOR UPDATE`,
       [params.id],
     );
@@ -60,24 +60,51 @@ export async function POST(
     );
     const vatAccountId = vatRows.rows[0]?.id ?? null;
 
-    // Default expense account fallback
+    // Bill lines (needed for non-PO bills)
+    const lineRows = await client.query(
+      `SELECT bl.*, bl.expense_account_id AS eff_expense_acct
+         FROM bill_lines bl
+        WHERE bl.bill_id = $1 ORDER BY bl.line_no`,
+      [params.id],
+    );
+
+    // Default expense account fallback (non-PO bills)
     const defExpRows = await client.query(
       `SELECT id FROM accounts WHERE company_id = $1 AND account_type = 'EXPENSE' AND is_active = true ORDER BY code LIMIT 1`,
       [bill.company_id],
     );
     const defaultExpAcctId = defExpRows.rows[0]?.id ?? null;
 
-    // Bill lines
-    const lineRows = await client.query(
-      `SELECT bl.*, COALESCE(bl.expense_account_id, i.expense_account_id) AS eff_expense_acct
-         FROM bill_lines bl
-         LEFT JOIN items i ON i.id = bl.item_id
-        WHERE bl.bill_id = $1 ORDER BY bl.line_no`,
-      [params.id],
+    // GRNI account (for PO-linked bills)
+    const grniRows = await client.query(
+      `SELECT id FROM accounts
+        WHERE company_id = $1
+          AND (name ILIKE '%grni%' OR name ILIKE '%goods received not yet%' OR code ILIKE '%grni%')
+          AND is_active = true
+        ORDER BY code LIMIT 1`,
+      [bill.company_id],
     );
+    const grniAccountId = grniRows.rows[0]?.id ?? null;
 
-    const vatAmount = Number(bill.vat_amount);
-    const total = Number(bill.total);
+    const vatAmount  = Number(bill.vat_amount);
+    const subtotal   = Number(bill.subtotal);
+    const total      = Number(bill.total);
+    const ewtAmount  = Number(bill.ewt_amount ?? 0);
+    const netPayable = parseFloat((total - ewtAmount).toFixed(2));
+
+    // EWT Payable account — from the linked tax code's account_id, or fallback search
+    let ewtPayableAccountId = (bill.ewt_account_id as string | null) ?? null;
+    if (!ewtPayableAccountId && ewtAmount > 0) {
+      const ewtAcctRows = await client.query(
+        `SELECT id FROM accounts
+          WHERE company_id = $1
+            AND (name ILIKE '%ewt payable%' OR name ILIKE '%withholding tax payable%' OR name ILIKE '%withholding payable%')
+            AND is_active = true
+          ORDER BY code LIMIT 1`,
+        [bill.company_id],
+      );
+      ewtPayableAccountId = ewtAcctRows.rows[0]?.id ?? null;
+    }
 
     // Get JE doc number
     const seriesRows = await client.query(
@@ -104,15 +131,24 @@ export async function POST(
 
     let lineNo = 1;
 
-    // DR Expense per line
-    for (const l of lineRows.rows as Array<Record<string, unknown>>) {
-      const acctId = (l.eff_expense_acct as string | null) ?? defaultExpAcctId;
-      if (!acctId) continue;
+    if (bill.po_id && grniAccountId) {
+      // PO-linked bill: DR GRNI (clear the receipt accrual)
       await client.query(
         `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
          VALUES ($1,$2,$3,$4,$5,0,'PHP',1,$5,0)`,
-        [je.id, lineNo++, acctId, l.description, Number(l.line_subtotal)],
+        [je.id, lineNo++, grniAccountId, `Clear GRNI — ${bill.internal_no}`, subtotal],
       );
+    } else {
+      // Non-PO bill (or no GRNI account): DR Expense per line
+      for (const l of lineRows.rows as Array<Record<string, unknown>>) {
+        const acctId = (l.eff_expense_acct as string | null) ?? defaultExpAcctId;
+        if (!acctId) continue;
+        await client.query(
+          `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
+           VALUES ($1,$2,$3,$4,$5,0,'PHP',1,$5,0)`,
+          [je.id, lineNo++, acctId, l.description, Number(l.line_subtotal)],
+        );
+      }
     }
 
     // DR Input VAT
@@ -124,11 +160,22 @@ export async function POST(
       );
     }
 
-    // CR Accounts Payable
+    // CR EWT Payable (withheld from supplier payment; to be remitted to BIR)
+    if (ewtAmount > 0 && ewtPayableAccountId) {
+      await client.query(
+        `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
+         VALUES ($1,$2,$3,$4,0,$5,'PHP',1,0,$5)`,
+        [je.id, lineNo++, ewtPayableAccountId,
+          `EWT Payable${bill.ewt_code ? ` (${bill.ewt_code})` : ''} — ${bill.internal_no}`,
+          ewtAmount],
+      );
+    }
+
+    // CR Accounts Payable — net payable (gross total less EWT withheld)
     await client.query(
       `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
        VALUES ($1,$2,$3,$4,0,$5,'PHP',1,0,$5)`,
-      [je.id, lineNo++, apAccountId, `AP — ${bill.internal_no}`, total],
+      [je.id, lineNo++, apAccountId, `AP — ${bill.internal_no}`, netPayable],
     );
 
     // Update account balances
@@ -163,7 +210,7 @@ export async function POST(
         const billDate = new Date(bill.bill_date as string);
         const periodYear = billDate.getFullYear();
         const periodQuarter = Math.ceil((billDate.getMonth() + 1) / 3);
-        const ewtRate = Number(bill.supplier_ewt_rate ?? 1);
+        const ewtRate = Number(bill.ewt_code_rate ?? bill.supplier_ewt_rate ?? 1);
         const atcCode = (bill.supplier_atc_code as string | null) ?? 'WC158';
 
         const certSeqRows = await client.query(

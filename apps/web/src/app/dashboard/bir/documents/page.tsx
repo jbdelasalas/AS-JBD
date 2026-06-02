@@ -60,7 +60,7 @@ export default function BirDocumentsPage() {
         ...(filterFrom && { date_from: filterFrom }),
         ...(filterTo && { date_to: filterTo }),
       });
-      const res = await api.get(`/api/v1/bir/documents?${qs}`) as { data: IssuedDocument[]; total: number };
+      const res = await api.get(`/bir/documents?${qs}`) as { data: IssuedDocument[]; total: number };
       setRows(res.data ?? []);
       setTotal(res.total ?? 0);
     } catch {
@@ -94,7 +94,7 @@ export default function BirDocumentsPage() {
   async function save() {
     setSaving(true); setError('');
     try {
-      await api.post('/api/v1/bir/documents', { ...form, company_id: companyId });
+      await api.post('/bir/documents', { ...form, company_id: companyId });
       setShowNew(false);
       setForm({
         document_type: 'OR', transaction_date: new Date().toISOString().slice(0, 10),
@@ -114,7 +114,7 @@ export default function BirDocumentsPage() {
     if (!selected || !voidReason.trim()) return;
     setVoiding(true);
     try {
-      await api.patch(`/api/v1/bir/documents/${selected.id}`, { void_reason: voidReason });
+      await api.patch(`/bir/documents/${selected.id}`, { void_reason: voidReason });
       setSelected(null); setVoidReason('');
       load();
     } catch (e: unknown) {

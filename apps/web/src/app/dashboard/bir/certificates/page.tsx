@@ -43,7 +43,7 @@ export default function BirCertificatesPage() {
         ...(filterQuarter && { quarter: filterQuarter }),
         ...(filterStatus && { status: filterStatus }),
       });
-      const res = await api.get(`/api/v1/bir/certificates?${qs}`) as WhtCertificate[];
+      const res = await api.get(`/bir/certificates?${qs}`) as WhtCertificate[];
       const all = Array.isArray(res) ? res : [];
       setTotal(all.length);
       setRows(all);
@@ -55,7 +55,7 @@ export default function BirCertificatesPage() {
   async function save() {
     setSaving(true); setError('');
     try {
-      await api.post('/api/v1/bir/certificates', { ...form, company_id: companyId });
+      await api.post('/bir/certificates', { ...form, company_id: companyId });
       setShowNew(false);
       load();
     } catch (e: unknown) { setError((e as Error).message); }

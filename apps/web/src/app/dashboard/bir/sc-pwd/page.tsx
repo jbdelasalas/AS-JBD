@@ -35,7 +35,7 @@ export default function BirScPwdPage() {
         ...(filterFrom && { date_from: filterFrom }),
         ...(filterTo && { date_to: filterTo }),
       });
-      const res = await api.get(`/api/v1/bir/sc-pwd?${qs}`) as {
+      const res = await api.get(`/bir/sc-pwd?${qs}`) as {
         data: ScPwdTransaction[];
         total: number;
         summary: { sc_pwd_type: string; total_discount: number; total_transactions: number }[];

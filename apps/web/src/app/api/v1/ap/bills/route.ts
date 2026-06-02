@@ -101,6 +101,17 @@ export async function POST(request: NextRequest) {
   if (!suppliers[0]) return err('Supplier not found or inactive', 404);
   const supplier = suppliers[0] as Record<string, unknown>;
 
+  // If an EWT tax code is specified, use its rate
+  const ewtCodeId = dto.ewt_code_id as string | null ?? null;
+  let ewtCodeRate: number | null = null;
+  if (ewtCodeId) {
+    const tcRows = await query(
+      `SELECT rate_pct FROM tax_codes WHERE id = $1 AND company_id = $2 AND tax_type = 'ewt' AND is_active = true`,
+      [ewtCodeId, companyId],
+    );
+    if (tcRows[0]) ewtCodeRate = Number((tcRows[0] as Record<string, unknown>).rate_pct);
+  }
+
   const client = await getPool().connect();
   try {
     await client.query('BEGIN');
@@ -112,7 +123,7 @@ export async function POST(request: NextRequest) {
     const seq = seqRows.rows[0].c + 1;
     const internalNo = `BL-${new Date().getFullYear()}-${String(seq).padStart(6, '0')}`;
 
-    const supplierEwtRate = Number(supplier.ewt_rate ?? 0);
+    const supplierEwtRate = ewtCodeRate ?? Number(supplier.ewt_rate ?? 0);
     const mappedLines = (lines as Array<Record<string, unknown>>).map((l, idx) => {
       const qty = Number(l.quantity);
       const price = Number(l.unit_price);
@@ -138,19 +149,23 @@ export async function POST(request: NextRequest) {
       dueDate = d.toISOString().split('T')[0];
     }
 
+    const netPayable = parseFloat((totTotal - totEwt).toFixed(2));
+
     const headerRows = await client.query(
       `INSERT INTO bills
          (company_id, branch_id, bill_no, internal_no, supplier_id, bill_date, due_date, currency,
           subtotal, vat_amount, ewt_amount, total, amount_paid, balance, status, po_id, created_by,
-          building_id, cost_center_id, grow_reference_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'PHP',$8,$9,$10,$11,0,$11,'draft',$12,$13,$14,$15,$16)
+          building_id, cost_center_id, grow_reference_id, ewt_code_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'PHP',$8,$9,$10,$11,0,$12,'draft',$13,$14,$15,$16,$17,$18)
        RETURNING *`,
       [
         companyId, dto.branch_id ?? null, dto.bill_no, internalNo, supplierId,
         dto.bill_date, dueDate,
         totSubtotal.toFixed(2), totVat.toFixed(2), totEwt.toFixed(2), totTotal.toFixed(2),
+        netPayable.toFixed(2),
         dto.po_id ?? null, auth.userId,
         dto.building_id ?? null, dto.cost_center_id ?? null, dto.grow_reference_id ?? null,
+        ewtCodeId,
       ],
     );
     const header = headerRows.rows[0];
@@ -159,13 +174,14 @@ export async function POST(request: NextRequest) {
       await client.query(
         `INSERT INTO bill_lines
            (bill_id, line_no, item_id, description, quantity, unit_price, vat_rate, ewt_rate,
-            line_subtotal, line_vat, line_total, ewt_amount, expense_account_id, grow_reference_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+            line_subtotal, line_vat, line_total, ewt_amount, expense_account_id, grow_reference_id, ewt_code_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
         [
           header.id, l.line_no, l.item_id ?? null, l.description,
           l.qty, l.price, l.vatRate, l.ewtRate,
           l.lineSubtotal.toFixed(2), l.lineVat.toFixed(2), l.lineTotal.toFixed(2), l.ewtAmount.toFixed(2),
           l.expense_account_id ?? null, (l as Record<string,unknown>).grow_reference_id ?? null,
+          ewtCodeId,
         ],
       );
     }

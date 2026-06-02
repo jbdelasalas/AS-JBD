@@ -41,9 +41,23 @@ export async function GET(
   }
 
   const rows = await query(
-    `SELECT b.*, s.name AS supplier_name, s.code AS supplier_code
+    `SELECT b.*,
+            s.name AS supplier_name, s.code AS supplier_code,
+            br.code AS branch_code, br.name AS branch_name,
+            fb.code AS building_code, fb.name AS building_name,
+            cc.code AS cost_center_code, cc.name AS cost_center_name,
+            gr.code AS grow_ref_code, gr.name AS grow_ref_name,
+            po.po_no AS po_no,
+            tc.code AS ewt_code, tc.name AS ewt_code_name, tc.rate_pct AS ewt_code_rate,
+            tc.bir_atc_code AS ewt_atc_code
        FROM bills b
        JOIN suppliers s ON s.id = b.supplier_id
+       LEFT JOIN branches br ON br.id = b.branch_id
+       LEFT JOIN farm_buildings fb ON fb.id = b.building_id
+       LEFT JOIN cost_centers cc ON cc.id = b.cost_center_id
+       LEFT JOIN grow_references gr ON gr.id = b.grow_reference_id
+       LEFT JOIN purchase_orders po ON po.id = b.po_id
+       LEFT JOIN tax_codes tc ON tc.id = b.ewt_code_id
       WHERE b.id = $1 LIMIT 1`,
     [params.id],
   );

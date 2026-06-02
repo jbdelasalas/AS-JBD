@@ -12,9 +12,12 @@ const TAX_TYPES = [
   { value: 'percentage',  label: 'Percentage Tax',    color: 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200' },
 ];
 
+interface Account { id: string; code: string; name: string; }
+
 export default function BirTaxCodesPage() {
   const [companyId, setCompanyId] = useState('');
   const [rows, setRows] = useState<TaxCode[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(false);
   const [filterType, setFilterType] = useState('');
   const [showNew, setShowNew] = useState(false);
@@ -27,11 +30,16 @@ export default function BirTaxCodesPage() {
   });
 
   useEffect(() => {
-    const stored = localStorage.getItem('selected_company_id');
-    if (stored) setCompanyId(stored);
+    const cid = localStorage.getItem('company_id');
+    if (cid) {
+      setCompanyId(cid);
+      api.get<Account[]>(`/gl/accounts?company_id=${cid}&limit=500`)
+        .then(a => setAccounts(Array.isArray(a) ? a : []))
+        .catch(() => {});
+    }
   }, []);
 
-  useEffect(() => { if (companyId) load(); }, [companyId, filterType]);
+  useEffect(() => { if (companyId) load(); }, [companyId, filterType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function load() {
     setLoading(true);
@@ -40,15 +48,16 @@ export default function BirTaxCodesPage() {
         company_id: companyId,
         ...(filterType && { tax_type: filterType }),
       });
-      const res = await api.get(`/api/v1/bir/tax-codes?${qs}`) as TaxCode[];
+      const res = await api.get(`/bir/tax-codes?${qs}`) as TaxCode[];
       setRows(Array.isArray(res) ? res : []);
     } catch { setRows([]); } finally { setLoading(false); }
   }
 
   async function save() {
+    if (!form.code || !form.name || !form.rate_pct) { setError('Code, Name, and Rate are required.'); return; }
     setSaving(true); setError('');
     try {
-      await api.post('/api/v1/bir/tax-codes', {
+      await api.post('/bir/tax-codes', {
         ...form,
         company_id: companyId,
         rate_pct: Number(form.rate_pct),
@@ -68,8 +77,10 @@ export default function BirTaxCodesPage() {
   }));
 
   const typeColor = (type: string) => TAX_TYPES.find((t) => t.value === type)?.color ?? 'bg-slate-100 text-slate-700';
-
   const filtered = filterType ? rows.filter((r) => r.tax_type === filterType) : rows;
+
+  const inp = 'w-full rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-sm text-slate-900 dark:text-slate-100';
+  const lbl = 'block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1';
 
   return (
     <div>
@@ -99,7 +110,7 @@ export default function BirTaxCodesPage() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
             <tr>
-              {['Code','Name','Type','Rate','BIR ATC Code','Account','Status'].map((h) => (
+              {['Code','Name','Type','Rate','BIR ATC Code','GL Account','Status'].map((h) => (
                 <th key={h} className="px-3 py-2 text-left font-medium">{h}</th>
               ))}
             </tr>
@@ -135,56 +146,64 @@ export default function BirTaxCodesPage() {
       {/* New tax code modal */}
       {showNew && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-lg bg-white dark:bg-slate-900 shadow-xl p-6">
+          <div className="w-full max-w-lg rounded-lg bg-white dark:bg-slate-900 shadow-xl p-6">
             <h2 className="mb-4 text-base font-semibold text-slate-900 dark:text-slate-100">New Tax Code</h2>
-            {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+            {error && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Code *</label>
-                  <input type="text" value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
-                    className="w-full rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-sm text-slate-900 dark:text-slate-100"
-                    placeholder="e.g. VAT12" />
+                  <label className={lbl}>Code *</label>
+                  <input type="text" value={form.code}
+                    onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
+                    className={inp} placeholder="e.g. WC010" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Type *</label>
-                  <select value={form.tax_type} onChange={(e) => setForm((f) => ({ ...f, tax_type: e.target.value }))}
-                    className="w-full rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-sm text-slate-900 dark:text-slate-100">
+                  <label className={lbl}>Type *</label>
+                  <select value={form.tax_type} onChange={(e) => setForm((f) => ({ ...f, tax_type: e.target.value }))} className={inp}>
                     {TAX_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Name / Description *</label>
-                <input type="text" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  className="w-full rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-sm text-slate-900 dark:text-slate-100"
-                  placeholder="e.g. VAT 12% Output" />
+                <label className={lbl}>Name / Description *</label>
+                <input type="text" value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  className={inp} placeholder="e.g. EWT on Professional Fees 10%" />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Rate (%) *</label>
-                  <input type="number" step="0.01" value={form.rate_pct} onChange={(e) => setForm((f) => ({ ...f, rate_pct: e.target.value }))}
-                    className="w-full rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-sm text-slate-900 dark:text-slate-100" />
+                  <label className={lbl}>Rate (%) *</label>
+                  <input type="number" step="0.0001" min="0" value={form.rate_pct}
+                    onChange={(e) => setForm((f) => ({ ...f, rate_pct: e.target.value }))}
+                    className={inp} placeholder="e.g. 10" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">BIR ATC Code</label>
-                  <input type="text" value={form.bir_atc_code} onChange={(e) => setForm((f) => ({ ...f, bir_atc_code: e.target.value.toUpperCase() }))}
-                    className="w-full rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-sm text-slate-900 dark:text-slate-100"
-                    placeholder="e.g. WC010" />
+                  <label className={lbl}>BIR ATC Code</label>
+                  <input type="text" value={form.bir_atc_code}
+                    onChange={(e) => setForm((f) => ({ ...f, bir_atc_code: e.target.value.toUpperCase() }))}
+                    className={inp} placeholder="e.g. WC010" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">GL Account ID (optional)</label>
-                <input type="text" value={form.account_id} onChange={(e) => setForm((f) => ({ ...f, account_id: e.target.value }))}
-                  className="w-full rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-sm text-slate-900 dark:text-slate-100"
-                  placeholder="UUID of GL account" />
+                <label className={lbl}>GL Account (for journal posting)</label>
+                <select value={form.account_id} onChange={(e) => setForm((f) => ({ ...f, account_id: e.target.value }))} className={inp}>
+                  <option value="">— none —</option>
+                  {accounts.map(a => (
+                    <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                  For EWT codes: link to the "EWT Payable" liability account — credited when withholding is applied on a bill.
+                </p>
               </div>
             </div>
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="mt-5 flex justify-end gap-2">
               <button onClick={() => { setShowNew(false); setError(''); }}
-                className="rounded px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300">Cancel</button>
+                className="rounded px-4 py-1.5 text-sm border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                Cancel
+              </button>
               <button onClick={save} disabled={saving}
-                className="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                className="rounded bg-blue-600 px-5 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
                 {saving ? 'Saving…' : 'Create'}
               </button>
             </div>

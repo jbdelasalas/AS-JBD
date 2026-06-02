@@ -30,7 +30,7 @@ export default function BirHomePage() {
 
   useEffect(() => {
     if (!companyId) return;
-    api.get(`/api/v1/bir/filings?company_id=${companyId}&year=${new Date().getFullYear()}`)
+    api.get(`/bir/filings?company_id=${companyId}&year=${new Date().getFullYear()}`)
       .then((res: unknown) => {
         const data = res as { data?: { status: string }[] } | { status: string }[];
         const filings: { status: string }[] = Array.isArray(data) ? data : ((data as { data?: { status: string }[] }).data ?? []);

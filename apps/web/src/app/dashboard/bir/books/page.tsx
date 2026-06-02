@@ -41,7 +41,7 @@ export default function BirBooksPage() {
   async function load() {
     setLoading(true);
     try {
-      const res = await api.get(`/api/v1/bir/books?company_id=${companyId}&year=${filterYear}`) as BookGeneration[];
+      const res = await api.get(`/bir/books?company_id=${companyId}&year=${filterYear}`) as BookGeneration[];
       setRows(Array.isArray(res) ? res : []);
     } catch { setRows([]); } finally { setLoading(false); }
   }
@@ -49,7 +49,7 @@ export default function BirBooksPage() {
   async function generate() {
     setSaving(true); setError('');
     try {
-      await api.post('/api/v1/bir/books', {
+      await api.post('/bir/books', {
         ...form,
         company_id: companyId,
         period_month: form.period_month ? parseInt(form.period_month) : null,
@@ -63,7 +63,7 @@ export default function BirBooksPage() {
   async function finalize(id: string) {
     setFinalizing(id);
     try {
-      await api.patch(`/api/v1/bir/books/${id}`, { action: 'finalize' });
+      await api.patch(`/bir/books/${id}`, { action: 'finalize' });
       load();
     } catch (e: unknown) { setError((e as Error).message); }
     finally { setFinalizing(null); }
