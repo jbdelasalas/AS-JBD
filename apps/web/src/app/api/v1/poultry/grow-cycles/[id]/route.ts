@@ -60,14 +60,24 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const [existing] = await query<{ status: string; company_id: string }>(`SELECT status, company_id FROM grow_cycles WHERE id = $1`, [params.id]);
   if (!existing) return err('Not found', 404);
 
+  // Check BEFORE the transaction — a failed query inside BEGIN aborts the whole transaction
+  const [colRow] = await query<{ exists: boolean }>(
+    `SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='grow_cycles' AND column_name='live_item_id') AS exists`
+  );
+  const hasLiveItemCol = colRow?.exists === true;
+
   const client = await getPool().connect();
   try {
     await client.query('BEGIN');
 
-    // Update header fields
     const orNull = (v: unknown) => (v as string) || null;
-    // Try with live_item_id; fall back to without if column not yet migrated
-    try {
+    const baseArgs = [params.id,
+      orNull(dto.grow_reference), orNull(dto.branch_id), orNull(dto.building_id), orNull(dto.cost_center_id),
+      dto.start_date ?? null, dto.expected_end_date ?? null, dto.approx_heads ?? null,
+      dto.est_harvest_recovery ?? null, dto.chick_price_per_head ?? null,
+      dto.approx_chick_price_per_head ?? null, dto.culling_qty ?? null, orNull(dto.remarks)];
+
+    if (hasLiveItemCol) {
       await client.query(
         `UPDATE grow_cycles SET
            grow_reference             = COALESCE($2, grow_reference),
@@ -84,14 +94,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
            remarks                    = COALESCE($13, remarks),
            live_item_id               = COALESCE($14, live_item_id)
          WHERE id = $1`,
-        [params.id,
-         orNull(dto.grow_reference), orNull(dto.branch_id), orNull(dto.building_id), orNull(dto.cost_center_id),
-         dto.start_date ?? null, dto.expected_end_date ?? null, dto.approx_heads ?? null,
-         dto.est_harvest_recovery ?? null, dto.chick_price_per_head ?? null,
-         dto.approx_chick_price_per_head ?? null, dto.culling_qty ?? null, orNull(dto.remarks),
-         orNull(dto.live_item_id)],
+        [...baseArgs, orNull(dto.live_item_id)],
       );
-    } catch {
+    } else {
       await client.query(
         `UPDATE grow_cycles SET
            grow_reference             = COALESCE($2, grow_reference),
@@ -107,11 +112,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
            culling_qty                = COALESCE($12, culling_qty),
            remarks                    = COALESCE($13, remarks)
          WHERE id = $1`,
-        [params.id,
-         orNull(dto.grow_reference), orNull(dto.branch_id), orNull(dto.building_id), orNull(dto.cost_center_id),
-         dto.start_date ?? null, dto.expected_end_date ?? null, dto.approx_heads ?? null,
-         dto.est_harvest_recovery ?? null, dto.chick_price_per_head ?? null,
-         dto.approx_chick_price_per_head ?? null, dto.culling_qty ?? null, orNull(dto.remarks)],
+        baseArgs,
       );
     }
 
