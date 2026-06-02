@@ -152,3 +152,25 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   } catch (e) { await client.query('ROLLBACK'); return err((e as Error).message, 500); }
   finally { client.release(); }
 }
+
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try { auth = await requireAuth(_req); } catch (e) { return e as Response; }
+  if (!auth.isSuperadmin) return err('Forbidden — admin only', 403);
+  try {
+    const [rec] = await query<{ id: string; batch_id: string }>(`SELECT id, batch_id FROM grow_cycles WHERE id = $1`, [params.id]);
+    if (!rec) return err('Not found', 404);
+    const [{ cnt }] = await query<{ cnt: number }>(
+      `SELECT count(*)::int AS cnt FROM tally_sheets WHERE grow_cycle_id = $1`,
+      [params.id],
+    );
+    if (Number(cnt) > 0) return err('Cannot delete: linked tally sheets exist', 409);
+    await query(`DELETE FROM grow_item_consumption  WHERE grow_cycle_id = $1`, [params.id]);
+    await query(`DELETE FROM grow_daily_mortality   WHERE grow_cycle_id = $1`, [params.id]);
+    await query(`DELETE FROM grow_weekly_weights    WHERE grow_cycle_id = $1`, [params.id]);
+    await query(`DELETE FROM grow_cycles            WHERE id           = $1`, [params.id]);
+    // Return batch to available if it was in_growing
+    await query(`UPDATE chick_batches SET status='available', heads_available=heads_in WHERE id=$1 AND status='in_growing'`, [rec.batch_id]);
+    return new Response(null, { status: 204 });
+  } catch (e: unknown) { return err((e as Error).message, 500); }
+}

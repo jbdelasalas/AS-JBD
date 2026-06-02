@@ -147,3 +147,21 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return err((e as Error).message, 500);
   } finally { client.release(); }
 }
+
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try { auth = await requireAuth(_req); } catch (e) { return e as Response; }
+  if (!auth.isSuperadmin) return err('Forbidden — admin only', 403);
+  try {
+    const [rec] = await query<{ id: string }>(`SELECT id FROM tally_sheets WHERE id = $1`, [params.id]);
+    if (!rec) return err('Not found', 404);
+    const [{ cnt }] = await query<{ cnt: number }>(
+      `SELECT count(*)::int AS cnt FROM conversions WHERE tally_sheet_id = $1`,
+      [params.id],
+    );
+    if (Number(cnt) > 0) return err('Cannot delete: linked conversions exist', 409);
+    await query(`DELETE FROM tally_sheet_lines WHERE tally_sheet_id = $1`, [params.id]);
+    await query(`DELETE FROM tally_sheets       WHERE id            = $1`, [params.id]);
+    return new Response(null, { status: 204 });
+  } catch (e: unknown) { return err((e as Error).message, 500); }
+}

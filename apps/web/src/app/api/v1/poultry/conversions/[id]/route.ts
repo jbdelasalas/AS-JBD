@@ -29,3 +29,16 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     return ok({ ...hdr, outputs });
   } catch (e: unknown) { return err((e as Error).message, 500); }
 }
+
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try { auth = await requireAuth(_req); } catch (e) { return e as Response; }
+  if (!auth.isSuperadmin) return err('Forbidden — admin only', 403);
+  try {
+    const [rec] = await query<{ id: string }>(`SELECT id FROM conversions WHERE id = $1`, [params.id]);
+    if (!rec) return err('Not found', 404);
+    await query(`DELETE FROM conversion_outputs WHERE conversion_id = $1`, [params.id]);
+    await query(`DELETE FROM conversions        WHERE id           = $1`, [params.id]);
+    return new Response(null, { status: 204 });
+  } catch (e: unknown) { return err((e as Error).message, 500); }
+}

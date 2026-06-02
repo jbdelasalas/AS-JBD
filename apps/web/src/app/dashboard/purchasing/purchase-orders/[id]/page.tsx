@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatPHP, formatDate } from '@/lib/format';
@@ -94,11 +94,17 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function PODetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [po, setPo] = useState<PO | null>(null);
   const [bills, setBills] = useState<BillRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    try { const u = JSON.parse(localStorage.getItem('user') ?? 'null'); setIsAdmin(u?.is_superadmin === true); } catch {}
+  }, []);
 
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('company_id') ?? '' : '';
 
@@ -112,6 +118,13 @@ export default function PODetailPage() {
   }, [id, companyId]);
 
   useEffect(() => { load(); }, [load]);
+
+  async function handleDelete() {
+    if (!window.confirm('Delete this purchase order? This cannot be undone.')) return;
+    setBusy(true); setActionMsg(null);
+    try { await api.delete(`/purchasing/purchase-orders/${id}`); router.push('/dashboard/purchasing/purchase-orders'); }
+    catch (e: unknown) { setActionMsg((e as Error).message ?? 'Delete failed'); setBusy(false); }
+  }
 
   async function doAction(action: string) {
     setBusy(true);
@@ -259,7 +272,8 @@ export default function PODetailPage() {
       </div>
 
       {/* Action buttons — mirrors the form footer */}
-      {!isTerminal && (
+      <div className="flex items-center justify-between">
+        {!isTerminal && (
         <div className="flex gap-3">
           {po.status === 'draft' && (
             <button onClick={() => doAction('submit')} disabled={busy}
@@ -284,7 +298,14 @@ export default function PODetailPage() {
             {busy ? 'Cancelling…' : 'Cancel PO'}
           </button>
         </div>
-      )}
+        )}
+        {isAdmin && (
+          <button onClick={handleDelete} disabled={busy}
+            className="rounded border border-red-300 bg-red-50 px-4 py-1.5 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-700 dark:bg-red-950 dark:text-red-400">
+            Delete
+          </button>
+        )}
+      </div>
 
       {/* Related Bills */}
       <div className="rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">

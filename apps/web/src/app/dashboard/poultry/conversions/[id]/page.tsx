@@ -41,11 +41,22 @@ export default function ConversionDetailPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const load = useCallback(() => {
     api.get<Conversion>(`/poultry/conversions/${id}`).then(setDoc).catch(() => {}).finally(() => setLoading(false));
   }, [id]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    try { const u = JSON.parse(localStorage.getItem('user') ?? 'null'); setIsAdmin(u?.is_superadmin === true); } catch {}
+  }, []);
+
+  async function handleDelete() {
+    if (!window.confirm('Delete this conversion? This cannot be undone.')) return;
+    setBusy(true); setMsg(null);
+    try { await api.delete(`/poultry/conversions/${id}`); router.push('/dashboard/poultry/conversions'); }
+    catch (e: unknown) { setMsg((e as Error).message ?? 'Delete failed'); setBusy(false); }
+  }
 
   async function action(act: string) {
     setBusy(true); setMsg(null);
@@ -209,6 +220,12 @@ export default function ConversionDetailPage() {
             className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
             Create Delivery
           </Link>
+        )}
+        {isAdmin && (
+          <button onClick={handleDelete} disabled={busy}
+            className="ml-auto rounded border border-red-300 bg-red-50 px-5 py-2 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-700 dark:bg-red-950 dark:text-red-400">
+            Delete
+          </button>
         )}
       </div>
     </div>

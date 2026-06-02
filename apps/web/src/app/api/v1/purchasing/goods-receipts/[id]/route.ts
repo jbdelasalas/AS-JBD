@@ -57,3 +57,21 @@ export async function GET(
     }),
   });
 }
+
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try { auth = await requireAuth(_req); } catch (e) { return e as Response; }
+  if (!auth.isSuperadmin) return err('Forbidden — admin only', 403);
+  try {
+    const [rec] = await query<{ id: string }>(`SELECT id FROM goods_receipts WHERE id = $1`, [params.id]);
+    if (!rec) return err('Not found', 404);
+    const [{ cnt }] = await query<{ cnt: number }>(
+      `SELECT count(*)::int AS cnt FROM chick_batches WHERE grn_id = $1`,
+      [params.id],
+    );
+    if (Number(cnt) > 0) return err('Cannot delete: linked chick batches exist', 409);
+    await query(`DELETE FROM goods_receipt_lines WHERE grn_id = $1`, [params.id]);
+    await query(`DELETE FROM goods_receipts      WHERE id    = $1`, [params.id]);
+    return new Response(null, { status: 204 });
+  } catch (e: unknown) { return err((e as Error).message, 500); }
+}

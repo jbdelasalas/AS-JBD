@@ -58,6 +58,7 @@ export default function TallySheetDetailPage() {
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Reference data
   const [suppliers, setSuppliers]   = useState<Supplier[]>([]);
@@ -79,6 +80,10 @@ export default function TallySheetDetailPage() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
+    try { const u = JSON.parse(localStorage.getItem('user') ?? 'null'); setIsAdmin(u?.is_superadmin === true); } catch {}
+  }, []);
+
+  useEffect(() => {
     const cid = localStorage.getItem('company_id'); if (!cid) return;
     api.get<{ data: Supplier[] }>(`/ap/suppliers?company_id=${cid}&minimal=true&limit=500`).then(r => setSuppliers(r.data ?? [])).catch(() => {});
     api.get<Branch[]>(`/admin/branches?company_id=${cid}`).then(r => setBranches(Array.isArray(r) ? r : [])).catch(() => {});
@@ -90,6 +95,13 @@ export default function TallySheetDetailPage() {
   }, []);
 
   const isEditable = doc?.status === 'saved';
+
+  async function handleDelete() {
+    if (!window.confirm('Delete this tally sheet? This cannot be undone.')) return;
+    setBusy(true); setMsg(null);
+    try { await api.delete(`/poultry/tally-sheets/${id}`); router.push('/dashboard/poultry/tally-sheets'); }
+    catch (e: unknown) { setMsg({ text: (e as Error).message ?? 'Delete failed', type: 'error' }); setBusy(false); }
+  }
 
   function setF(field: keyof TallySheet, value: unknown) {
     setForm(f => ({ ...f, [field]: value }));
@@ -426,6 +438,12 @@ export default function TallySheetDetailPage() {
                 Void
               </button>
             </>
+          )}
+          {isAdmin && (
+            <button onClick={handleDelete} disabled={busy}
+              className="rounded border border-red-300 bg-red-50 px-5 py-2 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-700 dark:bg-red-950 dark:text-red-400">
+              Delete
+            </button>
           )}
           {doc.status === 'posted' && (
             <button type="button"

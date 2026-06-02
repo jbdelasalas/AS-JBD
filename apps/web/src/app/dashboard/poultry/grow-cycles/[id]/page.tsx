@@ -65,6 +65,7 @@ export default function GrowCycleDetailPage() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [msgType, setMsgType] = useState<'error' | 'success'>('error');
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Harvest panel state
   const [showHarvest, setShowHarvest] = useState(false);
@@ -114,6 +115,17 @@ export default function GrowCycleDetailPage() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    try { const u = JSON.parse(localStorage.getItem('user') ?? 'null'); setIsAdmin(u?.is_superadmin === true); } catch {}
+  }, []);
+
+  async function handleDelete() {
+    if (!window.confirm('Delete this grow cycle? This cannot be undone.')) return;
+    setSaving(true); setMsg(null);
+    try { await api.delete(`/poultry/grow-cycles/${id}`); router.push('/dashboard/poultry/grow-cycles'); }
+    catch (e: unknown) { setMsg((e as Error).message ?? 'Delete failed'); setMsgType('error'); setSaving(false); }
+  }
 
   // Load reference data for dropdowns independently of the cycle reload
   useEffect(() => {
@@ -259,6 +271,12 @@ export default function GrowCycleDetailPage() {
                 Mark Completed
               </button>
             </>
+          )}
+          {isAdmin && (
+            <button onClick={handleDelete} disabled={saving}
+              className="rounded border border-red-300 bg-red-50 px-4 py-1.5 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-700 dark:bg-red-950 dark:text-red-400">
+              Delete
+            </button>
           )}
           <button onClick={() => router.back()} className="text-slate-400 hover:text-slate-600 text-lg leading-none">←</button>
         </div>

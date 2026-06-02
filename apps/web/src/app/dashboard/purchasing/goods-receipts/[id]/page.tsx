@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
@@ -44,19 +44,32 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function GRNDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [grn, setGrn] = useState<GRN | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     setLoading(true);
     api.get<GRN>(`/purchasing/goods-receipts/${id}`).then(setGrn).finally(() => setLoading(false));
+    try { const u = JSON.parse(localStorage.getItem('user') ?? 'null'); setIsAdmin(u?.is_superadmin === true); } catch {}
   }, [id]);
+
+  async function handleDelete() {
+    if (!window.confirm('Delete this goods receipt? This cannot be undone.')) return;
+    setBusy(true); setErrMsg(null);
+    try { await api.delete(`/purchasing/goods-receipts/${id}`); router.push('/dashboard/purchasing/goods-receipts'); }
+    catch (e: unknown) { setErrMsg((e as Error).message ?? 'Delete failed'); setBusy(false); }
+  }
 
   if (loading) return <div className="py-10 text-center text-sm text-slate-500">Loading…</div>;
   if (!grn) return <div className="py-10 text-center text-sm text-red-600">Goods receipt not found</div>;
 
   return (
     <div>
+      {errMsg && <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errMsg}</div>}
       <div className="mb-5 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -67,10 +80,18 @@ export default function GRNDetailPage() {
           </div>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{grn.supplier_name}</p>
         </div>
-        <Link href={`/dashboard/purchasing/purchase-orders/${grn.po_id}`}
-          className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
-          View PO: {grn.po_no}
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href={`/dashboard/purchasing/purchase-orders/${grn.po_id}`}
+            className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
+            View PO: {grn.po_no}
+          </Link>
+          {isAdmin && (
+            <button onClick={handleDelete} disabled={busy}
+              className="rounded border border-red-300 bg-red-50 px-3 py-1.5 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-700 dark:bg-red-950 dark:text-red-400">
+              Delete
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mb-5 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
