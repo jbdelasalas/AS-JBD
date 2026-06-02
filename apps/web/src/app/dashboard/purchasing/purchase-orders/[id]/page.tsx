@@ -273,32 +273,40 @@ export default function PODetailPage() {
 
       {/* Action buttons — mirrors the form footer */}
       <div className="flex items-center justify-between">
-        {!isTerminal && (
         <div className="flex gap-3">
-          {po.status === 'draft' && (
-            <button onClick={() => doAction('submit')} disabled={busy}
-              className="rounded bg-amber-600 px-5 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">
-              {busy ? 'Submitting…' : 'Submit for Approval'}
-            </button>
+          {!isTerminal && (
+            <>
+              {po.status === 'draft' && (
+                <button onClick={() => doAction('submit')} disabled={busy}
+                  className="rounded bg-amber-600 px-5 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">
+                  {busy ? 'Submitting…' : 'Submit for Approval'}
+                </button>
+              )}
+              {po.status === 'pending_approval' && (
+                <button onClick={() => doAction('approve')} disabled={busy}
+                  className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
+                  {busy ? 'Approving…' : 'Approve'}
+                </button>
+              )}
+              {po.status === 'approved' && (
+                <Link href={`/dashboard/purchasing/goods-receipts/new?po_id=${id}`}
+                  className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
+                  Receive Goods
+                </Link>
+              )}
+              <button onClick={() => doAction('cancel')} disabled={busy}
+                className="rounded border border-red-300 px-5 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950">
+                {busy ? 'Cancelling…' : 'Cancel PO'}
+              </button>
+            </>
           )}
-          {po.status === 'pending_approval' && (
-            <button onClick={() => doAction('approve')} disabled={busy}
-              className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
-              {busy ? 'Approving…' : 'Approve'}
-            </button>
-          )}
-          {po.status === 'approved' && (
-            <Link href={`/dashboard/purchasing/goods-receipts/new?po_id=${id}`}
-              className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
-              Receive Goods
+          {['approved', 'received', 'partial'].includes(po.status) && (
+            <Link href={`/dashboard/ap/bills/new?po_id=${id}`}
+              className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+              Process to Bill
             </Link>
           )}
-          <button onClick={() => doAction('cancel')} disabled={busy}
-            className="rounded border border-red-300 px-5 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950">
-            {busy ? 'Cancelling…' : 'Cancel PO'}
-          </button>
         </div>
-        )}
         {isAdmin && (
           <button onClick={handleDelete} disabled={busy}
             className="rounded border border-red-300 bg-red-50 px-4 py-1.5 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-700 dark:bg-red-950 dark:text-red-400">
