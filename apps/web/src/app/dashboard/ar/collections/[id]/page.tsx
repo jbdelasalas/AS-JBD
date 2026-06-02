@@ -73,6 +73,12 @@ export default function CollectionDetailPage() {
               Post Receipt
             </button>
           )}
+          {(pmt as unknown as { je_id?: string }).je_id && (
+            <a href={`/dashboard/gl/journal-entries/${(pmt as unknown as { je_id?: string }).je_id}`}
+              className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
+              View Journal Entry
+            </a>
+          )}
           {pmt.status === 'posted' && (
             <button onClick={() => setShowVoid(true)} disabled={busy}
               className="rounded border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50">

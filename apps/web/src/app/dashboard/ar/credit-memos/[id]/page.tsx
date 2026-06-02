@@ -100,6 +100,12 @@ export default function CreditMemoDetailPage() {
               Apply to Invoice
             </button>
           )}
+          {(cm as unknown as { je_id?: string }).je_id && (
+            <a href={`/dashboard/gl/journal-entries/${(cm as unknown as { je_id?: string }).je_id}`}
+              className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
+              View Journal Entry
+            </a>
+          )}
           {['draft','pending_approval'].includes(cm.status) && cm.amount_applied === 0 && (
             <button onClick={() => setShowCancel(true)} disabled={busy}
               className="rounded border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50">

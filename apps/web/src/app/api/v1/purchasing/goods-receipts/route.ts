@@ -156,9 +156,140 @@ export async function POST(request: NextRequest) {
     );
 
     await client.query(
-      `UPDATE goods_receipts SET posted_at = now() WHERE id = $1`,
-      [header.id],
+      `UPDATE goods_receipts SET posted_at = now(), posted_by = $2 WHERE id = $1`,
+      [header.id, auth.userId],
     );
+
+    // ── Journal Entry: DR Inventory/Asset, CR GRNI ───────────────────────────
+    const periodRows = await client.query(
+      `SELECT id, status FROM fiscal_periods
+        WHERE company_id = $1 AND $2::date BETWEEN start_date AND end_date LIMIT 1`,
+      [companyId, dto.receipt_date],
+    );
+    const period = periodRows.rows[0] as Record<string, unknown> | null ?? null;
+
+    if (period && period.status !== 'closed') {
+      // GRNI credit account
+      const grniRows = await client.query(
+        `SELECT id FROM accounts
+          WHERE company_id = $1
+            AND (name ILIKE '%grni%' OR name ILIKE '%goods received not yet%' OR code ILIKE '%grni%')
+            AND is_active = true
+          ORDER BY code LIMIT 1`,
+        [companyId],
+      );
+      const grniAccountId = grniRows.rows[0]?.id ?? null;
+
+      // Default asset/inventory account fallback for lines with no specific account
+      const defAssetRows = await client.query(
+        `SELECT id FROM accounts
+          WHERE company_id = $1 AND is_active = true
+            AND (name ILIKE '%inventor%' OR name ILIKE '%raw material%' OR name ILIKE '%merchandise%')
+            AND account_type IN ('ASSET','asset')
+          ORDER BY code LIMIT 1`,
+        [companyId],
+      );
+      // Secondary fallback: any asset account
+      const defAsset2Rows = defAssetRows.rows[0]?.id ? null : await client.query(
+        `SELECT id FROM accounts WHERE company_id = $1 AND account_type IN ('ASSET','asset') AND is_active = true ORDER BY code LIMIT 1`,
+        [companyId],
+      );
+      const defaultAssetAccountId: string | null = defAssetRows.rows[0]?.id ?? defAsset2Rows?.rows[0]?.id ?? null;
+
+      const seriesRows = await client.query(
+        `UPDATE document_series SET current_number = current_number + 1, updated_at = now()
+          WHERE company_id = $1 AND doc_type = 'journal_voucher' AND is_active = true
+          RETURNING prefix, current_number`,
+        [companyId],
+      );
+
+      if (grniAccountId && seriesRows.rows[0]) {
+        const jeNo = `${seriesRows.rows[0].prefix}${String(Number(seriesRows.rows[0].current_number)).padStart(6, '0')}`;
+
+        const grnLineDetails = await client.query(
+          `SELECT grl.qty_received, grl.unit_cost, grl.line_no,
+                  COALESCE(i.inventory_account_id, pol.gl_account_id) AS asset_account_id,
+                  pol.description
+             FROM goods_receipt_lines grl
+             JOIN purchase_order_lines pol ON pol.id = grl.po_line_id
+             LEFT JOIN items i ON i.id = pol.item_id
+            WHERE grl.grn_id = $1
+            ORDER BY grl.line_no`,
+          [header.id],
+        );
+
+        const jeRows = await client.query(
+          `INSERT INTO journal_entries
+             (company_id, branch_id, entry_no, entry_date, fiscal_period_id, reference, memo,
+              source_module, source_doc_type, source_doc_id, status, created_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,'purchasing','goods_receipt',$8,'posted',$9)
+           RETURNING id`,
+          [
+            companyId, (dto.branch_id as string) || null, jeNo,
+            dto.receipt_date, period.id, grnNo,
+            `GRN ${grnNo}`,
+            header.id, auth.userId,
+          ],
+        );
+        const jeId = jeRows.rows[0].id as string;
+
+        let jeLineNo = 1;
+        let totalAmount = 0;
+
+        for (const l of grnLineDetails.rows as Array<Record<string, unknown>>) {
+          const amount = parseFloat((Number(l.qty_received) * Number(l.unit_cost)).toFixed(2));
+          if (amount <= 0) continue;
+          // Use line-specific account or fall back to default asset account
+          const acctId = (l.asset_account_id as string | null) ?? defaultAssetAccountId;
+          if (!acctId) continue;
+          totalAmount = parseFloat((totalAmount + amount).toFixed(2));
+          await client.query(
+            `INSERT INTO journal_entry_lines
+               (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
+             VALUES ($1,$2,$3,$4,$5,0,'PHP',1,$5,0)`,
+            [jeId, jeLineNo++, acctId, String(l.description), amount],
+          );
+        }
+
+        if (totalAmount > 0) {
+          await client.query(
+            `INSERT INTO journal_entry_lines
+               (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
+             VALUES ($1,$2,$3,$4,0,$5,'PHP',1,0,$5)`,
+            [jeId, jeLineNo, grniAccountId, `GRNI — ${grnNo}`, totalAmount],
+          );
+
+          await client.query(
+            `INSERT INTO account_balances (account_id, fiscal_period_id, debit_total, credit_total)
+             SELECT jel.account_id, $2, jel.debit, jel.credit
+               FROM journal_entry_lines jel WHERE jel.entry_id = $1
+             ON CONFLICT (account_id, fiscal_period_id) DO UPDATE
+               SET debit_total  = account_balances.debit_total  + EXCLUDED.debit_total,
+                   credit_total = account_balances.credit_total + EXCLUDED.credit_total`,
+            [jeId, period.id],
+          );
+
+          await client.query(
+            `UPDATE journal_entries SET posted_at = now(), posted_by = $2 WHERE id = $1`,
+            [jeId, auth.userId],
+          );
+
+          await client.query(
+            `UPDATE goods_receipts SET je_id = $2 WHERE id = $1`,
+            [header.id, jeId],
+          );
+        } else {
+          // No postable lines — remove the empty JE header
+          await client.query(`DELETE FROM journal_entries WHERE id = $1`, [jeId]);
+          // Restore document series counter
+          await client.query(
+            `UPDATE document_series SET current_number = current_number - 1
+              WHERE company_id = $1 AND doc_type = 'journal_voucher'`,
+            [companyId],
+          );
+        }
+      }
+    }
 
     // Auto-create chick batches for each GRN line
     const { rows: cntRows } = await client.query<{ c: number }>(

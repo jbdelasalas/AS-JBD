@@ -27,6 +27,7 @@ interface Payment {
   supplier_name: string;
   supplier_code: string;
   supplier_id: string;
+  je_id: string | null;
   applications: Application[];
 }
 
@@ -81,12 +82,20 @@ export default function PaymentDetailPage() {
             </Link>
           </p>
         </div>
-        {payment.status === 'draft' && (
-          <button onClick={() => setShowJEPreview(true)} disabled={busy}
-            className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700 disabled:opacity-50">
-            Post Payment
-          </button>
-        )}
+        <div className="flex gap-2">
+          {payment.status === 'draft' && (
+            <button onClick={() => setShowJEPreview(true)} disabled={busy}
+              className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700 disabled:opacity-50">
+              Post Payment
+            </button>
+          )}
+          {payment.je_id && (
+            <Link href={`/dashboard/gl/journal-entries/${payment.je_id}`}
+              className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
+              View Journal Entry
+            </Link>
+          )}
+        </div>
       </div>
 
       {actionMsg && (

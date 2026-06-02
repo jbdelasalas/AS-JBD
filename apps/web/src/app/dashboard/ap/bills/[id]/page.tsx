@@ -64,6 +64,7 @@ interface Bill {
   ewt_code_name: string | null;
   ewt_code_rate: number | null;
   ewt_atc_code: string | null;
+  je_id: string | null;
   lines: BillLine[];
 }
 
@@ -337,6 +338,12 @@ export default function BillDetailPage() {
             className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
             Approve
           </button>
+        )}
+        {bill.je_id && (
+          <Link href={`/dashboard/gl/journal-entries/${bill.je_id}`}
+            className="rounded border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
+            View Journal Entry
+          </Link>
         )}
         {bill.status === 'approved' && bill.balance > 0 && (
           <Link href={`/dashboard/ap/payments/new?supplier_id=${bill.supplier_id}`}
