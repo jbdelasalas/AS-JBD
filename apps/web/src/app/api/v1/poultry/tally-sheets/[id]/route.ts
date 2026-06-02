@@ -152,16 +152,58 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   let auth: Awaited<ReturnType<typeof requireAuth>>;
   try { auth = await requireAuth(_req); } catch (e) { return e as Response; }
   if (!auth.isSuperadmin) return err('Forbidden — admin only', 403);
+
+  const [rec] = await query<{ id: string; status: string; grow_cycle_id: string | null; company_id: string; warehouse_id: string | null; net_heads: number; net_kgs: number }>(
+    `SELECT id, status, grow_cycle_id, company_id, warehouse_id, net_heads, net_kgs FROM tally_sheets WHERE id = $1`, [params.id]);
+  if (!rec) return err('Not found', 404);
+
+  const [{ cnt }] = await query<{ cnt: number }>(
+    `SELECT count(*)::int AS cnt FROM conversions WHERE tally_sheet_id = $1`, [params.id]);
+  if (Number(cnt) > 0) return err('Cannot delete: linked conversions exist', 409);
+
+  const lines = await query<{ item_id: string; heads: number; net_kgs: number }>(
+    `SELECT item_id, heads, net_kgs FROM tally_sheet_lines WHERE tally_sheet_id = $1`, [params.id]);
+
+  const client = await getPool().connect();
   try {
-    const [rec] = await query<{ id: string }>(`SELECT id FROM tally_sheets WHERE id = $1`, [params.id]);
-    if (!rec) return err('Not found', 404);
-    const [{ cnt }] = await query<{ cnt: number }>(
-      `SELECT count(*)::int AS cnt FROM conversions WHERE tally_sheet_id = $1`,
-      [params.id],
-    );
-    if (Number(cnt) > 0) return err('Cannot delete: linked conversions exist', 409);
-    await query(`DELETE FROM tally_sheet_lines WHERE tally_sheet_id = $1`, [params.id]);
-    await query(`DELETE FROM tally_sheets       WHERE id            = $1`, [params.id]);
+    await client.query('BEGIN');
+
+    if (rec.status === 'posted') {
+      // Reverse grow cycle head counts
+      if (rec.grow_cycle_id) {
+        const harvestedHeads = Number(rec.net_heads ?? 0);
+        await client.query(
+          `UPDATE grow_cycles SET
+             heads_harvested = GREATEST(0, heads_harvested - $1),
+             heads_available = heads_available + $1,
+             status = CASE WHEN status = 'completed' THEN 'harvesting' ELSE status END
+           WHERE id = $2`,
+          [harvestedHeads, rec.grow_cycle_id],
+        );
+      }
+
+      // Reverse poultry_inventory_balance for each tally line
+      for (const l of lines) {
+        await client.query(
+          `UPDATE poultry_inventory_balance SET
+             qty_heads = GREATEST(0, qty_heads - $1),
+             qty_kgs   = GREATEST(0, qty_kgs   - $2),
+             last_updated = now()
+           WHERE company_id = $3 AND warehouse_id IS NOT DISTINCT FROM $4 AND item_id = $5`,
+          [Number(l.heads), Number(l.net_kgs), rec.company_id, rec.warehouse_id, l.item_id],
+        );
+      }
+
+      // Remove ledger entries
+      await client.query(
+        `DELETE FROM poultry_inventory_ledger WHERE source_type = 'tally_sheet' AND source_id = $1`, [params.id]);
+    }
+
+    await client.query(`DELETE FROM tally_sheet_lines WHERE tally_sheet_id = $1`, [params.id]);
+    await client.query(`DELETE FROM tally_sheets       WHERE id            = $1`, [params.id]);
+
+    await client.query('COMMIT');
     return new Response(null, { status: 204 });
-  } catch (e: unknown) { return err((e as Error).message, 500); }
+  } catch (e) { await client.query('ROLLBACK'); return err((e as Error).message, 500); }
+  finally { client.release(); }
 }

@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { type NextRequest } from 'next/server';
-import { query } from '@/lib/db';
+import { query, getPool } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
 
@@ -34,11 +34,52 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   let auth: Awaited<ReturnType<typeof requireAuth>>;
   try { auth = await requireAuth(_req); } catch (e) { return e as Response; }
   if (!auth.isSuperadmin) return err('Forbidden — admin only', 403);
+
+  const [rec] = await query<{ id: string; status: string; company_id: string; warehouse_id: string | null; source_item_id: string; source_heads: number; source_kgs: number }>(
+    `SELECT id, status, company_id, warehouse_id, source_item_id, source_heads, source_kgs FROM conversions WHERE id = $1`, [params.id]);
+  if (!rec) return err('Not found', 404);
+
+  const outputs = await query<{ output_item_id: string; heads: number; kgs: number }>(
+    `SELECT output_item_id, heads, kgs FROM conversion_outputs WHERE conversion_id = $1`, [params.id]);
+
+  const client = await getPool().connect();
   try {
-    const [rec] = await query<{ id: string }>(`SELECT id FROM conversions WHERE id = $1`, [params.id]);
-    if (!rec) return err('Not found', 404);
-    await query(`DELETE FROM conversion_outputs WHERE conversion_id = $1`, [params.id]);
-    await query(`DELETE FROM conversions        WHERE id           = $1`, [params.id]);
+    await client.query('BEGIN');
+
+    if (rec.status === 'posted') {
+      // Add source inventory back
+      await client.query(
+        `INSERT INTO poultry_inventory_balance (company_id, warehouse_id, item_id, qty_heads, qty_kgs, last_updated)
+         VALUES ($1,$2,$3,$4,$5,now())
+         ON CONFLICT (company_id, warehouse_id, item_id) DO UPDATE
+           SET qty_heads = poultry_inventory_balance.qty_heads + $4,
+               qty_kgs   = poultry_inventory_balance.qty_kgs   + $5,
+               last_updated = now()`,
+        [rec.company_id, rec.warehouse_id, rec.source_item_id, Number(rec.source_heads), Number(rec.source_kgs)],
+      );
+
+      // Remove output inventory
+      for (const o of outputs) {
+        await client.query(
+          `UPDATE poultry_inventory_balance SET
+             qty_heads = GREATEST(0, qty_heads - $1),
+             qty_kgs   = GREATEST(0, qty_kgs   - $2),
+             last_updated = now()
+           WHERE company_id = $3 AND warehouse_id IS NOT DISTINCT FROM $4 AND item_id = $5`,
+          [Number(o.heads), Number(o.kgs), rec.company_id, rec.warehouse_id, o.output_item_id],
+        );
+      }
+
+      // Remove ledger entries
+      await client.query(
+        `DELETE FROM poultry_inventory_ledger WHERE source_type = 'conversion' AND source_id = $1`, [params.id]);
+    }
+
+    await client.query(`DELETE FROM conversion_outputs WHERE conversion_id = $1`, [params.id]);
+    await client.query(`DELETE FROM conversions        WHERE id           = $1`, [params.id]);
+
+    await client.query('COMMIT');
     return new Response(null, { status: 204 });
-  } catch (e: unknown) { return err((e as Error).message, 500); }
+  } catch (e) { await client.query('ROLLBACK'); return err((e as Error).message, 500); }
+  finally { client.release(); }
 }

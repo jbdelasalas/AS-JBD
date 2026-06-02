@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { type NextRequest } from 'next/server';
-import { query } from '@/lib/db';
+import { query, getPool } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
 
@@ -62,16 +62,51 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   let auth: Awaited<ReturnType<typeof requireAuth>>;
   try { auth = await requireAuth(_req); } catch (e) { return e as Response; }
   if (!auth.isSuperadmin) return err('Forbidden — admin only', 403);
+
+  const [rec] = await query<{ id: string; po_id: string }>(`SELECT id, po_id FROM goods_receipts WHERE id = $1`, [params.id]);
+  if (!rec) return err('Not found', 404);
+
+  // Block if any chick batch from this GRN is already in use (in_growing)
+  const [{ cnt }] = await query<{ cnt: number }>(
+    `SELECT count(*)::int AS cnt FROM chick_batches WHERE grn_id = $1 AND status != 'available'`,
+    [params.id],
+  );
+  if (Number(cnt) > 0) return err('Cannot delete: one or more chick batches from this receipt are already in a grow cycle', 409);
+
+  const client = await getPool().connect();
   try {
-    const [rec] = await query<{ id: string }>(`SELECT id FROM goods_receipts WHERE id = $1`, [params.id]);
-    if (!rec) return err('Not found', 404);
-    const [{ cnt }] = await query<{ cnt: number }>(
-      `SELECT count(*)::int AS cnt FROM chick_batches WHERE grn_id = $1`,
+    await client.query('BEGIN');
+
+    // Reverse qty_received on each PO line
+    await client.query(
+      `UPDATE purchase_order_lines pol
+          SET qty_received = GREATEST(0, pol.qty_received - grl.qty_received)
+         FROM goods_receipt_lines grl
+        WHERE grl.grn_id = $1 AND pol.id = grl.po_line_id`,
       [params.id],
     );
-    if (Number(cnt) > 0) return err('Cannot delete: linked chick batches exist', 409);
-    await query(`DELETE FROM goods_receipt_lines WHERE grn_id = $1`, [params.id]);
-    await query(`DELETE FROM goods_receipts      WHERE id    = $1`, [params.id]);
+
+    // Recalculate PO status (back to 'approved' if nothing received, else 'partial')
+    await client.query(
+      `UPDATE purchase_orders SET
+         status = CASE
+           WHEN (SELECT COALESCE(SUM(qty_received),0) FROM purchase_order_lines WHERE po_id = $1) = 0
+           THEN 'approved'
+           ELSE 'partial'
+         END,
+         updated_at = now()
+       WHERE id = $1`,
+      [rec.po_id],
+    );
+
+    // Delete chick batches created by this GRN (they are 'available' — safe to remove)
+    await client.query(`DELETE FROM chick_batches WHERE grn_id = $1`, [params.id]);
+
+    await client.query(`DELETE FROM goods_receipt_lines WHERE grn_id = $1`, [params.id]);
+    await client.query(`DELETE FROM goods_receipts      WHERE id    = $1`, [params.id]);
+
+    await client.query('COMMIT');
     return new Response(null, { status: 204 });
-  } catch (e: unknown) { return err((e as Error).message, 500); }
+  } catch (e) { await client.query('ROLLBACK'); return err((e as Error).message, 500); }
+  finally { client.release(); }
 }
