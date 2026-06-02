@@ -128,6 +128,18 @@ export async function POST(request: NextRequest) {
     if (tcRows[0]) ewtCodeRate = Number((tcRows[0] as Record<string, unknown>).rate_pct);
   }
 
+  // Detect which columns exist so inserts work before and after migration 034
+  const colCheckResult = await query(`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_schema='public' AND column_name IN ('ewt_code_id','ewt_amount','ewt_rate','grow_reference_id')
+      AND table_name IN ('bills','bill_lines')
+  `);
+  const existingCols = new Set((colCheckResult as Array<Record<string,unknown>>).map(r => String(r.column_name)));
+  const hasEwtCodeId   = existingCols.has('ewt_code_id');
+  const hasEwtAmount   = existingCols.has('ewt_amount');
+  const hasLineEwtRate = existingCols.has('ewt_rate');
+  const hasGrowRef     = existingCols.has('grow_reference_id');
+
   const client = await getPool().connect();
   try {
     await client.query('BEGIN');
@@ -184,38 +196,50 @@ export async function POST(request: NextRequest) {
 
     const netPayable = parseFloat((totTotal - totEwt).toFixed(2));
 
+    // Build bills INSERT dynamically based on which columns exist
+    const billCols = [
+      'company_id','branch_id','bill_no','internal_no','supplier_id','bill_date','due_date','currency',
+      'subtotal','vat_amount','total','amount_paid','balance','status','po_id','created_by',
+      'building_id','cost_center_id',
+    ];
+    const billVals: unknown[] = [
+      companyId, dto.branch_id ?? null, dto.bill_no, internalNo, supplierId,
+      dto.bill_date, dueDate, 'PHP',
+      totSubtotal.toFixed(2), totVat.toFixed(2), totTotal.toFixed(2), 0,
+      hasEwtAmount ? netPayable.toFixed(2) : totTotal.toFixed(2),
+      'draft', dto.po_id ?? null, auth.userId,
+      dto.building_id ?? null, dto.cost_center_id ?? null,
+    ];
+    if (hasGrowRef) { billCols.push('grow_reference_id'); billVals.push(dto.grow_reference_id ?? null); }
+    if (hasEwtAmount) { billCols.splice(9, 0, 'ewt_amount'); billVals.splice(9, 0, totEwt.toFixed(2)); }
+    if (hasEwtCodeId) { billCols.push('ewt_code_id'); billVals.push(ewtCodeId); }
+
+    const billPlaceholders = billVals.map((_, i) => `$${i + 1}`).join(',');
     const headerRows = await client.query(
-      `INSERT INTO bills
-         (company_id, branch_id, bill_no, internal_no, supplier_id, bill_date, due_date, currency,
-          subtotal, vat_amount, ewt_amount, total, amount_paid, balance, status, po_id, created_by,
-          building_id, cost_center_id, grow_reference_id, ewt_code_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'PHP',$8,$9,$10,$11,0,$12,'draft',$13,$14,$15,$16,$17,$18)
-       RETURNING *`,
-      [
-        companyId, dto.branch_id ?? null, dto.bill_no, internalNo, supplierId,
-        dto.bill_date, dueDate,
-        totSubtotal.toFixed(2), totVat.toFixed(2), totEwt.toFixed(2), totTotal.toFixed(2),
-        netPayable.toFixed(2),
-        dto.po_id ?? null, auth.userId,
-        dto.building_id ?? null, dto.cost_center_id ?? null, dto.grow_reference_id ?? null,
-        ewtCodeId,
-      ],
+      `INSERT INTO bills (${billCols.join(',')}) VALUES (${billPlaceholders}) RETURNING *`,
+      billVals,
     );
     const header = headerRows.rows[0];
 
     for (const l of mappedLines) {
+      const lineCols = ['bill_id','line_no','item_id','description','quantity','unit_price','vat_rate','line_subtotal','line_vat','line_total','expense_account_id'];
+      const lineVals: unknown[] = [
+        header.id, l.line_no, l.item_id ?? null, l.description,
+        l.qty, l.price, l.vatRate,
+        l.lineSubtotal.toFixed(2), l.lineVat.toFixed(2), l.lineTotal.toFixed(2),
+        l.expense_account_id ?? null,
+      ];
+      if (hasLineEwtRate) {
+        lineCols.push('ewt_rate', 'ewt_amount');
+        lineVals.push(l.ewtRate, l.ewtAmount.toFixed(2));
+      }
+      if (hasGrowRef) { lineCols.push('grow_reference_id'); lineVals.push((l as Record<string,unknown>).grow_reference_id ?? null); }
+      if (hasEwtCodeId) { lineCols.push('ewt_code_id'); lineVals.push(l.resolvedEwtCodeId); }
+
+      const linePlaceholders = lineVals.map((_, i) => `$${i + 1}`).join(',');
       await client.query(
-        `INSERT INTO bill_lines
-           (bill_id, line_no, item_id, description, quantity, unit_price, vat_rate, ewt_rate,
-            line_subtotal, line_vat, line_total, ewt_amount, expense_account_id, grow_reference_id, ewt_code_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
-        [
-          header.id, l.line_no, l.item_id ?? null, l.description,
-          l.qty, l.price, l.vatRate, l.ewtRate,
-          l.lineSubtotal.toFixed(2), l.lineVat.toFixed(2), l.lineTotal.toFixed(2), l.ewtAmount.toFixed(2),
-          l.expense_account_id ?? null, (l as Record<string,unknown>).grow_reference_id ?? null,
-          l.resolvedEwtCodeId,
-        ],
+        `INSERT INTO bill_lines (${lineCols.join(',')}) VALUES (${linePlaceholders})`,
+        lineVals,
       );
     }
 
