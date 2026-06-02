@@ -1,14 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+
+interface Role { id: string; name: string; }
 
 export default function NewUserPage() {
   const router = useRouter();
   const [form, setForm] = useState({ email: '', full_name: '', password: '', is_active: true });
+  const [allRoles, setAllRoles] = useState<Role[]>([]);
+  const [selectedRoleId, setSelectedRoleId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const companyId = localStorage.getItem('company_id') ?? '';
+    api.get<Role[]>(`/admin/roles?company_id=${companyId}`).then(setAllRoles).catch(() => {});
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -16,6 +25,10 @@ export default function NewUserPage() {
     setError(null);
     try {
       const res = await api.post<{ id: string }>('/admin/users', form);
+      if (selectedRoleId) {
+        const companyId = localStorage.getItem('company_id') ?? null;
+        await api.post(`/admin/users/${res.id}/roles`, { role_id: selectedRoleId, company_id: companyId });
+      }
       router.push(`/dashboard/admin/users/${res.id}`);
     } catch (e: unknown) {
       setError((e as Error).message ?? 'Failed');
@@ -46,6 +59,16 @@ export default function NewUserPage() {
           <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Password *</label>
           <input required type="password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
             className="w-full rounded border border-slate-300 dark:border-slate-600 px-2 py-1.5 text-sm dark:bg-slate-800 dark:text-slate-100" />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Role</label>
+          <select value={selectedRoleId} onChange={(e) => setSelectedRoleId(e.target.value)}
+            className="w-full rounded border border-slate-300 dark:border-slate-600 px-2 py-1.5 text-sm dark:bg-slate-800 dark:text-slate-100">
+            <option value="">— No role —</option>
+            {allRoles.map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </select>
         </div>
         <div className="flex items-center gap-2">
           <input type="checkbox" id="active" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))} />
