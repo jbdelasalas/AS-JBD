@@ -47,7 +47,13 @@ export default function NewGrowCyclePage() {
     api.get<Branch[]>(`/admin/branches?company_id=${cid}`).then(r => setBranches(Array.isArray(r) ? r : [])).catch(() => {});
     api.get<GrowRef[]>(`/poultry/grow-references?company_id=${cid}`).then(r => setGrowRefs(Array.isArray(r) ? r : [])).catch(() => {});
     api.get<CostCenter[]>(`/admin/cost-centers?company_id=${cid}&limit=100`).then(r => setCostCenters(Array.isArray(r) ? r : [])).catch(() => {});
-    api.get<AllItem[]>(`/inventory/items?company_id=${cid}&minimal=true`).then(r => setAllItems(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<AllItem[]>(`/inventory/items?company_id=${cid}&minimal=true`).then(r => {
+      const arr = Array.isArray(r) ? r : [];
+      setAllItems(arr);
+      // Default harvest item to first item with "live" in name
+      const liveItem = arr.find(i => /live/i.test(i.name) || /live/i.test(i.sku));
+      if (liveItem) setField('live_item_id', liveItem.id);
+    }).catch(() => {});
   }, []);
 
   // Filter buildings by selected location

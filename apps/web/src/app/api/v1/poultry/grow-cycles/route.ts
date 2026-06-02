@@ -55,11 +55,17 @@ export async function POST(request: NextRequest) {
   const heads = Number(dto.heads ?? batch.heads_available);
   if (heads > batch.heads_available) return err('Heads exceed available batch quantity', 400);
 
-  // Check BEFORE transaction — a failed INSERT inside BEGIN aborts the whole transaction
+  // Ensure column exists — auto-add if migration hasn't run (DDL outside transaction is safe)
   const [colRow] = await query<{ exists: boolean }>(
     `SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='grow_cycles' AND column_name='live_item_id') AS exists`
   );
-  const hasLiveItemCol = colRow?.exists === true;
+  let hasLiveItemCol = colRow?.exists === true;
+  if (!hasLiveItemCol) {
+    try {
+      await query(`ALTER TABLE grow_cycles ADD COLUMN IF NOT EXISTS live_item_id uuid REFERENCES items(id)`);
+      hasLiveItemCol = true;
+    } catch { /* non-fatal — column will just be skipped */ }
+  }
 
   const client = await getPool().connect();
   try {

@@ -60,11 +60,17 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const [existing] = await query<{ status: string; company_id: string }>(`SELECT status, company_id FROM grow_cycles WHERE id = $1`, [params.id]);
   if (!existing) return err('Not found', 404);
 
-  // Check BEFORE the transaction — a failed query inside BEGIN aborts the whole transaction
+  // Ensure column exists — auto-add if migration hasn't run (DDL outside transaction is safe)
   const [colRow] = await query<{ exists: boolean }>(
     `SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='grow_cycles' AND column_name='live_item_id') AS exists`
   );
-  const hasLiveItemCol = colRow?.exists === true;
+  let hasLiveItemCol = colRow?.exists === true;
+  if (!hasLiveItemCol) {
+    try {
+      await query(`ALTER TABLE grow_cycles ADD COLUMN IF NOT EXISTS live_item_id uuid REFERENCES items(id)`);
+      hasLiveItemCol = true;
+    } catch { /* non-fatal */ }
+  }
 
   const client = await getPool().connect();
   try {

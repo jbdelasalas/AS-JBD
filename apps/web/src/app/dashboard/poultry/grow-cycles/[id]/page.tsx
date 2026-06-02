@@ -132,7 +132,15 @@ export default function GrowCycleDetailPage() {
     const cid = localStorage.getItem('company_id');
     if (!cid) return;
     api.get<Item[]>(`/poultry/grow-cycles/${id}/consumable-items`).then(r => setItems(Array.isArray(r) ? r : [])).catch(() => {});
-    api.get<AllItem[]>(`/inventory/items?company_id=${cid}&minimal=true`).then(r => setAllItems(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<AllItem[]>(`/inventory/items?company_id=${cid}&minimal=true`).then(r => {
+      const arr = Array.isArray(r) ? r : [];
+      setAllItems(arr);
+      // If no harvest item set yet, default to first item with "live" in name
+      const liveItem = arr.find(i => /live/i.test(i.name) || /live/i.test(i.sku));
+      if (liveItem) {
+        setHeaderForm(f => ({ ...f, live_item_id: f.live_item_id || liveItem.id }));
+      }
+    }).catch(() => {});
     api.get<Branch[]>(`/admin/branches?company_id=${cid}`).then(r => setBranches(Array.isArray(r) ? r : [])).catch(() => {});
     api.get<Building[]>(`/poultry/buildings?company_id=${cid}`).then(r => setBuildings(Array.isArray(r) ? r : [])).catch(() => {});
     api.get<GrowRef[]>(`/poultry/grow-references?company_id=${cid}`).then(r => setGrowRefs(Array.isArray(r) ? r : [])).catch(() => {});
