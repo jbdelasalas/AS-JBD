@@ -190,7 +190,10 @@ export default function CertificateDetailPage() {
         <div className="flex gap-2">
           {cert.status==='draft'  && <button onClick={()=>updateStatus('issued')} disabled={busy} className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50">Mark as Issued</button>}
           {cert.status==='issued' && <button onClick={()=>updateStatus('filed')}  disabled={busy} className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700 disabled:opacity-50">Mark as Filed</button>}
-          <button onClick={()=>window.print()} className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">Print / Save PDF</button>
+          <a href={`/api/v1/bir/certificates/${id}/pdf`} target="_blank"
+            className="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">
+            Download PDF
+          </a>
           <Link href={`/dashboard/ap/bills/${cert.bill_id}`} className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">View Bill</Link>
         </div>
       </div>
@@ -200,7 +203,7 @@ export default function CertificateDetailPage() {
           BIR FORM 2307  January 2018 (ENCS)
           ════════════════════════════════════ */}
       <div id="form2307" style={{
-        width:'210mm',margin:'0 auto',background:'#fff',color:'#000',
+        width:'216mm',margin:'0 auto',background:'#fff',color:'#000',
         fontFamily:'Arial,Helvetica,sans-serif',fontSize:'8px',lineHeight:'1.2',
         padding:'5mm 6mm 4mm 6mm',boxSizing:'border-box',
       }}>
@@ -479,7 +482,7 @@ export default function CertificateDetailPage() {
         @media print {
           body > * { display:none !important; }
           #form2307 { display:block !important; position:static !important; }
-          @page { size:A4; margin:0; }
+          @page { size: 8.5in 13in; margin:0; }
         }
       `}</style>
     </div>
