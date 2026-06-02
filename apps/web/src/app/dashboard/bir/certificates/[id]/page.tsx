@@ -17,8 +17,8 @@ interface Cert {
   company_name: string; company_tin: string | null; company_address: string | null;
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  draft: 'bg-slate-100 text-slate-700', issued: 'bg-blue-100 text-blue-700', filed: 'bg-emerald-100 text-emerald-700',
+const STATUS_STYLES: Record<string,string> = {
+  draft:'bg-slate-100 text-slate-700', issued:'bg-blue-100 text-blue-700', filed:'bg-emerald-100 text-emerald-700',
 };
 const Q_STARTS = ['01/01','04/01','07/01','10/01'];
 const Q_ENDS   = ['03/31','06/30','09/30','12/31'];
@@ -33,147 +33,136 @@ function monthPos(d: string, q: number): 0|1|2 {
 }
 function fmt(n: number) { return n.toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 
-/* ── Shared constants ── */
-const BLK = '1px solid #000';
-const F7  = {fontSize:'7px'} as const;
-const F8  = {fontSize:'8px'} as const;
-const F9  = {fontSize:'9px'} as const;
-const BOLD = {fontWeight:700} as const;
-const MONO = {fontFamily:'monospace'} as const;
-const HDR_BG = {backgroundColor:'#d0d0d0'} as const;
-const CELL_PAD = {padding:'2px 3px'} as const;
-
-/* ── Individual character box ── */
-function CharBox({ch,w=12,h=15}:{ch?:string,w?:number,h?:number}) {
-  return (
-    <span style={{
-      display:'inline-block', width:`${w}px`, height:`${h}px`,
-      border:BLK, ...MONO, ...F9,
-      textAlign:'center', lineHeight:`${h}px`, marginRight:'0.5px',
-    }}>{ch?.trim()||''}</span>
-  );
+/* ── Single character box ── */
+function CB({v='',w=12,h=14}:{v?:string,w?:number,h?:number}) {
+  return <span style={{display:'inline-block',width:w,height:h,border:'1px solid #777',
+    fontSize:'8px',fontFamily:'Arial',textAlign:'center',lineHeight:`${h}px`,
+    marginRight:'0.5px',verticalAlign:'middle'}}>{v.trim()}</span>;
 }
 
-/* ── TIN boxes: ###-###-###-##### ── */
-function TinBoxes({tin}:{tin:string|null}) {
-  const d = (tin??'').replace(/\D/g,'').padEnd(14,' ').split('');
-  return (
-    <span style={{display:'inline-flex',alignItems:'center',whiteSpace:'nowrap'}}>
-      {d.slice(0,3).map((c,i)=><CharBox key={i} ch={c}/>)}
-      <span style={{...F9,...BOLD,padding:'0 2px'}}>-</span>
-      {d.slice(3,6).map((c,i)=><CharBox key={i} ch={c}/>)}
-      <span style={{...F9,...BOLD,padding:'0 2px'}}>-</span>
-      {d.slice(6,9).map((c,i)=><CharBox key={i} ch={c}/>)}
-      <span style={{...F9,...BOLD,padding:'0 2px'}}>-</span>
-      {d.slice(9,14).map((c,i)=><CharBox key={i} ch={c}/>)}
-    </span>
-  );
+/* ── TIN: ###-###-###-##### ── */
+function TIN({tin}:{tin:string|null}) {
+  const d=(tin??'').replace(/\D/g,'').padEnd(14,' ').split('');
+  return <span style={{display:'inline-flex',alignItems:'center',verticalAlign:'middle'}}>
+    {d.slice(0,3).map((c,i)=><CB key={i} v={c}/>)}
+    <span style={{margin:'0 2px',fontSize:'9px',fontWeight:700}}>-</span>
+    {d.slice(3,6).map((c,i)=><CB key={i} v={c}/>)}
+    <span style={{margin:'0 2px',fontSize:'9px',fontWeight:700}}>-</span>
+    {d.slice(6,9).map((c,i)=><CB key={i} v={c}/>)}
+    <span style={{margin:'0 2px',fontSize:'9px',fontWeight:700}}>-</span>
+    {d.slice(9,14).map((c,i)=><CB key={i} v={c}/>)}
+  </span>;
 }
 
 /* ── Date boxes: MM/DD/YYYY ── */
-function DateBoxes({date}:{date:string}) {
+function DBx({date}:{date:string}) {
   const [mm='',dd='',yyyy=''] = date.split('/');
-  const b = (s:string,n:number) => s.padEnd(n,' ').split('');
-  return (
-    <span style={{display:'inline-flex',alignItems:'center',whiteSpace:'nowrap'}}>
-      {b(mm,2).map((c,i)=><CharBox key={i} ch={c}/>)}
-      <span style={{...F8,padding:'0 1px'}}>/</span>
-      {b(dd,2).map((c,i)=><CharBox key={i} ch={c}/>)}
-      <span style={{...F8,padding:'0 1px'}}>/</span>
-      {b(yyyy,4).map((c,i)=><CharBox key={i} ch={c}/>)}
-    </span>
-  );
+  const pad=(s:string,n:number)=>s.padEnd(n,' ').split('');
+  return <span style={{display:'inline-flex',alignItems:'center',verticalAlign:'middle'}}>
+    {pad(mm,2).map((c,i)=><CB key={i} v={c}/>)}
+    <span style={{margin:'0 1px',fontSize:'8px',fontWeight:700}}>/</span>
+    {pad(dd,2).map((c,i)=><CB key={i} v={c}/>)}
+    <span style={{margin:'0 1px',fontSize:'8px',fontWeight:700}}>/</span>
+    {pad(yyyy,4).map((c,i)=><CB key={i} v={c}/>)}
+  </span>;
 }
 
-/* ── ZIP code boxes ── */
-function ZipBoxes() {
-  return (
-    <span style={{display:'inline-flex',gap:'1px'}}>
-      {[0,1,2,3].map(i=><span key={i} style={{display:'inline-block',width:'12px',height:'14px',border:BLK}}/>)}
-    </span>
-  );
+/* ── ZIP boxes ── */
+function ZIP() {
+  return <span style={{display:'inline-flex',gap:'1px'}}>
+    {[0,1,2,3].map(i=><CB key={i} w={11} h={13}/>)}
+  </span>;
 }
 
-/* ── Date issue/expiry boxes inside signature row ── */
-function DateFieldBoxes() {
-  return (
-    <span style={{display:'inline-flex',alignItems:'center',whiteSpace:'nowrap',gap:'0.5px'}}>
-      {[0,1].map(i=><CharBox key={i} w={11} h={14}/>)}
-      <span style={{...F8,padding:'0 1px'}}>/</span>
-      {[0,1].map(i=><CharBox key={i} w={11} h={14}/>)}
-      <span style={{...F8,padding:'0 1px'}}>/</span>
-      {[0,1,2,3].map(i=><CharBox key={i} w={11} h={14}/>)}
-    </span>
-  );
+/* ── Date field boxes (for signature rows) ── */
+function DBOX() {
+  return <span style={{display:'inline-flex',alignItems:'center',verticalAlign:'middle'}}>
+    <CB w={11} h={13}/><CB w={11} h={13}/>
+    <span style={{margin:'0 1px',fontSize:'8px',fontWeight:700}}>/</span>
+    <CB w={11} h={13}/><CB w={11} h={13}/>
+    <span style={{margin:'0 1px',fontSize:'8px',fontWeight:700}}>/</span>
+    <CB w={11} h={13}/><CB w={11} h={13}/><CB w={11} h={13}/><CB w={11} h={13}/>
+  </span>;
 }
 
-/* ── Blank data row for Part III ── */
-function BlankRow() {
-  return (
-    <tr style={{height:'16px'}}>
-      {[0,1,2,3,4,5,6].map(i=><td key={i} style={{border:BLK}}/>)}
+/* ─── Style constants ─── */
+const BK = '1px solid #000';
+const GR = {backgroundColor:'#d0d0d0'} as const;
+const cp = {padding:'2px 4px'} as const;
+const f7 = {fontSize:'7px'} as const;
+const f8 = {fontSize:'8px'} as const;
+const f9 = {fontSize:'9px'} as const;
+const bold = {fontWeight:700 as const};
+const italic = {fontStyle:'italic' as const};
+const mono = {fontFamily:'monospace'} as const;
+
+/* ── Field row for Parts I & II ──
+   Left  (~45%): blank with field number centered
+   Right (~55%): label + input                   */
+function FRow({n,children,h=28}:{n:number,children:React.ReactNode,h?:number}) {
+  return <tr>
+    <td style={{border:BK,width:'45%',textAlign:'center',verticalAlign:'middle',...f9,...bold,minHeight:h}}>
+      {n}
+    </td>
+    <td style={{border:BK,width:'55%',padding:'2px 4px',verticalAlign:'top'}}>
+      {children}
+    </td>
+  </tr>;
+}
+
+/* ── Blank Part III row ── */
+function BR() {
+  return <tr style={{height:'15px'}}>
+    {[0,1,2,3,4,5,6].map(i=><td key={i} style={{border:BK}}/>)}
+  </tr>;
+}
+
+/* ── Signature block ── */
+function SIG({label}:{label:string}) {
+  return <>
+    <tr><td style={{border:BK,height:'44px',verticalAlign:'bottom',...cp,fontSize:'0px'}}>&nbsp;</td></tr>
+    <tr><td style={{border:BK,borderTop:'none',...cp,textAlign:'center',...f8}}>{label}</td></tr>
+    <tr><td style={{border:BK,borderTop:'none',...cp,textAlign:'center',...f7,...italic,color:'#444'}}>(Indicate Title/Designation and TIN)</td></tr>
+    <tr>
+      <td style={{border:BK,borderTop:'none',padding:'3px 4px'}}>
+        <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <tbody><tr>
+            <td style={{...f7,width:'34%',verticalAlign:'top',paddingRight:'4px'}}>
+              Tax Agent Accreditation No./<br/>Attorney&apos;s Roll No. <em>(if applicable)</em>
+            </td>
+            <td style={{borderLeft:BK,paddingLeft:'4px',width:'33%',verticalAlign:'top'}}>
+              <div style={f7}>Date of Issue</div>
+              <div style={{marginTop:'2px'}}><DBOX/></div>
+              <div style={{...f7,color:'#666'}}>(MM/DD/YYYY)</div>
+            </td>
+            <td style={{borderLeft:BK,paddingLeft:'4px',width:'33%',verticalAlign:'top'}}>
+              <div style={f7}>Date of Expiry</div>
+              <div style={{marginTop:'2px'}}><DBOX/></div>
+              <div style={{...f7,color:'#666'}}>(MM/DD/YYYY)</div>
+            </td>
+          </tr></tbody>
+        </table>
+      </td>
     </tr>
-  );
-}
-
-/* ── Signature block (used twice) ── */
-function SigBlock({label}:{label:string}) {
-  return (
-    <>
-      <tr><td style={{border:BLK,height:'48px',padding:'2px 4px',verticalAlign:'bottom',fontSize:'0px'}}>&nbsp;</td></tr>
-      <tr>
-        <td style={{border:BLK,borderTop:'none',...CELL_PAD,textAlign:'center',...F8}}>
-          {label}
-        </td>
-      </tr>
-      <tr>
-        <td style={{border:BLK,borderTop:'none',...CELL_PAD,textAlign:'center',...F7,color:'#444',fontStyle:'italic'}}>
-          (Indicate Title/Designation and TIN)
-        </td>
-      </tr>
-      <tr>
-        <td style={{border:BLK,borderTop:'none',padding:'3px 4px'}}>
-          <table style={{width:'100%',borderCollapse:'collapse'}}>
-            <tbody>
-              <tr>
-                <td style={{...F7,width:'35%',verticalAlign:'top',paddingRight:'4px'}}>
-                  Tax Agent Accreditation No./<br/>Attorney&apos;s Roll No. (if applicable)
-                </td>
-                <td style={{borderLeft:BLK,paddingLeft:'4px',width:'32%',verticalAlign:'top'}}>
-                  <div style={F7}>Date of Issue</div>
-                  <div style={{marginTop:'2px'}}><DateFieldBoxes/></div>
-                  <div style={{...F7,color:'#666',marginTop:'1px'}}>(MM/DD/YYYY)</div>
-                </td>
-                <td style={{borderLeft:BLK,paddingLeft:'4px',width:'33%',verticalAlign:'top'}}>
-                  <div style={F7}>Date of Expiry</div>
-                  <div style={{marginTop:'2px'}}><DateFieldBoxes/></div>
-                  <div style={{...F7,color:'#666',marginTop:'1px'}}>(MM/DD/YYYY)</div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </td>
-      </tr>
-    </>
-  );
+  </>;
 }
 
 export default function CertificateDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [cert, setCert] = useState<Cert | null>(null);
+  const [cert, setCert] = useState<Cert|null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string|null>(null);
 
-  const load = useCallback(() => {
+  const load = useCallback(()=>{
     setLoading(true);
     api.get<Cert>(`/bir/certificates/${id}`).then(setCert).finally(()=>setLoading(false));
   },[id]);
   useEffect(()=>{load();},[load]);
 
-  async function updateStatus(status: string) {
+  async function updateStatus(status:string) {
     setBusy(true); setMsg(null);
-    try { await api.patch(`/bir/certificates/${id}`,{status}); load(); }
+    try{await api.patch(`/bir/certificates/${id}`,{status});load();}
     catch(e:unknown){setMsg((e as Error).message??'Failed');}
     finally{setBusy(false);}
   }
@@ -184,20 +173,15 @@ export default function CertificateDetailPage() {
   const q=cert.period_quarter, y=cert.period_year;
   const months=Q_MONTHS[q];
   const pos=monthPos(cert.bill_date,q);
-  const amounts:[number,number,number]=[0,0,0];
-  amounts[pos]=cert.taxable_amount;
+  const am:[number,number,number]=[0,0,0];
+  am[pos]=cert.taxable_amount;
 
-  /* shared cell styles */
-  const c  = (s?:React.CSSProperties):React.CSSProperties => ({border:BLK,...CELL_PAD,verticalAlign:'top',...F8,...s});
-  const h  = (s?:React.CSSProperties):React.CSSProperties => ({...c(s),...HDR_BG,...BOLD,textAlign:'center',lineHeight:'1.3',...s});
-  const n  = ():React.CSSProperties => ({...c(),...BOLD,width:'16px',textAlign:'center',verticalAlign:'top'});
-  const lbl:React.CSSProperties = {...F7,color:'#333',fontStyle:'italic',display:'block',lineHeight:'1.2'};
-  const val:React.CSSProperties = {...F9,...BOLD,display:'block',marginTop:'2px'};
-  const fld:React.CSSProperties = {border:BLK,minHeight:'16px',marginTop:'2px',padding:'1px 3px',...F9};
+  const hc=(extra?:React.CSSProperties):React.CSSProperties=>({border:BK,...cp,...GR,...bold,...f8,textAlign:'center',lineHeight:'1.3',...extra});
+  const dc=(extra?:React.CSSProperties):React.CSSProperties=>({border:BK,...cp,...f8,verticalAlign:'top',...extra});
 
   return (
     <div>
-      {/* Toolbar */}
+      {/* ── Toolbar ── */}
       <div className="mb-4 flex items-center justify-between print:hidden">
         <div className="flex items-center gap-3">
           <Link href="/dashboard/bir/certificates" className="text-sm text-slate-500 hover:text-slate-700">← Certificates</Link>
@@ -212,323 +196,282 @@ export default function CertificateDetailPage() {
       </div>
       {msg && <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 print:hidden">{msg}</div>}
 
-      {/* ════════════════════════════════════════
-          BIR FORM 2307 — January 2018 (ENCS)
-          ════════════════════════════════════════ */}
+      {/* ════════════════════════════════════
+          BIR FORM 2307  January 2018 (ENCS)
+          ════════════════════════════════════ */}
       <div id="form2307" style={{
-        width:'210mm', margin:'0 auto', background:'#fff', color:'#000',
-        fontFamily:'"Arial","Helvetica",sans-serif',
-        fontSize:'8px', lineHeight:'1.2',
-        padding:'5mm 6mm 5mm 6mm', boxSizing:'border-box',
+        width:'210mm',margin:'0 auto',background:'#fff',color:'#000',
+        fontFamily:'Arial,Helvetica,sans-serif',fontSize:'8px',lineHeight:'1.2',
+        padding:'5mm 6mm 4mm 6mm',boxSizing:'border-box',
       }}>
 
-        {/* ═══ TOP BAND: BIR-Use / Seal+Gov / empty right ═══ */}
-        <table style={{width:'100%',borderCollapse:'collapse',border:BLK}}>
-          <tbody>
-            <tr>
-              <td style={{border:BLK,width:'58px',padding:'2px 3px',verticalAlign:'top',...F7,lineHeight:'1.4'}}>
-                <div>For BIR &nbsp;BCS/</div>
-                <div>Use Only Item:</div>
-              </td>
-              <td style={{padding:'3px 4px',textAlign:'center',verticalAlign:'middle'}}>
-                <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
-                  {/* Philippine Seal circle placeholder */}
-                  <div style={{
-                    width:'32px',height:'32px',borderRadius:'50%',border:'1px solid #555',
-                    display:'flex',alignItems:'center',justifyContent:'center',
-                    flexShrink:0,flexDirection:'column',lineHeight:'1.1'
-                  }}>
-                    <div style={{fontSize:'5px',textAlign:'center',color:'#444',fontWeight:700}}>PH</div>
-                  </div>
-                  <div style={{textAlign:'center'}}>
-                    <div style={{...F7}}>Republic of the Philippines</div>
-                    <div style={{...F8,...BOLD}}>Department of Finance</div>
-                    <div style={{...F8,...BOLD}}>Bureau of Internal Revenue</div>
-                  </div>
+        {/* ═══ HEADER BAND 1: BIR-use | Seal+Gov | empty ═══ */}
+        <table style={{width:'100%',borderCollapse:'collapse',border:BK}}>
+          <tbody><tr>
+            {/* For BIR Use Only */}
+            <td style={{border:BK,width:'72px',padding:'2px 4px',verticalAlign:'top',...f7,lineHeight:'1.5'}}>
+              <div>For BIR &nbsp; BCS/</div>
+              <div>Use Only</div>
+              <div>Item:</div>
+            </td>
+            {/* Seal + Gov */}
+            <td style={{padding:'4px',textAlign:'center',verticalAlign:'middle'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'8px'}}>
+                <div style={{
+                  width:'34px',height:'34px',borderRadius:'50%',border:'1px solid #888',
+                  display:'flex',alignItems:'center',justifyContent:'center',
+                  flexShrink:0,flexDirection:'column' as const,
+                }}>
+                  <span style={{fontSize:'5px',fontWeight:700,color:'#666',textAlign:'center',lineHeight:'1.2'}}>PH<br/>SEAL</span>
                 </div>
-              </td>
-              <td style={{border:BLK,width:'90px'}}/>
-            </tr>
-          </tbody>
+                <div>
+                  <div style={f7}>Republic of the Philippines</div>
+                  <div style={{...f8,...bold}}>Department of Finance</div>
+                  <div style={{...f8,...bold}}>Bureau of Internal Revenue</div>
+                </div>
+              </div>
+            </td>
+            {/* empty top-right */}
+            <td style={{border:BK,width:'100px'}}/>
+          </tr></tbody>
         </table>
 
-        {/* ═══ TITLE BAND: Form No. / Title / Barcode ═══ */}
-        <table style={{width:'100%',borderCollapse:'collapse',border:BLK,borderTop:'none'}}>
-          <tbody>
-            <tr>
-              {/* BIR Form No. */}
-              <td style={{border:BLK,width:'90px',padding:'2px 4px',verticalAlign:'top'}}>
-                <div style={{...F7}}>BIR Form No.</div>
-                <div style={{fontSize:'30px',fontWeight:900,lineHeight:'1',letterSpacing:'-1px'}}>2307</div>
-                <div style={{...F7}}>January 2018 (ENCS)</div>
-              </td>
-              {/* Title */}
-              <td style={{textAlign:'center',padding:'4px 6px',verticalAlign:'middle'}}>
-                <div style={{fontSize:'15px',fontWeight:900,lineHeight:'1.2'}}>Certificate of Creditable Tax</div>
-                <div style={{fontSize:'15px',fontWeight:900,lineHeight:'1.2'}}>Withheld at Source</div>
-              </td>
-              {/* Barcode */}
-              <td style={{border:BLK,width:'90px',padding:'2px 4px',verticalAlign:'top',textAlign:'right'}}>
-                <div style={{
-                  width:'80px',height:'28px',marginLeft:'auto',marginBottom:'2px',
-                  background:'repeating-linear-gradient(90deg,#000 0,#000 1.5px,transparent 1.5px,transparent 3.5px,#000 3.5px,#000 4px,transparent 4px,transparent 6px)',
-                }}/>
-                <div style={{...F7,textAlign:'center'}}>2307 01/18ENCS</div>
-              </td>
-            </tr>
-          </tbody>
+        {/* ═══ HEADER BAND 2: Form No. | Title | Barcode ═══ */}
+        <table style={{width:'100%',borderCollapse:'collapse',border:BK,borderTop:'none'}}>
+          <tbody><tr>
+            {/* BIR Form No. */}
+            <td style={{border:BK,width:'95px',padding:'2px 5px',verticalAlign:'top'}}>
+              <div style={f7}>BIR Form No.</div>
+              <div style={{fontSize:'30px',fontWeight:900,lineHeight:'1',letterSpacing:'-1px'}}>2307</div>
+              <div style={f7}>January 2018 (ENCS)</div>
+            </td>
+            {/* Title */}
+            <td style={{textAlign:'center',padding:'6px 8px',verticalAlign:'middle'}}>
+              <div style={{fontSize:'16px',fontWeight:900,lineHeight:'1.15'}}>Certificate of Creditable Tax</div>
+              <div style={{fontSize:'16px',fontWeight:900,lineHeight:'1.15'}}>Withheld at Source</div>
+            </td>
+            {/* Barcode */}
+            <td style={{border:BK,width:'95px',padding:'3px 4px',verticalAlign:'top',textAlign:'right'}}>
+              <div style={{
+                width:'82px',height:'30px',marginLeft:'auto',marginBottom:'2px',
+                background:'repeating-linear-gradient(90deg,#000 0,#000 1.5px,#fff 1.5px,#fff 3.5px,#000 3.5px,#000 4.5px,#fff 4.5px,#fff 6px)',
+              }}/>
+              <div style={{...f7,textAlign:'center'}}>2307 01/18ENCS</div>
+            </td>
+          </tr></tbody>
         </table>
 
         {/* ═══ INSTRUCTION ═══ */}
-        <div style={{border:BLK,borderTop:'none',padding:'1.5px 4px',...F7}}>
+        <div style={{border:BK,borderTop:'none',padding:'1.5px 4px',...f7}}>
           Fill in all applicable spaces. Mark all appropriate boxes with an &ldquo;X&rdquo;.
         </div>
 
         {/* ═══ FIELD 1: For the Period ═══ */}
         <table style={{width:'100%',borderCollapse:'collapse'}}>
-          <tbody>
-            <tr>
-              <td style={n()}>1</td>
-              <td style={{...c(),padding:'3px 5px',verticalAlign:'middle'}}>
-                <span style={{...F8,marginRight:'10px'}}>For the Period</span>
-                <strong style={F8}>From</strong>&nbsp;
-                <DateBoxes date={`${Q_STARTS[q-1]}/${y}`}/>
-                <span style={{...F7,color:'#555',margin:'0 10px 0 3px'}}>(MM/DD/YYYY)</span>
-                <strong style={F8}>To</strong>&nbsp;
-                <DateBoxes date={`${Q_ENDS[q-1]}/${y}`}/>
-                <span style={{...F7,color:'#555',marginLeft:'3px'}}>(MM/DD/YYYY)</span>
-              </td>
-            </tr>
-          </tbody>
+          <tbody><tr>
+            <td style={{border:BK,width:'20px',textAlign:'center',verticalAlign:'middle',...f9,...bold,padding:'2px 3px'}}>1</td>
+            <td style={{border:BK,padding:'3px 5px',verticalAlign:'middle'}}>
+              <span style={{...f8,marginRight:'8px'}}>For the Period</span>
+              <strong style={f8}>From</strong>&nbsp;
+              <DBx date={`${Q_STARTS[q-1]}/${y}`}/>
+              <span style={{...f7,color:'#666',margin:'0 8px 0 2px'}}>(MM/DD/YYYY)</span>
+              <strong style={f8}>To</strong>&nbsp;
+              <DBx date={`${Q_ENDS[q-1]}/${y}`}/>
+              <span style={{...f7,color:'#666',marginLeft:'2px'}}>(MM/DD/YYYY)</span>
+            </td>
+          </tr></tbody>
         </table>
 
         {/* ═══ PART I: PAYEE ═══ */}
         <table style={{width:'100%',borderCollapse:'collapse'}}>
           <tbody>
-            <tr><td colSpan={2} style={h()}>Part I &#8211; Payee Information</td></tr>
+            <tr><td colSpan={2} style={hc()}>Part I &#8211; Payee Information</td></tr>
 
             {/* Field 2: Payee TIN */}
-            <tr>
-              <td style={n()}>2</td>
-              <td style={{...c(),display:'table-cell'}}>
-                <table style={{width:'100%',borderCollapse:'collapse'}}>
-                  <tbody><tr>
-                    <td style={{verticalAlign:'middle',...F8}}>Taxpayer Identification Number <em>(TIN)</em></td>
-                    <td style={{textAlign:'right',verticalAlign:'middle',paddingLeft:'6px',whiteSpace:'nowrap'}}>
-                      <TinBoxes tin={cert.supplier_tin}/>
-                    </td>
-                  </tr></tbody>
-                </table>
-              </td>
-            </tr>
+            <FRow n={2}>
+              <div style={{...f8,marginBottom:'2px'}}>Taxpayer Identification Number <em style={italic}>(TIN)</em></div>
+              <TIN tin={cert.supplier_tin}/>
+            </FRow>
 
             {/* Field 3: Payee Name */}
-            <tr>
-              <td style={n()}>3</td>
-              <td style={c()}>
-                <span style={lbl}>Payee&apos;s Name <em>(Last Name, First Name, Middle Name for Individual OR Registered Name for Non-Individual)</em></span>
-                <div style={{...fld,...val}}>{cert.supplier_name}</div>
-              </td>
-            </tr>
+            <FRow n={3} h={36}>
+              <div style={{...f7,...italic,color:'#333',marginBottom:'2px'}}>
+                Payee&apos;s Name <em>(Last Name, First Name, Middle Name for Individual OR Registered Name for Non-Individual)</em>
+              </div>
+              <div style={{border:BK,minHeight:'16px',padding:'1px 3px',...f9,...bold}}>
+                {cert.supplier_name}
+              </div>
+            </FRow>
 
             {/* Field 4: Address + ZIP */}
-            <tr>
-              <td style={n()}>4</td>
-              <td style={{...c(),padding:'0'}}>
-                <table style={{width:'100%',borderCollapse:'collapse'}}>
-                  <tbody><tr>
-                    <td style={{padding:'2px 3px',borderRight:BLK,width:'82%',verticalAlign:'top'}}>
-                      <span style={lbl}>Registered Address</span>
-                      <div style={{...fld,...F9}}>{cert.supplier_address??''}</div>
-                    </td>
-                    <td style={{padding:'2px 3px',width:'18%',verticalAlign:'top'}}>
-                      <span style={{...F7,fontStyle:'normal' as const,display:'block',marginBottom:'2px'}}>4A ZIP Code</span>
-                      <ZipBoxes/>
-                    </td>
-                  </tr></tbody>
-                </table>
-              </td>
-            </tr>
+            <FRow n={4} h={32}>
+              <table style={{width:'100%',borderCollapse:'collapse'}}>
+                <tbody><tr>
+                  <td style={{width:'82%',paddingRight:'4px',verticalAlign:'top'}}>
+                    <div style={{...f7,...italic,color:'#333',marginBottom:'2px'}}>Registered Address</div>
+                    <div style={{border:BK,minHeight:'16px',padding:'1px 3px',...f9}}>
+                      {cert.supplier_address??''}
+                    </div>
+                  </td>
+                  <td style={{borderLeft:BK,paddingLeft:'4px',width:'18%',verticalAlign:'top'}}>
+                    <div style={{...f7,marginBottom:'2px'}}>4A ZIP Code</div>
+                    <ZIP/>
+                  </td>
+                </tr></tbody>
+              </table>
+            </FRow>
 
             {/* Field 5: Foreign Address */}
-            <tr>
-              <td style={n()}>5</td>
-              <td style={c()}>
-                <span style={lbl}>Foreign Address, <em>if applicable</em></span>
-                <div style={{...fld,...F9}}>&nbsp;</div>
-              </td>
-            </tr>
+            <FRow n={5} h={28}>
+              <div style={{...f7,...italic,color:'#333',marginBottom:'2px'}}>Foreign Address, <em>if applicable</em></div>
+              <div style={{border:BK,minHeight:'14px',padding:'1px 3px',...f9}}>&nbsp;</div>
+            </FRow>
           </tbody>
         </table>
+
+        {/* BIR Data Privacy note (between Part I and Part II) */}
+        <div style={{border:BK,borderTop:'none',padding:'1px 4px',textAlign:'right',...f7,color:'#444',fontStyle:'italic'}}>
+          *NOTE: The BIR Data Privacy is in the BIR website (www.bir.gov.ph)
+        </div>
 
         {/* ═══ PART II: PAYOR ═══ */}
         <table style={{width:'100%',borderCollapse:'collapse'}}>
           <tbody>
-            <tr><td colSpan={2} style={h()}>Part II &#8211; Payor Information</td></tr>
+            <tr><td colSpan={2} style={hc()}>Part II &#8211; Payor Information</td></tr>
 
             {/* Field 6: Payor TIN */}
-            <tr>
-              <td style={n()}>6</td>
-              <td style={{...c(),display:'table-cell'}}>
-                <table style={{width:'100%',borderCollapse:'collapse'}}>
-                  <tbody><tr>
-                    <td style={{verticalAlign:'middle',...F8}}>Taxpayer Identification Number <em>(TIN)</em></td>
-                    <td style={{textAlign:'right',verticalAlign:'middle',paddingLeft:'6px',whiteSpace:'nowrap'}}>
-                      <TinBoxes tin={cert.company_tin}/>
-                    </td>
-                  </tr></tbody>
-                </table>
-              </td>
-            </tr>
+            <FRow n={6}>
+              <div style={{...f8,marginBottom:'2px'}}>Taxpayer Identification Number <em style={italic}>(TIN)</em></div>
+              <TIN tin={cert.company_tin}/>
+            </FRow>
 
             {/* Field 7: Payor Name */}
-            <tr>
-              <td style={n()}>7</td>
-              <td style={c()}>
-                <span style={lbl}>Payor&apos;s Name <em>(Last Name, First Name, Middle Name for Individual OR Registered Name for Non-Individual)</em></span>
-                <div style={{...fld,...val}}>{cert.company_name}</div>
-              </td>
-            </tr>
+            <FRow n={7} h={36}>
+              <div style={{...f7,...italic,color:'#333',marginBottom:'2px'}}>
+                Payor&apos;s Name <em>(Last Name, First Name, Middle Name for Individual OR Registered Name for Non-Individual)</em>
+              </div>
+              <div style={{border:BK,minHeight:'16px',padding:'1px 3px',...f9,...bold}}>
+                {cert.company_name}
+              </div>
+            </FRow>
 
             {/* Field 8: Address + ZIP */}
-            <tr>
-              <td style={n()}>8</td>
-              <td style={{...c(),padding:'0'}}>
-                <table style={{width:'100%',borderCollapse:'collapse'}}>
-                  <tbody><tr>
-                    <td style={{padding:'2px 3px',borderRight:BLK,width:'82%',verticalAlign:'top'}}>
-                      <span style={lbl}>Registered Address</span>
-                      <div style={{...fld,...F9}}>{cert.company_address??''}</div>
-                    </td>
-                    <td style={{padding:'2px 3px',width:'18%',verticalAlign:'top'}}>
-                      <span style={{...F7,fontStyle:'normal' as const,display:'block',marginBottom:'2px'}}>8A ZIP Code</span>
-                      <ZipBoxes/>
-                    </td>
-                  </tr></tbody>
-                </table>
-              </td>
-            </tr>
+            <FRow n={8} h={32}>
+              <table style={{width:'100%',borderCollapse:'collapse'}}>
+                <tbody><tr>
+                  <td style={{width:'82%',paddingRight:'4px',verticalAlign:'top'}}>
+                    <div style={{...f7,...italic,color:'#333',marginBottom:'2px'}}>Registered Address</div>
+                    <div style={{border:BK,minHeight:'16px',padding:'1px 3px',...f9}}>
+                      {cert.company_address??''}
+                    </div>
+                  </td>
+                  <td style={{borderLeft:BK,paddingLeft:'4px',width:'18%',verticalAlign:'top'}}>
+                    <div style={{...f7,marginBottom:'2px'}}>8A ZIP Code</div>
+                    <ZIP/>
+                  </td>
+                </tr></tbody>
+              </table>
+            </FRow>
           </tbody>
         </table>
 
-        {/* ═══ PART III: TABLE ═══ */}
+        {/* ═══ PART III ═══ */}
         <table style={{width:'100%',borderCollapse:'collapse'}}>
           <thead>
-            <tr><td colSpan={7} style={h()}>Part III &#8211; Details of Monthly Income Payments and Taxes Withheld</td></tr>
+            <tr><td colSpan={7} style={hc()}>Part III &#8211; Details of Monthly Income Payments and Taxes Withheld</td></tr>
             <tr>
-              <th style={h({width:'32%',verticalAlign:'middle'})} rowSpan={2}>
+              <th style={hc({width:'30%',verticalAlign:'middle'})} rowSpan={2}>
                 Income Payments Subject to Expanded<br/>Withholding Tax
               </th>
-              <th style={h({width:'6%',verticalAlign:'middle'})} rowSpan={2}>ATC</th>
-              <th style={h()} colSpan={3}>AMOUNT OF INCOME PAYMENTS</th>
-              <th style={h({width:'11%',verticalAlign:'middle'})} rowSpan={2}>Total</th>
-              <th style={h({width:'12%',verticalAlign:'middle'})} rowSpan={2}>Tax Withheld for the<br/>Quarter</th>
+              <th style={hc({width:'7%',verticalAlign:'middle'})} rowSpan={2}>ATC</th>
+              <th style={hc()} colSpan={3}>AMOUNT OF INCOME PAYMENTS</th>
+              <th style={hc({width:'11%',verticalAlign:'middle'})} rowSpan={2}>Total</th>
+              <th style={hc({width:'12%',verticalAlign:'middle'})} rowSpan={2}>Tax Withheld for the<br/>Quarter</th>
             </tr>
             <tr>
               {[0,1,2].map(i=>(
-                <th key={i} style={h({width:'13%'})}>
+                <th key={i} style={hc({width:'13%'})}>
                   {['1st','2nd','3rd'][i]} Month of the<br/>Quarter<br/>
-                  <span style={{...F7,fontWeight:400}}>({months[i]})</span>
+                  <span style={{...f7,fontWeight:400}}>({months[i]})</span>
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {/* ── Section A: EWT data row ── */}
+            {/* Data row */}
             <tr>
-              <td style={c()}>
-                {cert.atc_description??'Income payment subject to expanded withholding tax'}
-                <div style={{...F7,color:'#555',marginTop:'1px'}}>
-                  {cert.internal_no} / {cert.bill_no} ({formatDate(cert.bill_date)})
-                </div>
+              <td style={dc()}>
+                <div style={{...f8}}>{cert.atc_description??'Income payment subject to EWT'}</div>
+                <div style={{...f7,color:'#555',marginTop:'1px'}}>{cert.internal_no} / {cert.bill_no} &#8212; {formatDate(cert.bill_date)}</div>
               </td>
-              <td style={c({textAlign:'center',...BOLD})}>{cert.bir_atc_code}</td>
-              {amounts.map((a,i)=>(
-                <td key={i} style={c({textAlign:'right',...MONO})}>{a>0?fmt(a):''}</td>
-              ))}
-              <td style={c({textAlign:'right',...MONO,...BOLD})}>{fmt(cert.taxable_amount)}</td>
-              <td style={c({textAlign:'right',...MONO,...BOLD})}>{fmt(cert.amount_withheld)}</td>
+              <td style={dc({textAlign:'center',...bold})}>{cert.bir_atc_code}</td>
+              {am.map((a,i)=><td key={i} style={dc({textAlign:'right',...mono})}>{a>0?fmt(a):''}</td>)}
+              <td style={dc({textAlign:'right',...mono,...bold})}>{fmt(cert.taxable_amount)}</td>
+              <td style={dc({textAlign:'right',...mono,...bold})}>{fmt(cert.amount_withheld)}</td>
             </tr>
             {/* 9 blank rows */}
-            {Array.from({length:9},(_,i)=><BlankRow key={i}/>)}
+            {Array.from({length:9},(_,i)=><BR key={i}/>)}
             {/* Total A */}
-            <tr style={HDR_BG}>
-              <td colSpan={2} style={c({...BOLD})}>Total</td>
-              {amounts.map((a,i)=><td key={i} style={c({textAlign:'right',...MONO,...BOLD})}>{a>0?fmt(a):''}</td>)}
-              <td style={c({textAlign:'right',...MONO,...BOLD})}>{fmt(cert.taxable_amount)}</td>
-              <td style={c({textAlign:'right',...MONO,...BOLD})}>{fmt(cert.amount_withheld)}</td>
+            <tr style={GR}>
+              <td colSpan={2} style={dc({...bold})}>Total</td>
+              {am.map((a,i)=><td key={i} style={dc({textAlign:'right',...mono,...bold})}>{a>0?fmt(a):''}</td>)}
+              <td style={dc({textAlign:'right',...mono,...bold})}>{fmt(cert.taxable_amount)}</td>
+              <td style={dc({textAlign:'right',...mono,...bold})}>{fmt(cert.amount_withheld)}</td>
             </tr>
-            {/* Section B header */}
+            {/* Section B */}
             <tr>
-              <td colSpan={7} style={c({...BOLD,...HDR_BG})}>
+              <td colSpan={7} style={dc({...bold,...GR})}>
                 Money Payments Subject to Withholding of<br/>Business Tax (Government &amp; Private)
               </td>
             </tr>
-            {/* 8 blank rows */}
-            {Array.from({length:8},(_,i)=><BlankRow key={100+i}/>)}
-            {/* Total B */}
-            <tr style={HDR_BG}>
-              <td colSpan={2} style={c({...BOLD})}>Total</td>
-              <td style={c()}></td><td style={c()}></td>
-              <td style={c()}></td><td style={c()}></td>
-              <td style={c()}></td>
+            {Array.from({length:8},(_,i)=><BR key={100+i}/>)}
+            <tr style={GR}>
+              <td colSpan={2} style={dc({...bold})}>Total</td>
+              {[0,1,2,3,4].map(i=><td key={i} style={dc()}/>)}
             </tr>
           </tbody>
         </table>
 
         {/* ═══ DECLARATION ═══ */}
         <table style={{width:'100%',borderCollapse:'collapse'}}>
-          <tbody>
-            <tr>
-              <td style={{border:BLK,padding:'4px 6px',...F7,lineHeight:'1.5',textAlign:'justify'}}>
-                &nbsp;&nbsp;&nbsp;&nbsp;We declare under the penalties of perjury that this certificate has been made in good faith, verified by us, and to the best of our knowledge and belief, is true and
-                correct, pursuant to the provisions of the National Internal Revenue Code, as amended, and the regulations issued under authority thereof. Further, we give our consent to
-                the processing of our information as contemplated under the *Data Privacy Act of 2012 (R.A. No. 10173) for legitimate and lawful purposes.
-              </td>
-            </tr>
-          </tbody>
+          <tbody><tr>
+            <td style={{border:BK,...cp,...f7,lineHeight:'1.55',textAlign:'justify'}}>
+              &nbsp;&nbsp;&nbsp;&nbsp;We declare under the penalties of perjury that this certificate has been made in good faith, verified by us, and to the best of our knowledge and belief, is true and correct, pursuant to the provisions of the National Internal Revenue Code, as amended, and the regulations issued under authority thereof. Further, we give our consent to the processing of our information as contemplated under the *Data Privacy Act of 2012 (R.A. No. 10173) for legitimate and lawful purposes.
+            </td>
+          </tr></tbody>
         </table>
 
-        {/* ═══ SIGNATURE BLOCK 1: PAYOR ═══ */}
+        {/* ═══ SIGNATURE: PAYOR ═══ */}
         <table style={{width:'100%',borderCollapse:'collapse'}}>
-          <tbody>
-            <SigBlock label="Signature over Printed Name of Payor/Payor's Authorized Representative/Tax Agent"/>
-          </tbody>
+          <tbody><SIG label="Signature over Printed Name of Payor/Payor's Authorized Representative/Tax Agent"/></tbody>
         </table>
 
         {/* ═══ CONFORME ═══ */}
         <table style={{width:'100%',borderCollapse:'collapse'}}>
-          <tbody>
-            <tr>
-              <td style={{border:BLK,borderTop:'none',padding:'3px 4px',textAlign:'center',...F9,...BOLD,...HDR_BG}}>
-                CONFORME:
-              </td>
-            </tr>
-          </tbody>
+          <tbody><tr>
+            <td style={{border:BK,borderTop:'none',...cp,textAlign:'center',...f9,...bold,...GR}}>
+              CONFORME:
+            </td>
+          </tr></tbody>
         </table>
 
-        {/* ═══ SIGNATURE BLOCK 2: PAYEE ═══ */}
+        {/* ═══ SIGNATURE: PAYEE ═══ */}
         <table style={{width:'100%',borderCollapse:'collapse'}}>
-          <tbody>
-            <SigBlock label="Signature over Printed Name of Payee/Payee's Authorized Representative/Tax Agent"/>
-          </tbody>
+          <tbody><SIG label="Signature over Printed Name of Payee/Payee's Authorized Representative/Tax Agent"/></tbody>
         </table>
 
         {/* ═══ FOOTNOTE ═══ */}
-        <div style={{...F7,marginTop:'3px'}}>
+        <div style={{...f7,marginTop:'2px'}}>
           *NOTE: The BIR Data Privacy is in the BIR website (www.bir.gov.ph)
         </div>
 
         {/* Internal ref — screen only */}
-        <div className="print:hidden" style={{
-          marginTop:'10px',borderTop:'1px solid #ddd',paddingTop:'6px',
-          fontSize:'11px',color:'#555',
-        }}>
-          <strong style={{color:'#333'}}>Certificate No.:</strong> {cert.cert_no}&nbsp;&nbsp;
-          <strong style={{color:'#333'}}>Bill:</strong> {cert.internal_no}&nbsp;&nbsp;
-          <strong style={{color:'#333'}}>Q{q} {y}</strong>&nbsp;&nbsp;
+        <div className="print:hidden" style={{marginTop:'10px',borderTop:'1px solid #ddd',paddingTop:'6px',fontSize:'11px',color:'#555'}}>
+          <strong style={{color:'#333'}}>Certificate No.:</strong> {cert.cert_no} &nbsp;·&nbsp;
+          <strong style={{color:'#333'}}>Bill:</strong> {cert.internal_no} &nbsp;·&nbsp;
+          <strong style={{color:'#333'}}>Q{q} {y}</strong> &nbsp;·&nbsp;
           <strong style={{color:'#333'}}>Status:</strong> {cert.status}
-          {cert.issued_at&&<span> &nbsp;·&nbsp;<strong style={{color:'#333'}}>Issued:</strong> {formatDate(cert.issued_at)}</span>}
+          {cert.issued_at&&<span> &nbsp;·&nbsp; <strong style={{color:'#333'}}>Issued:</strong> {formatDate(cert.issued_at)}</span>}
         </div>
       </div>
 
