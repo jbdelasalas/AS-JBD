@@ -29,16 +29,6 @@ export default function ARPage() {
       <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">Accounts Receivable</h1>
       <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">Customers, invoices, collections and aging.</p>
 
-      {/* KPI Cards */}
-      {summary && (
-        <div className="mb-6 grid grid-cols-4 gap-3">
-          <KPI label="Open AR" value={formatPHP(summary.total_open_ar)} sub={`${summary.invoice_count_open} invoices`} />
-          <KPI label="Overdue" value={formatPHP(summary.total_overdue)} sub="Past due date" danger />
-          <KPI label="Collected MTD" value={formatPHP(summary.total_collected_mtd)} sub="This month" good />
-          <KPI label="Active Customers" value={String(summary.customer_count_active)} sub="With open AR" />
-        </div>
-      )}
-
       <div className="grid grid-cols-2 gap-4">
         {MODULES.map((m) => (
           <Link key={m.href} href={m.href}
@@ -49,6 +39,15 @@ export default function ARPage() {
           </Link>
         ))}
       </div>
+
+      {summary && (
+        <div className="mt-6 grid grid-cols-4 gap-3">
+          <KPI label="Open AR" value={formatPHP(summary.total_open_ar)} sub={`${summary.invoice_count_open} invoices`} />
+          <KPI label="Overdue" value={formatPHP(summary.total_overdue)} sub="Past due date" danger />
+          <KPI label="Collected MTD" value={formatPHP(summary.total_collected_mtd)} sub="This month" good />
+          <KPI label="Active Customers" value={String(summary.customer_count_active)} sub="With open AR" />
+        </div>
+      )}
     </div>
   );
 }

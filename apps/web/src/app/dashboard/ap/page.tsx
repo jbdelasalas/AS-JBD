@@ -52,15 +52,6 @@ export default function ApHomePage() {
       <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">Accounts Payable</h1>
       <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">Suppliers, vendor bills, payment vouchers and EWT certificates.</p>
 
-      {summary && (
-        <div className="mb-6 grid grid-cols-4 gap-3">
-          <KPI label="Open AP" value={formatPHP(summary.total_open_ap)} sub={`${summary.bill_count_open} bills`} />
-          <KPI label="Overdue" value={formatPHP(summary.total_overdue)} sub="Past due date" danger={summary.total_overdue > 0} />
-          <KPI label="Draft Payments" value={String(summary.draft_payments)} sub="Pending posting" warn={summary.draft_payments > 0} />
-          <KPI label="Suppliers" value="—" sub="Active vendors" />
-        </div>
-      )}
-
       <div className="grid grid-cols-2 gap-4">
         {MODULES.map((m) => (
           <Link key={m.href} href={m.href}
@@ -70,6 +61,15 @@ export default function ApHomePage() {
           </Link>
         ))}
       </div>
+
+      {summary && (
+        <div className="mt-6 grid grid-cols-4 gap-3">
+          <KPI label="Open AP" value={formatPHP(summary.total_open_ap)} sub={`${summary.bill_count_open} bills`} />
+          <KPI label="Overdue" value={formatPHP(summary.total_overdue)} sub="Past due date" danger={summary.total_overdue > 0} />
+          <KPI label="Draft Payments" value={String(summary.draft_payments)} sub="Pending posting" warn={summary.draft_payments > 0} />
+          <KPI label="Suppliers" value="—" sub="Active vendors" />
+        </div>
+      )}
     </div>
   );
 }

@@ -46,14 +46,6 @@ export default function PurchasingHomePage() {
       <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">Purchasing</h1>
       <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">Suppliers, purchase orders, and goods receipts.</p>
 
-      {summary && (
-        <div className="mb-6 grid grid-cols-3 gap-3">
-          <KPI label="Open POs" value={String(summary.open_po_count)} sub="Draft · Approved · Partial" />
-          <KPI label="Pending Approval" value={String(summary.pending_approval_count)} sub="Awaiting sign-off" warn={summary.pending_approval_count > 0} />
-          <KPI label="Open PO Value" value={formatPHP(summary.total_open_po_value)} sub="Total committed" />
-        </div>
-      )}
-
       <div className="grid grid-cols-2 gap-4">
         {MODULES.map((m) => (
           <Link key={m.href} href={m.href}
@@ -63,6 +55,14 @@ export default function PurchasingHomePage() {
           </Link>
         ))}
       </div>
+
+      {summary && (
+        <div className="mt-6 grid grid-cols-3 gap-3">
+          <KPI label="Open POs" value={String(summary.open_po_count)} sub="Draft · Approved · Partial" />
+          <KPI label="Pending Approval" value={String(summary.pending_approval_count)} sub="Awaiting sign-off" warn={summary.pending_approval_count > 0} />
+          <KPI label="Open PO Value" value={formatPHP(summary.total_open_po_value)} sub="Total committed" />
+        </div>
+      )}
     </div>
   );
 }
