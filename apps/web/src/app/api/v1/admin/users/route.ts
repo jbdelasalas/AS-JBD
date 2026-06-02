@@ -55,10 +55,10 @@ export async function POST(req: NextRequest) {
     const password_hash = await bcrypt.hash(password, 12);
 
     const [user] = await query<{ id: string; email: string }>(
-      `INSERT INTO users (email, full_name, password_hash, is_active, created_by)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO users (email, full_name, password_hash, is_active)
+       VALUES ($1, $2, $3, $4)
        RETURNING id, email`,
-      [email, full_name, password_hash, is_active, auth.userId]
+      [email, full_name, password_hash, is_active]
     );
 
     return ok(user, 201);
