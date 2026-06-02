@@ -123,18 +123,35 @@ export async function POST(request: NextRequest) {
     const seq = seqRows.rows[0].c + 1;
     const internalNo = `BL-${new Date().getFullYear()}-${String(seq).padStart(6, '0')}`;
 
-    const supplierEwtRate = ewtCodeRate ?? Number(supplier.ewt_rate ?? 0);
-    const mappedLines = (lines as Array<Record<string, unknown>>).map((l, idx) => {
+    // Per-line ewt_code_id may differ; resolve rate from line code if provided
+    const lineEwtRateCache = new Map<string, number>();
+    if (ewtCodeId && ewtCodeRate !== null) lineEwtRateCache.set(ewtCodeId, ewtCodeRate);
+
+    const mappedLines = await Promise.all((lines as Array<Record<string, unknown>>).map(async (l, idx) => {
       const qty = Number(l.quantity);
       const price = Number(l.unit_price);
       const vatRate = Number(l.vat_rate ?? 12);
-      const ewtRate = Number(l.ewt_rate ?? supplierEwtRate);
+
+      // Resolve per-line EWT rate: per-line code > explicit rate > bill default code > 0
+      const lineCodeId = (l.ewt_code_id as string | null) || null;
+      let resolvedEwtRate = Number(l.ewt_rate ?? 0);
+      if (lineCodeId) {
+        if (!lineEwtRateCache.has(lineCodeId)) {
+          const tcRow = await query(
+            `SELECT rate_pct FROM tax_codes WHERE id = $1 AND company_id = $2 AND is_active = true`,
+            [lineCodeId, companyId],
+          );
+          if (tcRow[0]) lineEwtRateCache.set(lineCodeId, Number((tcRow[0] as Record<string, unknown>).rate_pct));
+        }
+        resolvedEwtRate = lineEwtRateCache.get(lineCodeId) ?? resolvedEwtRate;
+      }
+      const ewtRate = resolvedEwtRate;
       const lineSubtotal = parseFloat((qty * price).toFixed(2));
       const lineVat = parseFloat((lineSubtotal * (vatRate / 100)).toFixed(2));
       const lineTotal = parseFloat((lineSubtotal + lineVat).toFixed(2));
       const ewtAmount = parseFloat((lineSubtotal * (ewtRate / 100)).toFixed(2));
-      return { ...l, line_no: idx + 1, qty, price, vatRate, ewtRate, lineSubtotal, lineVat, lineTotal, ewtAmount } as Record<string, unknown> & { line_no: number; qty: number; price: number; vatRate: number; ewtRate: number; lineSubtotal: number; lineVat: number; lineTotal: number; ewtAmount: number; item_id?: unknown; description: unknown; expense_account_id?: unknown };
-    });
+      return { ...l, line_no: idx + 1, qty, price, vatRate, ewtRate, lineSubtotal, lineVat, lineTotal, ewtAmount, resolvedEwtCodeId: lineCodeId ?? ewtCodeId ?? null } as Record<string, unknown> & { line_no: number; qty: number; price: number; vatRate: number; ewtRate: number; lineSubtotal: number; lineVat: number; lineTotal: number; ewtAmount: number; resolvedEwtCodeId: string | null; item_id?: unknown; description: unknown; expense_account_id?: unknown };
+    }));
 
     const totSubtotal = mappedLines.reduce((s, l) => s + l.lineSubtotal, 0);
     const totVat = mappedLines.reduce((s, l) => s + l.lineVat, 0);
@@ -181,7 +198,7 @@ export async function POST(request: NextRequest) {
           l.qty, l.price, l.vatRate, l.ewtRate,
           l.lineSubtotal.toFixed(2), l.lineVat.toFixed(2), l.lineTotal.toFixed(2), l.ewtAmount.toFixed(2),
           l.expense_account_id ?? null, (l as Record<string,unknown>).grow_reference_id ?? null,
-          ewtCodeId,
+          l.resolvedEwtCodeId,
         ],
       );
     }
