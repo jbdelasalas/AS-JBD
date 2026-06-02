@@ -2572,5 +2572,31 @@ export async function POST(request: NextRequest) {
     results.push('033 employees table: ok');
   } catch (e) { results.push(`033 employees FAILED: ${(e as Error).message}`); }
 
+  // 034 — EWT code linkage on bills + suppliers.bir_atc_code
+  try {
+    await query(`ALTER TABLE bills       ADD COLUMN IF NOT EXISTS ewt_code_id  uuid REFERENCES tax_codes(id)`);
+    results.push('034 bills.ewt_code_id: ok');
+  } catch (e) { results.push(`034 bills.ewt_code_id FAILED: ${(e as Error).message}`); }
+
+  try {
+    await query(`ALTER TABLE bill_lines  ADD COLUMN IF NOT EXISTS ewt_rate    numeric(5,2)  DEFAULT 0`);
+    results.push('034 bill_lines.ewt_rate: ok');
+  } catch (e) { results.push(`034 bill_lines.ewt_rate FAILED: ${(e as Error).message}`); }
+
+  try {
+    await query(`ALTER TABLE bill_lines  ADD COLUMN IF NOT EXISTS ewt_amount  numeric(18,2) DEFAULT 0`);
+    results.push('034 bill_lines.ewt_amount: ok');
+  } catch (e) { results.push(`034 bill_lines.ewt_amount FAILED: ${(e as Error).message}`); }
+
+  try {
+    await query(`ALTER TABLE bill_lines  ADD COLUMN IF NOT EXISTS ewt_code_id uuid REFERENCES tax_codes(id)`);
+    results.push('034 bill_lines.ewt_code_id: ok');
+  } catch (e) { results.push(`034 bill_lines.ewt_code_id FAILED: ${(e as Error).message}`); }
+
+  try {
+    await query(`ALTER TABLE suppliers   ADD COLUMN IF NOT EXISTS bir_atc_code varchar(10)`);
+    results.push('034 suppliers.bir_atc_code: ok');
+  } catch (e) { results.push(`034 suppliers.bir_atc_code FAILED: ${(e as Error).message}`); }
+
   return ok({ results });
 }
