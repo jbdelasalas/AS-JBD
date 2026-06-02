@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { api } from '@/lib/api';
 import { Pagination } from '@/components/Pagination';
 import type { WhtCertificate } from '@perpet/shared';
@@ -121,9 +120,14 @@ export default function BirCertificatesPage() {
             {paged.map((c) => (
               <tr key={c.id} className="border-t border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer">
                 <td className="px-3 py-2 font-mono text-xs">
-                  <Link href={`/dashboard/bir/certificates/${c.id}`} className="text-brand-700 hover:underline dark:text-brand-400">
+                  <button
+                    onClick={() => {
+                      const token = localStorage.getItem('access_token') ?? '';
+                      window.open(`/api/v1/bir/certificates/${c.id}/pdf?token=${token}`, '_blank');
+                    }}
+                    className="text-brand-700 hover:underline dark:text-brand-400">
                     {c.cert_no}
-                  </Link>
+                  </button>
                 </td>
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{c.supplier_name ?? c.supplier_id}</td>
                 <td className="px-3 py-2 font-mono text-xs text-blue-700 dark:text-blue-300">{c.bir_atc_code}</td>
