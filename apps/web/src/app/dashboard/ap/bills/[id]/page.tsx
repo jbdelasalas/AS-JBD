@@ -322,10 +322,14 @@ export default function BillDetailPage() {
               </div>
             </div>
             <div className="flex items-end">
-              <Link href={`/dashboard/bir/certificates/${cert.id}`}
+              <button
+                onClick={() => {
+                  const token = localStorage.getItem('access_token') ?? '';
+                  window.open(`/api/v1/bir/certificates/${cert.id}/pdf?token=${token}`, '_blank');
+                }}
                 className="text-sm font-medium text-amber-800 hover:underline dark:text-amber-300">
-                View Certificate →
-              </Link>
+                Download Certificate →
+              </button>
             </div>
           </div>
         </div>
