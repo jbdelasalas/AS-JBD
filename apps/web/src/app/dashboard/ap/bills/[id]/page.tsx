@@ -98,41 +98,55 @@ export default function BillDetailPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [cert, setCert] = useState<WhtCert | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [companyId, setCompanyId] = useState('');
   const [busy, setBusy] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [showJEPreview, setShowJEPreview] = useState(false);
 
-  const companyId = typeof window !== 'undefined' ? localStorage.getItem('company_id') ?? '' : '';
+  // Initialise companyId once on mount from localStorage — keeps `load` stable
+  useEffect(() => {
+    setCompanyId(localStorage.getItem('company_id') ?? '');
+  }, []);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
+    if (!id) return;
     setLoading(true);
-    Promise.all([
-      api.get<Bill>(`/ap/bills/${id}`),
-      api.get<{ data: Payment[] }>(`/ap/payments?company_id=${companyId}&bill_id=${id}`).catch(() => ({ data: [] as Payment[] })),
-      api.get<WhtCert[]>(`/bir/certificates?company_id=${companyId}&bill_id=${id}`).catch(() => [] as WhtCert[]),
-    ]).then(([b, pay, certs]) => {
+    setLoadError(null);
+    try {
+      const b = await api.get<Bill>(`/ap/bills/${id}`);
       setBill(b);
+      // Secondary data — silent failures are fine
+      const [pay, certs] = await Promise.all([
+        api.get<{ data: Payment[] }>(`/ap/payments?company_id=${companyId}&bill_id=${id}`).catch(() => ({ data: [] as Payment[] })),
+        api.get<WhtCert[]>(`/bir/certificates?company_id=${companyId}&bill_id=${id}`).catch(() => [] as WhtCert[]),
+      ]);
       setPayments(pay.data);
-      const arr = Array.isArray(certs) ? certs : [];
-      setCert(arr[0] ?? null);
-    }).catch(() => {}).finally(() => setLoading(false));
+      setCert((Array.isArray(certs) ? certs : [])[0] ?? null);
+    } catch (e: unknown) {
+      setLoadError((e as Error).message ?? 'Failed to load bill');
+    } finally {
+      setLoading(false);
+    }
   }, [id, companyId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   async function doAction(action: string) {
     setBusy(true);
     setActionMsg(null);
     try {
       await api.post(`/ap/bills/${id}/${action}`);
-      load();
+      void load();
     } catch (e: unknown) {
       setActionMsg((e as Error).message ?? 'Action failed');
     } finally { setBusy(false); }
   }
 
   if (loading) return <div className="py-10 text-center text-sm text-slate-500">Loading…</div>;
-  if (!bill) return <div className="py-10 text-center text-sm text-red-600">Bill not found</div>;
+  if (loadError || !bill) return (
+    <div className="py-10 text-center text-sm text-red-600">{loadError ?? 'Bill not found'}</div>
+  );
 
   const paidPct = bill.total > 0 ? Math.min((bill.amount_paid / bill.total) * 100, 100) : 0;
 
