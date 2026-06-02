@@ -12,6 +12,7 @@ interface Cycle {
   approx_heads: number; chick_price_per_head: number; approx_chick_price_per_head: number;
   culling_qty: number; remarks: string | null;
   item_id: string; item_name: string; sku: string; batch_no: string;
+  live_item_id: string | null; live_item_name: string | null; live_item_sku: string | null;
   branch_id: string | null; building_id: string | null; cost_center_id: string | null;
   building_name: string | null; building_code: string | null;
   branch_name: string | null; branch_code: string | null;
@@ -20,6 +21,8 @@ interface Cycle {
   weekly_weights: Array<{ week_no: number; weight_kg: number }>;
   item_consumption: Array<{ id: string; line_no: number; item_id: string; item_name: string; sku: string; quantity: number; uom: string; unit_cost: number; total_cost: number; remarks: string | null }>;
 }
+
+interface AllItem { id: string; sku: string; name: string; uom: string; }
 
 interface Building { id: string; code: string; name: string; branch_id: string | null; }
 interface Branch { id: string; code: string; name: string; }
@@ -52,6 +55,7 @@ export default function GrowCycleDetailPage() {
   const router = useRouter();
   const [doc, setDoc] = useState<Cycle | null>(null);
   const [items, setItems] = useState<Item[]>([]);
+  const [allItems, setAllItems] = useState<AllItem[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [growRefs, setGrowRefs] = useState<GrowRef[]>([]);
@@ -73,7 +77,7 @@ export default function GrowCycleDetailPage() {
   const [editingHeader, setEditingHeader] = useState(false);
   const [headerForm, setHeaderForm] = useState({
     branch_id: '', building_id: '', grow_reference: '', cost_center_id: '',
-    start_date: '', expected_end_date: '', remarks: '',
+    start_date: '', expected_end_date: '', live_item_id: '', remarks: '',
   });
 
   // Operations edit state
@@ -92,6 +96,7 @@ export default function GrowCycleDetailPage() {
         cost_center_id: d.cost_center_id ?? '',
         start_date: d.start_date ?? '',
         expected_end_date: d.expected_end_date ?? '',
+        live_item_id: d.live_item_id ?? '',
         remarks: d.remarks ?? '',
       });
       // Populate operations edit states
@@ -115,6 +120,7 @@ export default function GrowCycleDetailPage() {
     const cid = localStorage.getItem('company_id');
     if (!cid) return;
     api.get<Item[]>(`/poultry/grow-cycles/${id}/consumable-items`).then(r => setItems(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<AllItem[]>(`/inventory/items?company_id=${cid}&minimal=true`).then(r => setAllItems(Array.isArray(r) ? r : [])).catch(() => {});
     api.get<Branch[]>(`/admin/branches?company_id=${cid}`).then(r => setBranches(Array.isArray(r) ? r : [])).catch(() => {});
     api.get<Building[]>(`/poultry/buildings?company_id=${cid}`).then(r => setBuildings(Array.isArray(r) ? r : [])).catch(() => {});
     api.get<GrowRef[]>(`/poultry/grow-references?company_id=${cid}`).then(r => setGrowRefs(Array.isArray(r) ? r : [])).catch(() => {});
@@ -141,6 +147,11 @@ export default function GrowCycleDetailPage() {
     try {
       const cid = localStorage.getItem('company_id')!;
       const today = new Date().toISOString().split('T')[0];
+      if (!doc.live_item_id) {
+        setHarvestError('Harvest item (live chicken) is not set on this grow cycle. Click Edit Header to configure it.');
+        setHarvesting(false);
+        return;
+      }
       const ts = await api.post<{ id: string }>('/poultry/tally-sheets', {
         company_id:        cid,
         grow_cycle_id:     id,
@@ -153,7 +164,7 @@ export default function GrowCycleDetailPage() {
         cost_center_id:    doc.cost_center_id || null,
         remarks:           `Generated from growing ${doc.doc_no}`,
         lines: [{
-          item_id:   doc.item_id,
+          item_id:   doc.live_item_id,   // live chicken, not DOC
           heads,
           gross_kgs: 0,
           crate_kgs: 0,
@@ -185,6 +196,7 @@ export default function GrowCycleDetailPage() {
           cost_center_id:    headerForm.cost_center_id || null,
           start_date:        headerForm.start_date || null,
           expected_end_date: headerForm.expected_end_date || null,
+          live_item_id:      headerForm.live_item_id || null,
           remarks:           headerForm.remarks || null,
         } : {}),
         culling_qty: parseFloat(culling) || 0,
@@ -233,7 +245,7 @@ export default function GrowCycleDetailPage() {
                   Edit Header
                 </button>
               ) : (
-                <button onClick={() => { setEditingHeader(false); setHeaderForm({ branch_id: doc.branch_id ?? '', building_id: doc.building_id ?? '', grow_reference: doc.grow_reference ?? '', cost_center_id: doc.cost_center_id ?? '', start_date: doc.start_date ?? '', expected_end_date: doc.expected_end_date ?? '', remarks: doc.remarks ?? '' }); }}
+                <button onClick={() => { setEditingHeader(false); setHeaderForm({ branch_id: doc.branch_id ?? '', building_id: doc.building_id ?? '', grow_reference: doc.grow_reference ?? '', cost_center_id: doc.cost_center_id ?? '', start_date: doc.start_date ?? '', expected_end_date: doc.expected_end_date ?? '', live_item_id: doc.live_item_id ?? '', remarks: doc.remarks ?? '' }); }}
                   className="rounded border border-slate-300 px-4 py-1.5 text-sm text-slate-500 hover:bg-slate-50 dark:border-slate-600">
                   Cancel Edit
                 </button>
@@ -318,6 +330,14 @@ export default function GrowCycleDetailPage() {
                   className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
               </div>
               <div className="col-span-2">
+                <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Harvest Item (Live Chicken)</label>
+                <select value={headerForm.live_item_id} onChange={e => setHeaderForm(f => ({ ...f, live_item_id: e.target.value }))}
+                  className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                  <option value="">— select live chicken item —</option>
+                  {allItems.map(i => <option key={i.id} value={i.id}>{i.sku} — {i.name}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2">
                 <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Remarks</label>
                 <input type="text" value={headerForm.remarks} onChange={e => setHeaderForm(f => ({ ...f, remarks: e.target.value }))}
                   className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
@@ -331,6 +351,13 @@ export default function GrowCycleDetailPage() {
               <Field label="Cost Center" value={doc.cost_center_name ? `${doc.cost_center_code} — ${doc.cost_center_name}` : null} />
               <Field label="Start Date" value={formatDate(doc.start_date)} />
               <Field label="End Date" value={doc.expected_end_date ? formatDate(doc.expected_end_date) : null} />
+              <div className="col-span-2">
+                <Field label="Harvest Item (Live Chicken)"
+                  value={doc.live_item_name
+                    ? <span className="font-medium text-emerald-700 dark:text-emerald-400">{doc.live_item_sku} — {doc.live_item_name}</span>
+                    : <span className="text-amber-600 text-xs">Not set — click Edit Header to configure</span>}
+                />
+              </div>
               <div className="col-span-2"><Field label="Remarks" value={doc.remarks} /></div>
             </>
           )}

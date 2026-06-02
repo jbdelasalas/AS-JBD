@@ -86,6 +86,10 @@ export async function POST(request: NextRequest) {
 
     // ── grow_cycles ──────────────────────────────────────────────────────────
     ['grow_cycles.cost_center_id', `ALTER TABLE grow_cycles ADD COLUMN IF NOT EXISTS cost_center_id uuid REFERENCES cost_centers(id)`],
+    ['grow_cycles.live_item_id',   `ALTER TABLE grow_cycles ADD COLUMN IF NOT EXISTS live_item_id uuid REFERENCES items(id)`],
+
+    // ── poultry_inventory_balance avg_cost ───────────────────────────────────
+    ['poultry_inventory_balance.avg_cost', `ALTER TABLE poultry_inventory_balance ADD COLUMN IF NOT EXISTS avg_cost numeric(18,6) DEFAULT 0`],
   ];
 
   const results: string[] = [];

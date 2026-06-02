@@ -1,5 +1,5 @@
 'use client';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 
@@ -34,6 +34,7 @@ function NewTallySheetForm() {
 
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState<string | null>(null);
+  const prevGrowCycleId = useRef<string>('');
 
   const [form, setForm] = useState({
     grow_cycle_id:    params.get('grow_cycle_id') ?? '',
@@ -77,6 +78,19 @@ function NewTallySheetForm() {
     api.get<Building[]>(`/poultry/buildings?company_id=${cid}`).then(r => setBuildings(Array.isArray(r) ? r : [])).catch(() => {});
     api.get<DeliveryMethod[]>(`/admin/delivery-methods?company_id=${cid}`).then(r => setDeliveryMethods(Array.isArray(r) ? r : [])).catch(() => {});
   }, []);
+
+  // When grow cycle changes, auto-fill first line item with live_item_id
+  useEffect(() => {
+    if (!form.grow_cycle_id || form.grow_cycle_id === prevGrowCycleId.current) return;
+    prevGrowCycleId.current = form.grow_cycle_id;
+    api.get<{ live_item_id: string | null }>(`/poultry/grow-cycles/${form.grow_cycle_id}`)
+      .then(gc => {
+        if (gc.live_item_id) {
+          setLines(prev => prev.map((l, i) => i === 0 ? { ...l, item_id: gc.live_item_id! } : l));
+        }
+      })
+      .catch(() => {});
+  }, [form.grow_cycle_id]);
 
   function setF(field: string, value: string | number) {
     setForm(f => ({ ...f, [field]: value }));

@@ -11,10 +11,11 @@ interface Batch {
   grn_branch_id: string | null; grn_building_id: string | null; grn_grow_reference_id: string | null;
   po_branch_id: string | null;  po_building_id: string | null;  po_grow_reference_id: string | null;
 }
-interface Building { id: string; code: string; name: string; branch_id: string | null; }
-interface Branch { id: string; name: string; code: string; }
-interface GrowRef { id: string; code: string; name: string; }
-interface CostCenter { id: string; code: string; name: string; }
+interface Building    { id: string; code: string; name: string; branch_id: string | null; }
+interface Branch      { id: string; name: string; code: string; }
+interface GrowRef     { id: string; code: string; name: string; }
+interface CostCenter  { id: string; code: string; name: string; }
+interface AllItem     { id: string; sku: string; name: string; uom: string; }
 
 export default function NewGrowCyclePage() {
   const router = useRouter();
@@ -23,6 +24,7 @@ export default function NewGrowCyclePage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [growRefs, setGrowRefs] = useState<GrowRef[]>([]);
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+  const [allItems, setAllItems] = useState<AllItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,6 +36,7 @@ export default function NewGrowCyclePage() {
     start_date: now, expected_end_date: endDefault,
     heads: '', approx_heads: '', est_harvest_recovery: '70',
     chick_price_per_head: '', approx_chick_price_per_head: '',
+    live_item_id: '',
     remarks: '',
   });
 
@@ -44,6 +47,7 @@ export default function NewGrowCyclePage() {
     api.get<Branch[]>(`/admin/branches?company_id=${cid}`).then(r => setBranches(Array.isArray(r) ? r : [])).catch(() => {});
     api.get<GrowRef[]>(`/poultry/grow-references?company_id=${cid}`).then(r => setGrowRefs(Array.isArray(r) ? r : [])).catch(() => {});
     api.get<CostCenter[]>(`/admin/cost-centers?company_id=${cid}&limit=100`).then(r => setCostCenters(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<AllItem[]>(`/inventory/items?company_id=${cid}&minimal=true`).then(r => setAllItems(Array.isArray(r) ? r : [])).catch(() => {});
   }, []);
 
   // Filter buildings by selected location
@@ -113,6 +117,7 @@ export default function NewGrowCyclePage() {
         est_harvest_recovery: form.est_harvest_recovery ? parseFloat(form.est_harvest_recovery) : undefined,
         chick_price_per_head: form.chick_price_per_head ? parseFloat(form.chick_price_per_head) : undefined,
         approx_chick_price_per_head: form.approx_chick_price_per_head ? parseFloat(form.approx_chick_price_per_head) : undefined,
+        live_item_id: form.live_item_id || undefined,
         remarks: form.remarks || undefined,
       });
       router.push(`/dashboard/poultry/grow-cycles/${rec.id}`);
@@ -254,6 +259,17 @@ export default function NewGrowCyclePage() {
               <input type="number" min={0} step="0.000001" value={form.approx_chick_price_per_head}
                 onChange={e => setField('approx_chick_price_per_head', e.target.value)}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
+
+            {/* Row 6 — Harvest item */}
+            <div className="col-span-2">
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Harvest Item (Live Chicken) *</label>
+              <select required value={form.live_item_id} onChange={e => setField('live_item_id', e.target.value)}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                <option value="">— select live chicken item —</option>
+                {allItems.map(i => <option key={i.id} value={i.id}>{i.sku} — {i.name}</option>)}
+              </select>
+              <p className="mt-0.5 text-xs text-slate-400">The inventory item that represents grown live chickens from this cycle.</p>
             </div>
           </div>
         </div>

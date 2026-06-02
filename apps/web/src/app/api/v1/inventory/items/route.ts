@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   try {
     if (minimal) {
       const rows = await query(
-        `SELECT id, sku, name, selling_price FROM items i WHERE ${where} ORDER BY sku LIMIT $${params.length}`,
+        `SELECT id, sku, name, uom, selling_price FROM items i WHERE ${where} ORDER BY sku LIMIT $${params.length}`,
         params,
       );
       return ok(rows.map((r) => ({ ...r, selling_price: Number(r.selling_price) })));

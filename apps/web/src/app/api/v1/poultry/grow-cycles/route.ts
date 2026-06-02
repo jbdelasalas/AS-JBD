@@ -70,14 +70,15 @@ export async function POST(request: NextRequest) {
     const { rows: [hdr] } = await client.query(
       `INSERT INTO grow_cycles (company_id, doc_no, year, branch_id, building_id, cost_center_id, batch_id, heads_in, heads_available,
          start_date, expected_end_date, est_harvest_recovery, grow_reference, approx_heads,
-         chick_price_per_head, approx_chick_price_per_head, status, remarks, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10,$11,$12,$13,$14,$15,'active',$16,$17) RETURNING *`,
+         chick_price_per_head, approx_chick_price_per_head, live_item_id, status, remarks, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10,$11,$12,$13,$14,$15,$16,'active',$17,$18) RETURNING *`,
       [companyId, docNo, year,
        (dto.branch_id as string) || null, (dto.building_id as string) || null, (dto.cost_center_id as string) || null,
        dto.batch_id, heads,
        dto.start_date, dto.expected_end_date ?? null, dto.est_harvest_recovery ?? null,
        dto.grow_reference ?? null, dto.approx_heads ?? heads,
        dto.chick_price_per_head ?? 0, dto.approx_chick_price_per_head ?? 0,
+       (dto.live_item_id as string) || null,
        dto.remarks ?? null, auth.userId],
     );
     await client.query(`UPDATE chick_batches SET status='in_growing', heads_available=heads_available-$1 WHERE id=$2`, [heads, dto.batch_id]);

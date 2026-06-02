@@ -19,6 +19,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     await client.query('BEGIN');
 
     // Update grow cycle harvested heads if linked
+    let liveItemId: string | null = null;
+    let liveAvgCostPerKg = 0;
     if (rec.grow_cycle_id) {
       const harvestedHeads = Number(rec.net_heads ?? 0);
       await client.query(
@@ -27,6 +29,42 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
          WHERE id = $2`,
         [harvestedHeads, rec.grow_cycle_id],
       );
+
+      // Compute live chicken avg cost: (DOC cost + consumption) ÷ total harvested kgs
+      const [gc] = await client.query(
+        `SELECT g.chick_price_per_head, g.heads_in, g.live_item_id,
+                COALESCE(SUM(c.total_cost), 0) AS total_consumption_cost
+           FROM grow_cycles g
+           LEFT JOIN grow_item_consumption c ON c.grow_cycle_id = g.id
+          WHERE g.id = $1
+          GROUP BY g.id, g.chick_price_per_head, g.heads_in, g.live_item_id`,
+        [rec.grow_cycle_id],
+      ).then(r => r.rows);
+
+      if (gc?.live_item_id) {
+        liveItemId = gc.live_item_id as string;
+        const totalDocCost = Number(gc.chick_price_per_head) * Number(gc.heads_in);
+        const totalConsumptionCost = Number(gc.total_consumption_cost);
+        const totalGrowCost = totalDocCost + totalConsumptionCost;
+
+        // Sum kgs already posted from previous tally sheets for this grow cycle
+        const prevKgsResult = await client.query(
+          `SELECT COALESCE(SUM(tsl.net_kgs), 0) AS prev_kgs
+             FROM tally_sheet_lines tsl
+             JOIN tally_sheets ts ON ts.id = tsl.tally_sheet_id
+            WHERE ts.grow_cycle_id = $1 AND ts.status = 'posted' AND tsl.item_id = $2`,
+          [rec.grow_cycle_id, liveItemId],
+        );
+        const prevKgs = Number(prevKgsResult.rows[0]?.prev_kgs ?? 0);
+        const currentKgs = lines
+          .filter(l => l.item_id === liveItemId)
+          .reduce((s, l) => s + Number(l.net_kgs ?? 0), 0);
+        const totalHarvestedKgs = prevKgs + currentKgs;
+
+        if (totalHarvestedKgs > 0) {
+          liveAvgCostPerKg = totalGrowCost / totalHarvestedKgs;
+        }
+      }
     }
 
     // Write inventory for each line
@@ -49,11 +87,13 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
          SELECT $1,$2,$3,'in','tally_sheet',$4,doc_no,$5,$6,$7,$8,$9 FROM tally_sheets WHERE id=$4`,
         [rec.company_id, rec.warehouse_id, l.item_id, params.id, rec.transfer_date, heads, netKgs, newHeads, newKgs],
       );
+      // For the live chicken item, carry the computed avg cost
+      const avgCost = l.item_id === liveItemId ? liveAvgCostPerKg : Number(bal.avg_cost ?? 0);
       await client.query(
-        `INSERT INTO poultry_inventory_balance (company_id, warehouse_id, item_id, qty_heads, qty_kgs, last_updated)
-         VALUES ($1,$2,$3,$4,$5,now())
-         ON CONFLICT (company_id, warehouse_id, item_id) DO UPDATE SET qty_heads=$4, qty_kgs=$5, last_updated=now()`,
-        [rec.company_id, rec.warehouse_id, l.item_id, newHeads, newKgs],
+        `INSERT INTO poultry_inventory_balance (company_id, warehouse_id, item_id, qty_heads, qty_kgs, avg_cost, last_updated)
+         VALUES ($1,$2,$3,$4,$5,$6,now())
+         ON CONFLICT (company_id, warehouse_id, item_id) DO UPDATE SET qty_heads=$4, qty_kgs=$5, avg_cost=$6, last_updated=now()`,
+        [rec.company_id, rec.warehouse_id, l.item_id, newHeads, newKgs, avgCost],
       );
     }
 
