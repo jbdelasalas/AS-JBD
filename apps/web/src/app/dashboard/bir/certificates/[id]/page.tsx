@@ -39,38 +39,37 @@ const STATUS_STYLES: Record<string, string> = {
   filed:  'bg-emerald-100 text-emerald-700',
 };
 
-// Quarter start/end dates
-function quarterPeriod(year: number, quarter: number) {
-  const starts = ['01/01', '04/01', '07/01', '10/01'];
-  const ends   = ['03/31', '06/30', '09/30', '12/31'];
-  return {
-    from: `${starts[quarter - 1]}/${year}`,
-    to:   `${ends[quarter - 1]}/${year}`,
-  };
-}
-
-// Month labels per quarter position
-const QUARTER_MONTH_LABELS: Record<number, [string, string, string]> = {
-  1: ['January', 'February', 'March'],
-  2: ['April', 'May', 'June'],
-  3: ['July', 'August', 'September'],
-  4: ['October', 'November', 'December'],
+const QUARTER_STARTS = ['01/01', '04/01', '07/01', '10/01'];
+const QUARTER_ENDS   = ['03/31', '06/30', '09/30', '12/31'];
+const QUARTER_MONTHS: Record<number,[string,string,string]> = {
+  1: ['January','February','March'],
+  2: ['April','May','June'],
+  3: ['July','August','September'],
+  4: ['October','November','December'],
 };
 
-// Given bill date, return which month-of-quarter (1, 2, or 3) it belongs to
-function monthOfQuarter(billDate: string, quarter: number): 1 | 2 | 3 {
-  const month = new Date(billDate).getMonth() + 1; // 1-12
-  const firstMonth = (quarter - 1) * 3 + 1;
-  const pos = month - firstMonth + 1;
-  return (Math.min(Math.max(pos, 1), 3)) as 1 | 2 | 3;
+function qFrom(y: number, q: number) { return `${QUARTER_STARTS[q-1]}/${y}`; }
+function qTo(y: number, q: number)   { return `${QUARTER_ENDS[q-1]}/${y}`; }
+
+function monthPos(billDate: string, q: number): 0|1|2 {
+  const m = new Date(billDate).getMonth() + 1;
+  const first = (q - 1) * 3 + 1;
+  return Math.max(0, Math.min(2, m - first)) as 0|1|2;
 }
 
-function fmt(n: number) { return n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-function fmtTin(tin: string | null) { return tin ?? ''; }
+function fmt(n: number) {
+  return n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
-const border = 'border border-black';
-const td = `${border} px-1.5 py-1 text-[9px]`;
-const th = `${border} px-1.5 py-1 text-[8px] font-bold text-center`;
+/* ─── Shared cell styles ─── */
+const S = {
+  cell:   { border: '1px solid black', padding: '2px 4px', fontSize: '8px' },
+  hdr:    { border: '1px solid black', padding: '2px 4px', fontSize: '8px', fontWeight: 700, textAlign: 'center' as const, backgroundColor: '#e8e8e8' },
+  num:    { border: '1px solid black', padding: '2px 3px', fontSize: '8px', fontWeight: 700, width: '14px', verticalAlign: 'top' as const, textAlign: 'center' as const },
+  label:  { fontSize: '7px', color: '#555', display: 'block' as const },
+  value:  { fontSize: '9px', fontWeight: 700, display: 'block' as const, marginTop: '1px' },
+  normal: { fontSize: '9px', display: 'block' as const, marginTop: '1px' },
+};
 
 export default function CertificateDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -96,16 +95,28 @@ export default function CertificateDetailPage() {
   if (loading) return <div className="py-10 text-center text-sm text-slate-500">Loading…</div>;
   if (!cert) return <div className="py-10 text-center text-sm text-red-600">Certificate not found</div>;
 
-  const { from, to } = quarterPeriod(cert.period_year, cert.period_quarter);
-  const mPos = monthOfQuarter(cert.bill_date, cert.period_quarter);
-  const monthLabels = QUARTER_MONTH_LABELS[cert.period_quarter];
-  const m1 = mPos === 1 ? cert.taxable_amount : 0;
-  const m2 = mPos === 2 ? cert.taxable_amount : 0;
-  const m3 = mPos === 3 ? cert.taxable_amount : 0;
+  const q = cert.period_quarter;
+  const y = cert.period_year;
+  const months = QUARTER_MONTHS[q];
+  const pos = monthPos(cert.bill_date, q);
+  const amounts: [number, number, number] = [0, 0, 0];
+  amounts[pos] = cert.taxable_amount;
+
+  const blankRow = (key: number) => (
+    <tr key={key} style={{ height: '18px' }}>
+      <td style={S.cell}></td>
+      <td style={{ ...S.cell, textAlign: 'center' }}></td>
+      <td style={{ ...S.cell, textAlign: 'right' }}></td>
+      <td style={{ ...S.cell, textAlign: 'right' }}></td>
+      <td style={{ ...S.cell, textAlign: 'right' }}></td>
+      <td style={{ ...S.cell, textAlign: 'right' }}></td>
+      <td style={{ ...S.cell, textAlign: 'right' }}></td>
+    </tr>
+  );
 
   return (
     <div>
-      {/* Toolbar */}
+      {/* ── Toolbar (screen only) ── */}
       <div className="mb-4 flex items-center justify-between print:hidden">
         <div className="flex items-center gap-3">
           <Link href="/dashboard/bir/certificates" className="text-sm text-slate-500 hover:text-slate-700">← Certificates</Link>
@@ -121,275 +132,366 @@ export default function CertificateDetailPage() {
               className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700 disabled:opacity-50">Mark as Filed</button>
           )}
           <button onClick={() => window.print()}
-            className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
-            Print / Save PDF
-          </button>
+            className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">Print / Save PDF</button>
           <Link href={`/dashboard/ap/bills/${cert.bill_id}`}
-            className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
-            View Bill
-          </Link>
+            className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">View Bill</Link>
         </div>
       </div>
       {msg && <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 print:hidden">{msg}</div>}
 
-      {/* ───────────────── BIR FORM 2307 ───────────────── */}
-      <div id="form2307"
-        className="mx-auto bg-white text-black print:shadow-none"
-        style={{ width: '210mm', minHeight: '297mm', fontFamily: 'Arial, sans-serif', fontSize: '9px', padding: '8mm 8mm 8mm 8mm' }}>
+      {/* ════════════════════════════════════════════════
+          BIR FORM 2307  –  January 2018 (ENCS)
+          ════════════════════════════════════════════════ */}
+      <div id="form2307" style={{
+        width: '210mm', margin: '0 auto', backgroundColor: '#fff', color: '#000',
+        fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '8px',
+        padding: '6mm 6mm 6mm 6mm', boxSizing: 'border-box',
+      }}>
 
-        {/* TOP HEADER ROW */}
-        <div className="flex items-start justify-between mb-0.5">
-          <div className="text-[8px] leading-tight">
-            <div>For BIR</div>
-            <div>Use Only</div>
-            <div className="mt-0.5">BCS/</div>
-            <div>Item:</div>
-          </div>
-          <div className="flex-1 text-center">
-            <div className="text-[8px]">Republic of the Philippines</div>
-            <div className="text-[9px] font-bold">Department of Finance</div>
-            <div className="text-[9px] font-bold">Bureau of Internal Revenue</div>
-          </div>
-          <div className="text-right text-[8px] leading-tight">
-            <div className="text-[8px]">BIR Form No.</div>
-            <div className="text-[28px] font-bold leading-none">2307</div>
-            <div className="text-[7px]">January 2018 (ENCS)</div>
-          </div>
-        </div>
-
-        {/* TITLE */}
-        <div className="border-2 border-black text-center py-1 mb-0.5">
-          <div className="text-[14px] font-bold">Certificate of Creditable Tax</div>
-          <div className="text-[14px] font-bold">Withheld at Source</div>
-        </div>
-
-        <div className="text-[7px] mb-1">Fill in all applicable spaces. Mark all appropriate boxes with an "X".</div>
-
-        {/* FIELD 1 — For the Period */}
-        <table className="w-full border-collapse mb-0.5">
+        {/* ── TOP HEADER ── */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1px' }}>
           <tbody>
             <tr>
-              <td className={`${border} px-1 py-0.5 w-8 text-[8px] font-bold`}>1</td>
-              <td className={`${border} px-1 py-0.5 text-[8px]`}>
-                For the Period &nbsp;&nbsp;
-                <span className="font-bold">From</span>&nbsp;
-                <span className="inline-block border-b border-black px-2 text-[8px]">{from}</span>
-                &nbsp;&nbsp;<span className="font-bold">To</span>&nbsp;
-                <span className="inline-block border-b border-black px-2 text-[8px]">{to}</span>
-                &nbsp;<span className="text-[7px] text-gray-500">(MM/DD/YYYY)</span>
+              {/* For BIR Use Only box */}
+              <td style={{ border: '1px solid black', padding: '2px 4px', width: '60px', verticalAlign: 'top', fontSize: '7px', lineHeight: '1.3' }}>
+                <div>For BIR</div>
+                <div>Use Only</div>
+                <div style={{ marginTop: '4px' }}>BCS/</div>
+                <div>Item:</div>
+              </td>
+              {/* Center: Gov header */}
+              <td style={{ textAlign: 'center', verticalAlign: 'middle', padding: '2px' }}>
+                <div style={{ fontSize: '8px' }}>Republic of the Philippines</div>
+                <div style={{ fontSize: '9px', fontWeight: 700 }}>Department of Finance</div>
+                <div style={{ fontSize: '9px', fontWeight: 700 }}>Bureau of Internal Revenue</div>
+              </td>
+              {/* Right: BIR Form No. */}
+              <td style={{ border: '1px solid black', padding: '2px 6px', width: '120px', textAlign: 'right', verticalAlign: 'top' }}>
+                <div style={{ fontSize: '7px' }}>BIR Form No.</div>
+                <div style={{ fontSize: '36px', fontWeight: 900, lineHeight: '1', letterSpacing: '-1px' }}>2307</div>
+                <div style={{ fontSize: '7px' }}>January 2018 (ENCS)</div>
+                <div style={{ fontSize: '7px', marginTop: '2px' }}>2307 01/18ENCS</div>
               </td>
             </tr>
           </tbody>
         </table>
 
-        {/* PART I — PAYEE */}
-        <div className={`${border} text-center text-[8px] font-bold py-0.5 bg-gray-100`}>Part I – Payee Information</div>
-        <table className="w-full border-collapse">
+        {/* ── TITLE ── */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1px' }}>
           <tbody>
             <tr>
-              <td className={`${border} px-1 py-0.5 w-8 text-[8px] font-bold align-top`}>2</td>
-              <td className={`${border} px-1 py-1`}>
-                <div className="text-[7px] text-gray-500">Taxpayer Identification Number (TIN)</div>
-                <div className="text-[9px] font-mono mt-0.5 tracking-widest">{fmtTin(cert.supplier_tin)}</div>
-              </td>
-            </tr>
-            <tr>
-              <td className={`${border} px-1 py-0.5 w-8 text-[8px] font-bold align-top`}>3</td>
-              <td className={`${border} px-1 py-1`}>
-                <div className="text-[7px] text-gray-500">Payee's Name (Last Name, First Name, Middle Name for Individual OR Registered Name for Non-Individual)</div>
-                <div className="text-[9px] font-bold mt-0.5">{cert.supplier_name}</div>
-              </td>
-            </tr>
-            <tr>
-              <td className={`${border} px-1 py-0.5 w-8 text-[8px] font-bold align-top`}>4</td>
-              <td className={`${border} px-1 py-1`}>
-                <div className="text-[7px] text-gray-500">Registered Address</div>
-                <div className="text-[9px] mt-0.5">{cert.supplier_address ?? ''}</div>
+              <td style={{ border: '1px solid black', textAlign: 'center', padding: '4px', fontSize: '13px', fontWeight: 900 }}>
+                Certificate of Creditable Tax Withheld at Source
               </td>
             </tr>
           </tbody>
         </table>
 
-        {/* PART II — PAYOR */}
-        <div className={`${border} text-center text-[8px] font-bold py-0.5 bg-gray-100 mt-0.5`}>Part II – Payor Information</div>
-        <table className="w-full border-collapse">
-          <tbody>
-            <tr>
-              <td className={`${border} px-1 py-0.5 w-8 text-[8px] font-bold align-top`}>6</td>
-              <td className={`${border} px-1 py-1`}>
-                <div className="text-[7px] text-gray-500">Taxpayer Identification Number (TIN)</div>
-                <div className="text-[9px] font-mono mt-0.5 tracking-widest">{fmtTin(cert.company_tin)}</div>
-              </td>
-            </tr>
-            <tr>
-              <td className={`${border} px-1 py-0.5 w-8 text-[8px] font-bold align-top`}>7</td>
-              <td className={`${border} px-1 py-1`}>
-                <div className="text-[7px] text-gray-500">Payor's Name (Last Name, First Name, Middle Name for Individual OR Registered Name for Non-Individual)</div>
-                <div className="text-[9px] font-bold mt-0.5">{cert.company_name}</div>
-              </td>
-            </tr>
-            <tr>
-              <td className={`${border} px-1 py-0.5 w-8 text-[8px] font-bold align-top`}>8</td>
-              <td className={`${border} px-1 py-1`}>
-                <div className="text-[7px] text-gray-500">Registered Address</div>
-                <div className="text-[9px] mt-0.5">{cert.company_address ?? ''}</div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        {/* PART III — INCOME PAYMENTS TABLE */}
-        <div className={`${border} text-center text-[8px] font-bold py-0.5 bg-gray-100 mt-0.5`}>
-          Part III – Details of Monthly Income Payments and Taxes Withheld
+        {/* ── INSTRUCTION ── */}
+        <div style={{ fontSize: '7px', marginBottom: '2px' }}>
+          Fill in all applicable spaces. Mark all appropriate boxes with an &ldquo;X&rdquo;.
         </div>
-        <table className="w-full border-collapse">
+
+        {/* ── FIELD 1: For the Period ── */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '0' }}>
+          <tbody>
+            <tr>
+              <td style={S.num}>1</td>
+              <td style={{ ...S.cell, padding: '3px 6px' }}>
+                <span style={{ fontSize: '8px' }}>For the Period &nbsp;&nbsp;&nbsp;
+                  <strong>From</strong>&nbsp;
+                  <span style={{ display: 'inline-block', borderBottom: '1px solid black', minWidth: '80px', paddingBottom: '1px', fontSize: '8px' }}>{qFrom(y, q)}</span>
+                  &nbsp;&nbsp;&nbsp;<strong>To</strong>&nbsp;
+                  <span style={{ display: 'inline-block', borderBottom: '1px solid black', minWidth: '80px', paddingBottom: '1px', fontSize: '8px' }}>{qTo(y, q)}</span>
+                  &nbsp;&nbsp;<span style={{ fontSize: '7px', color: '#555' }}>(MM/DD/YYYY)</span>
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* ── PART I: PAYEE ── */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '0' }}>
+          <tbody>
+            <tr>
+              <td colSpan={2} style={S.hdr}>Part I – Payee Information</td>
+            </tr>
+            {/* Field 2: Payee TIN */}
+            <tr>
+              <td style={S.num}>2</td>
+              <td style={{ ...S.cell, padding: '3px 6px' }}>
+                <span style={S.label}>Taxpayer Identification Number <em>(TIN)</em></span>
+                <span style={{ ...S.normal, fontFamily: 'monospace', letterSpacing: '2px', fontSize: '10px' }}>
+                  {cert.supplier_tin
+                    ? cert.supplier_tin
+                    : <span style={{ color: '#aaa' }}>___  -  ___  -  ___  -  _____</span>}
+                </span>
+              </td>
+            </tr>
+            {/* Field 3: Payee Name */}
+            <tr>
+              <td style={S.num}>3</td>
+              <td style={{ ...S.cell, padding: '3px 6px' }}>
+                <span style={S.label}>Payee&apos;s Name <em>(Last Name, First Name, Middle Name for Individual OR Registered Name for Non-Individual)</em></span>
+                <span style={S.value}>{cert.supplier_name}</span>
+              </td>
+            </tr>
+            {/* Field 4: Payee Address + ZIP */}
+            <tr>
+              <td style={S.num}>4</td>
+              <td style={{ ...S.cell, padding: '0' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr>
+                      <td style={{ padding: '3px 6px', width: '85%' }}>
+                        <span style={S.label}>Registered Address</span>
+                        <span style={S.normal}>{cert.supplier_address ?? ''}</span>
+                      </td>
+                      <td style={{ borderLeft: '1px solid black', padding: '3px 4px', width: '15%' }}>
+                        <span style={S.label}>4A ZIP Code</span>
+                        <span style={S.normal}></span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+            {/* Field 5: Foreign Address */}
+            <tr>
+              <td style={S.num}>5</td>
+              <td style={{ ...S.cell, padding: '3px 6px' }}>
+                <span style={S.label}>Foreign Address, if applicable</span>
+                <span style={S.normal}>&nbsp;</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* ── PART II: PAYOR ── */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '0' }}>
+          <tbody>
+            <tr>
+              <td colSpan={2} style={S.hdr}>Part II – Payor Information</td>
+            </tr>
+            {/* Field 6: Payor TIN */}
+            <tr>
+              <td style={S.num}>6</td>
+              <td style={{ ...S.cell, padding: '3px 6px' }}>
+                <span style={S.label}>Taxpayer Identification Number <em>(TIN)</em></span>
+                <span style={{ ...S.normal, fontFamily: 'monospace', letterSpacing: '2px', fontSize: '10px' }}>
+                  {cert.company_tin
+                    ? cert.company_tin
+                    : <span style={{ color: '#aaa' }}>___  -  ___  -  ___  -  _____</span>}
+                </span>
+              </td>
+            </tr>
+            {/* Field 7: Payor Name */}
+            <tr>
+              <td style={S.num}>7</td>
+              <td style={{ ...S.cell, padding: '3px 6px' }}>
+                <span style={S.label}>Payor&apos;s Name <em>(Last Name, First Name, Middle Name for Individual OR Registered Name for Non-Individual)</em></span>
+                <span style={S.value}>{cert.company_name}</span>
+              </td>
+            </tr>
+            {/* Field 8: Payor Address + ZIP */}
+            <tr>
+              <td style={S.num}>8</td>
+              <td style={{ ...S.cell, padding: '0' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr>
+                      <td style={{ padding: '3px 6px', width: '85%' }}>
+                        <span style={S.label}>Registered Address</span>
+                        <span style={S.normal}>{cert.company_address ?? ''}</span>
+                      </td>
+                      <td style={{ borderLeft: '1px solid black', padding: '3px 4px', width: '15%' }}>
+                        <span style={S.label}>8A ZIP Code</span>
+                        <span style={S.normal}></span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* ── PART III: INCOME PAYMENTS TABLE ── */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '0' }}>
           <thead>
             <tr>
-              <th className={`${th} w-1/3`} rowSpan={2}>Income Payments Subject to Expanded Withholding Tax</th>
-              <th className={`${th} w-10`} rowSpan={2}>ATC</th>
-              <th className={`${th}`} colSpan={3}>AMOUNT OF INCOME PAYMENTS</th>
-              <th className={`${th} w-20`} rowSpan={2}>Total</th>
-              <th className={`${th} w-20`} rowSpan={2}>Tax Withheld for the Quarter</th>
+              <td colSpan={7} style={S.hdr}>Part III – Details of Monthly Income Payments and Taxes Withheld</td>
             </tr>
             <tr>
-              <th className={th}>1st Month of the Quarter<br/><span className="font-normal text-[7px]">({monthLabels[0]})</span></th>
-              <th className={th}>2nd Month of the Quarter<br/><span className="font-normal text-[7px]">({monthLabels[1]})</span></th>
-              <th className={th}>3rd Month of the Quarter<br/><span className="font-normal text-[7px]">({monthLabels[2]})</span></th>
+              <th style={{ ...S.hdr, width: '32%', verticalAlign: 'middle' }} rowSpan={2}>
+                Income Payments Subject to<br />Expanded Withholding Tax
+              </th>
+              <th style={{ ...S.hdr, width: '7%', verticalAlign: 'middle' }} rowSpan={2}>ATC</th>
+              <th style={{ ...S.hdr }} colSpan={3}>AMOUNT OF INCOME PAYMENTS</th>
+              <th style={{ ...S.hdr, width: '12%', verticalAlign: 'middle' }} rowSpan={2}>Total</th>
+              <th style={{ ...S.hdr, width: '12%', verticalAlign: 'middle' }} rowSpan={2}>Tax Withheld for the Quarter</th>
+            </tr>
+            <tr>
+              <th style={{ ...S.hdr, width: '12%' }}>
+                1st Month of the<br />Quarter<br />
+                <span style={{ fontWeight: 400, fontSize: '7px' }}>({months[0]})</span>
+              </th>
+              <th style={{ ...S.hdr, width: '12%' }}>
+                2nd Month of the<br />Quarter<br />
+                <span style={{ fontWeight: 400, fontSize: '7px' }}>({months[1]})</span>
+              </th>
+              <th style={{ ...S.hdr, width: '12%' }}>
+                3rd Month of the<br />Quarter<br />
+                <span style={{ fontWeight: 400, fontSize: '7px' }}>({months[2]})</span>
+              </th>
             </tr>
           </thead>
           <tbody>
-            {/* Main data row */}
-            <tr>
-              <td className={`${td} text-left`}>
-                {cert.atc_description ?? cert.bir_atc_code}
-                <div className="text-[7px] text-gray-500 mt-0.5">Ref: {cert.internal_no} / {cert.bill_no} ({formatDate(cert.bill_date)})</div>
+            {/* ── Section A: EWT ── */}
+            {/* Data row with actual values */}
+            <tr style={{ height: '18px' }}>
+              <td style={{ ...S.cell, fontSize: '8px' }}>
+                {cert.atc_description ?? 'Income payment subject to expanded withholding tax'}
+                <div style={{ fontSize: '7px', color: '#555' }}>({cert.internal_no} / {cert.bill_no} — {formatDate(cert.bill_date)})</div>
               </td>
-              <td className={`${td} text-center font-bold`}>{cert.bir_atc_code}</td>
-              <td className={`${td} text-right font-mono`}>{m1 > 0 ? fmt(m1) : ''}</td>
-              <td className={`${td} text-right font-mono`}>{m2 > 0 ? fmt(m2) : ''}</td>
-              <td className={`${td} text-right font-mono`}>{m3 > 0 ? fmt(m3) : ''}</td>
-              <td className={`${td} text-right font-mono font-bold`}>{fmt(cert.taxable_amount)}</td>
-              <td className={`${td} text-right font-mono font-bold`}>{fmt(cert.amount_withheld)}</td>
+              <td style={{ ...S.cell, textAlign: 'center', fontWeight: 700 }}>{cert.bir_atc_code}</td>
+              <td style={{ ...S.cell, textAlign: 'right', fontFamily: 'monospace' }}>{amounts[0] > 0 ? fmt(amounts[0]) : ''}</td>
+              <td style={{ ...S.cell, textAlign: 'right', fontFamily: 'monospace' }}>{amounts[1] > 0 ? fmt(amounts[1]) : ''}</td>
+              <td style={{ ...S.cell, textAlign: 'right', fontFamily: 'monospace' }}>{amounts[2] > 0 ? fmt(amounts[2]) : ''}</td>
+              <td style={{ ...S.cell, textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{fmt(cert.taxable_amount)}</td>
+              <td style={{ ...S.cell, textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{fmt(cert.amount_withheld)}</td>
             </tr>
-            {/* Empty filler rows to match the form layout */}
-            {[...Array(7)].map((_, i) => (
-              <tr key={i}>
-                <td className={`${td} h-4`}></td>
-                <td className={td}></td>
-                <td className={td}></td>
-                <td className={td}></td>
-                <td className={td}></td>
-                <td className={td}></td>
-                <td className={td}></td>
-              </tr>
-            ))}
+            {/* Empty rows (9 blank rows to match form) */}
+            {[...Array(9)].map((_, i) => blankRow(i))}
             {/* Total row */}
-            <tr className="bg-gray-50">
-              <td className={`${td} font-bold`} colSpan={2}>Total</td>
-              <td className={`${td} text-right font-mono font-bold`}>{m1 > 0 ? fmt(m1) : ''}</td>
-              <td className={`${td} text-right font-mono font-bold`}>{m2 > 0 ? fmt(m2) : ''}</td>
-              <td className={`${td} text-right font-mono font-bold`}>{m3 > 0 ? fmt(m3) : ''}</td>
-              <td className={`${td} text-right font-mono font-bold`}>{fmt(cert.taxable_amount)}</td>
-              <td className={`${td} text-right font-mono font-bold`}>{fmt(cert.amount_withheld)}</td>
+            <tr style={{ backgroundColor: '#f0f0f0' }}>
+              <td colSpan={2} style={{ ...S.cell, fontWeight: 700 }}>Total</td>
+              <td style={{ ...S.cell, textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{amounts[0] > 0 ? fmt(amounts[0]) : ''}</td>
+              <td style={{ ...S.cell, textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{amounts[1] > 0 ? fmt(amounts[1]) : ''}</td>
+              <td style={{ ...S.cell, textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{amounts[2] > 0 ? fmt(amounts[2]) : ''}</td>
+              <td style={{ ...S.cell, textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{fmt(cert.taxable_amount)}</td>
+              <td style={{ ...S.cell, textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{fmt(cert.amount_withheld)}</td>
             </tr>
-            {/* Money Payments section */}
-            <tr className="bg-gray-100">
-              <td className={`${td} font-bold text-[8px]`} colSpan={7}>Money Payments Subject to Withholding of Business Tax (Government &amp; Private)</td>
+            {/* ── Section B: Money Payments / Business Tax ── */}
+            <tr>
+              <td colSpan={7} style={{ ...S.cell, fontWeight: 700, fontSize: '8px', backgroundColor: '#e8e8e8' }}>
+                Money Payments Subject to Withholding of Business Tax (Government &amp; Private)
+              </td>
             </tr>
-            {[...Array(5)].map((_, i) => (
-              <tr key={i}>
-                <td className={`${td} h-4`}></td>
-                <td className={td}></td>
-                <td className={td}></td>
-                <td className={td}></td>
-                <td className={td}></td>
-                <td className={td}></td>
-                <td className={td}></td>
-              </tr>
-            ))}
-            <tr className="bg-gray-50">
-              <td className={`${td} font-bold`} colSpan={2}>Total</td>
-              <td className={td}></td>
-              <td className={td}></td>
-              <td className={td}></td>
-              <td className={td}></td>
-              <td className={td}></td>
+            {[...Array(8)].map((_, i) => blankRow(100 + i))}
+            {/* Total row B */}
+            <tr style={{ backgroundColor: '#f0f0f0' }}>
+              <td colSpan={2} style={{ ...S.cell, fontWeight: 700 }}>Total</td>
+              <td style={{ ...S.cell, textAlign: 'right' }}></td>
+              <td style={{ ...S.cell, textAlign: 'right' }}></td>
+              <td style={{ ...S.cell, textAlign: 'right' }}></td>
+              <td style={{ ...S.cell, textAlign: 'right' }}></td>
+              <td style={{ ...S.cell, textAlign: 'right' }}></td>
             </tr>
           </tbody>
         </table>
 
-        {/* CERTIFICATION */}
-        <div className={`${border} px-2 py-2 mt-0.5 text-[7px] leading-tight`}>
-          We declare under the penalties of perjury that this certificate has been made in good faith, verified by us, and to the best of our knowledge and belief, is true and correct, pursuant to the provisions of the National Internal Revenue Code, as amended, and the regulations issued under authority thereof. Further, we give our consent to the processing of our information as contemplated under the *Data Privacy Act of 2012 (R.A. No. 10173) for legitimate and lawful purposes.
-        </div>
-
-        {/* SIGNATURES */}
-        <table className="w-full border-collapse mt-0.5">
+        {/* ── DECLARATION ── */}
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <tbody>
             <tr>
-              <td className={`${border} px-2 py-6 text-center w-1/2`}>
-                <div className="border-t border-black mt-4 pt-1 text-[8px]">
-                  Signature over Printed Name of Payor/Payor&apos;s Authorized Representative/Tax Agent
-                </div>
-                <div className="text-[7px] text-gray-500">(Indicate Title/Designation and TIN)</div>
-                <div className="mt-2 flex gap-4 text-[7px]">
-                  <div>
-                    <div>Tax Agent Accreditation No./</div>
-                    <div>Attorney&apos;s Roll No. (if applicable)</div>
-                  </div>
-                  <div>
-                    <div>Date of Issue <span className="border-b border-black px-3">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
-                    <div className="text-[6px] text-gray-400">(MM/DD/YYYY)</div>
-                  </div>
-                  <div>
-                    <div>Date of Expiry <span className="border-b border-black px-3">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
-                    <div className="text-[6px] text-gray-400">(MM/DD/YYYY)</div>
-                  </div>
-                </div>
-              </td>
-              <td className={`${border} px-2 w-1/2 align-middle`}>
-                <div className="text-center font-bold text-[8px] mb-2">CONFORME:</div>
-                <div className="border-t border-black mt-4 pt-1 text-[8px] text-center">
-                  Signature over Printed Name of Payee/Payee&apos;s Authorized Representative/Tax Agent
-                </div>
-                <div className="text-[7px] text-gray-500 text-center">(Indicate Title/Designation and TIN)</div>
-                <div className="mt-2 flex gap-4 text-[7px] justify-center">
-                  <div>
-                    <div>Tax Agent Accreditation No./</div>
-                    <div>Attorney&apos;s Roll No. (if applicable)</div>
-                  </div>
-                  <div>
-                    <div>Date of Issue <span className="border-b border-black px-3">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
-                    <div className="text-[6px] text-gray-400">(MM/DD/YYYY)</div>
-                  </div>
-                  <div>
-                    <div>Date of Expiry <span className="border-b border-black px-3">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
-                    <div className="text-[6px] text-gray-400">(MM/DD/YYYY)</div>
-                  </div>
-                </div>
+              <td style={{ border: '1px solid black', padding: '4px 6px', fontSize: '7px', lineHeight: '1.5' }}>
+                We declare under the penalties of perjury that this certificate has been made in good faith, verified by us, and to the best of our knowledge and belief, is true and
+                correct, pursuant to the provisions of the National Internal Revenue Code, as amended, and the regulations issued under authority thereof. Further, we give our consent to
+                the processing of our information as contemplated under the *Data Privacy Act of 2012 (R.A. No. 10173) for legitimate and lawful purposes.
               </td>
             </tr>
           </tbody>
         </table>
 
-        <div className="text-[6px] text-gray-500 mt-0.5">
+        {/* ── SIGNATURES ── */}
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <tbody>
+            <tr>
+              {/* Left: Payor signature */}
+              <td style={{ border: '1px solid black', padding: '4px 6px', width: '50%', verticalAlign: 'top' }}>
+                <div style={{ minHeight: '32px' }}></div>
+                <div style={{ borderTop: '1px solid black', paddingTop: '2px', fontSize: '7px', textAlign: 'center' }}>
+                  Signature over Printed Name of Payor/Payor&apos;s Authorized Representative/Tax Agent
+                </div>
+                <div style={{ fontSize: '7px', textAlign: 'center', color: '#555', fontStyle: 'italic' }}>
+                  (Indicate Title/Designation and TIN)
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '4px' }}>
+                  <tbody>
+                    <tr>
+                      <td style={{ fontSize: '7px', width: '42%', verticalAlign: 'top', paddingRight: '4px' }}>
+                        Tax Agent Accreditation No./<br />Attorney&apos;s Roll No. (if applicable)
+                      </td>
+                      <td style={{ fontSize: '7px', width: '29%', verticalAlign: 'top' }}>
+                        <div>Date of Issue</div>
+                        <div style={{ borderBottom: '1px solid black', minHeight: '12px' }}></div>
+                        <div style={{ fontSize: '6px', color: '#555' }}>(MM/DD/YYYY)</div>
+                      </td>
+                      <td style={{ fontSize: '7px', width: '29%', verticalAlign: 'top', paddingLeft: '4px' }}>
+                        <div>Date of Expiry</div>
+                        <div style={{ borderBottom: '1px solid black', minHeight: '12px' }}></div>
+                        <div style={{ fontSize: '6px', color: '#555' }}>(MM/DD/YYYY)</div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+              {/* Right: Payee/CONFORME */}
+              <td style={{ border: '1px solid black', borderLeft: 'none', padding: '4px 6px', width: '50%', verticalAlign: 'top' }}>
+                <div style={{ fontWeight: 700, fontSize: '8px', textAlign: 'center', marginBottom: '4px' }}>CONFORME:</div>
+                <div style={{ minHeight: '32px' }}></div>
+                <div style={{ borderTop: '1px solid black', paddingTop: '2px', fontSize: '7px', textAlign: 'center' }}>
+                  Signature over Printed Name of Payee/Payee&apos;s Authorized Representative/Tax Agent
+                </div>
+                <div style={{ fontSize: '7px', textAlign: 'center', color: '#555', fontStyle: 'italic' }}>
+                  (Indicate Title/Designation and TIN)
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '4px' }}>
+                  <tbody>
+                    <tr>
+                      <td style={{ fontSize: '7px', width: '42%', verticalAlign: 'top', paddingRight: '4px' }}>
+                        Tax Agent Accreditation No./<br />Attorney&apos;s Roll No. (if applicable)
+                      </td>
+                      <td style={{ fontSize: '7px', width: '29%', verticalAlign: 'top' }}>
+                        <div>Date of Issue</div>
+                        <div style={{ borderBottom: '1px solid black', minHeight: '12px' }}></div>
+                        <div style={{ fontSize: '6px', color: '#555' }}>(MM/DD/YYYY)</div>
+                      </td>
+                      <td style={{ fontSize: '7px', width: '29%', verticalAlign: 'top', paddingLeft: '4px' }}>
+                        <div>Date of Expiry</div>
+                        <div style={{ borderBottom: '1px solid black', minHeight: '12px' }}></div>
+                        <div style={{ fontSize: '6px', color: '#555' }}>(MM/DD/YYYY)</div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* ── FOOTNOTE ── */}
+        <div style={{ fontSize: '6.5px', marginTop: '3px' }}>
           *NOTE: The BIR Data Privacy is in the BIR website (www.bir.gov.ph)
         </div>
 
-        {/* Internal reference — hidden when printing */}
-        <div className="mt-3 print:hidden border-t border-slate-200 pt-3 text-xs text-slate-500">
-          <span className="font-medium text-slate-700">Internal Ref:</span> {cert.cert_no} &nbsp;·&nbsp;
-          <span className="font-medium text-slate-700">Bill:</span> {cert.internal_no} ({cert.bill_no}) &nbsp;·&nbsp;
-          <span className="font-medium text-slate-700">Generated:</span> {formatDate(cert.created_at)}
-          {cert.issued_at && <span> &nbsp;·&nbsp; <span className="font-medium text-slate-700">Issued:</span> {formatDate(cert.issued_at)}</span>}
+        {/* Internal ref — screen only */}
+        <div className="print:hidden" style={{ marginTop: '8px', borderTop: '1px solid #ddd', paddingTop: '6px', fontSize: '11px', color: '#666' }}>
+          <strong style={{ color: '#333' }}>Certificate No.:</strong> {cert.cert_no} &nbsp;·&nbsp;
+          <strong style={{ color: '#333' }}>Bill:</strong> {cert.internal_no} &nbsp;·&nbsp;
+          <strong style={{ color: '#333' }}>Period:</strong> Q{q} {y} &nbsp;·&nbsp;
+          <strong style={{ color: '#333' }}>Status:</strong> {cert.status}
+          {cert.issued_at && <span> &nbsp;·&nbsp; <strong style={{ color: '#333' }}>Issued:</strong> {formatDate(cert.issued_at)}</span>}
         </div>
       </div>
 
+      {/* ── Print CSS ── */}
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          #form2307, #form2307 * { visibility: visible; }
-          #form2307 { position: absolute; left: 0; top: 0; width: 210mm; }
+          body > * { display: none !important; }
+          #form2307 { display: block !important; position: static !important; }
+          #form2307 .print\\:hidden { display: none !important; }
           @page { size: A4; margin: 0; }
         }
       `}</style>
