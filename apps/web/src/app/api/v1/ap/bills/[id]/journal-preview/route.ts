@@ -11,16 +11,27 @@ export async function GET(
   try { await requireAuth(request); } catch (e) { return e as Response; }
 
   try {
-    const rows = await query(
-      `SELECT b.*, s.ap_account_id, s.name AS supplier_name,
-              etc.account_id AS ewt_account_id, etc.code AS ewt_code,
-              COALESCE(s.bir_atc_code, etc.bir_atc_code) AS supplier_atc_code
-         FROM bills b
-         JOIN suppliers s ON s.id = b.supplier_id
-         LEFT JOIN tax_codes etc ON etc.id = b.ewt_code_id
-        WHERE b.id = $1 LIMIT 1`,
-      [params.id],
-    );
+    let rows: unknown[];
+    try {
+      rows = await query(
+        `SELECT b.*, s.ap_account_id, s.name AS supplier_name,
+                etc.account_id AS ewt_account_id, etc.code AS ewt_code,
+                COALESCE(s.bir_atc_code, etc.bir_atc_code) AS supplier_atc_code
+           FROM bills b
+           JOIN suppliers s ON s.id = b.supplier_id
+           LEFT JOIN tax_codes etc ON etc.id = b.ewt_code_id
+          WHERE b.id = $1 LIMIT 1`,
+        [params.id],
+      );
+    } catch {
+      rows = await query(
+        `SELECT b.*, s.ap_account_id, s.name AS supplier_name
+           FROM bills b
+           JOIN suppliers s ON s.id = b.supplier_id
+          WHERE b.id = $1 LIMIT 1`,
+        [params.id],
+      );
+    }
     if (!rows[0]) return err('Bill not found', 404);
     const bill = rows[0] as Record<string, unknown>;
 

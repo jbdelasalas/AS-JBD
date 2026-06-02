@@ -15,18 +15,31 @@ export async function POST(
   try {
     await client.query('BEGIN');
 
-    const rows = await client.query(
-      `SELECT b.*, s.ap_account_id, s.name AS supplier_name, s.ewt_rate AS supplier_ewt_rate,
-              COALESCE(s.bir_atc_code, etc.bir_atc_code) AS supplier_atc_code,
-              etc.account_id AS ewt_account_id, etc.code AS ewt_code, etc.rate_pct AS ewt_code_rate
-         FROM bills b
-         JOIN suppliers s ON s.id = b.supplier_id
-         LEFT JOIN tax_codes etc ON etc.id = b.ewt_code_id
-        WHERE b.id = $1 FOR UPDATE`,
-      [params.id],
-    );
-    if (!rows.rows[0]) { await client.query('ROLLBACK'); return err('Bill not found', 404); }
-    const bill = rows.rows[0] as Record<string, unknown>;
+    let billRows: Record<string, unknown>[];
+    try {
+      const r = await client.query(
+        `SELECT b.*, s.ap_account_id, s.name AS supplier_name, s.ewt_rate AS supplier_ewt_rate,
+                COALESCE(s.bir_atc_code, etc.bir_atc_code) AS supplier_atc_code,
+                etc.account_id AS ewt_account_id, etc.code AS ewt_code, etc.rate_pct AS ewt_code_rate
+           FROM bills b
+           JOIN suppliers s ON s.id = b.supplier_id
+           LEFT JOIN tax_codes etc ON etc.id = b.ewt_code_id
+          WHERE b.id = $1 FOR UPDATE`,
+        [params.id],
+      );
+      billRows = r.rows;
+    } catch {
+      const r = await client.query(
+        `SELECT b.*, s.ap_account_id, s.name AS supplier_name, s.ewt_rate AS supplier_ewt_rate
+           FROM bills b
+           JOIN suppliers s ON s.id = b.supplier_id
+          WHERE b.id = $1 FOR UPDATE`,
+        [params.id],
+      );
+      billRows = r.rows;
+    }
+    if (!billRows[0]) { await client.query('ROLLBACK'); return err('Bill not found', 404); }
+    const bill = billRows[0] as Record<string, unknown>;
 
     if (!['draft', 'pending_approval'].includes(String(bill.status))) {
       await client.query('ROLLBACK');
