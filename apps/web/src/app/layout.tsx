@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Outfit } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/lib/theme';
@@ -10,9 +10,27 @@ const outfit = Outfit({
   display: 'swap',
 });
 
+export const viewport: Viewport = {
+  themeColor: '#0f4c75',
+  width: 'device-width',
+  initialScale: 1,
+  minimumScale: 1,
+};
+
 export const metadata: Metadata = {
-  title: 'ERP System',
-  description: 'ERP for Perpet Pilipinas Corp.',
+  title: 'AFCC ERP System',
+  description: 'Enterprise Resource Planning System for Art Fresh Creative Corporation',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'AFCC ERP System',
+  },
+  formatDetection: { telephone: false },
+  icons: {
+    shortcut: '/icons/favicon.ico',
+    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180' }],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

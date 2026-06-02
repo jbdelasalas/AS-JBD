@@ -25,7 +25,9 @@ export default function AdminHomePage() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const logoRef = useRef<HTMLInputElement>(null);
   const [companySaved, setCompanySaved] = useState(false);
+  const [companySaving, setCompanySaving] = useState(false);
   const [companyLoading, setCompanyLoading] = useState(true);
+  const [companyError, setCompanyError] = useState<string | null>(null);
 
   useEffect(() => {
     setTheme(getBrandingTheme());
@@ -39,7 +41,7 @@ export default function AdminHomePage() {
         setCompany({ name: d.name, legal_name: d.legal_name ?? '', tin: d.tin ?? '', rdo_code: d.rdo_code ?? '', address: d.address ?? '', phone: d.phone ?? '', email: d.email ?? '', website: d.website ?? '', logo: d.logo ?? null });
         setLogoPreview(d.logo ?? null);
       })
-      .catch(() => {})
+      .catch((e) => setCompanyError((e as Error).message))
       .finally(() => setCompanyLoading(false));
   }, []);
 
@@ -56,18 +58,28 @@ export default function AdminHomePage() {
   }
 
   async function handleSaveCompany() {
-    if (!companyId) return;
-    await api.put(`/companies/${companyId}`, company);
-    // Sync company name to app_settings so login page can read it without auth
-    const token = localStorage.getItem('access_token');
-    await fetch('/api/v1/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ company_name: company.name }),
-    });
-    localStorage.setItem('company_name', company.name);
-    setCompanySaved(true);
-    setTimeout(() => setCompanySaved(false), 2000);
+    if (!companyId) {
+      setCompanyError('No company selected. Please log out and log back in.');
+      return;
+    }
+    setCompanyError(null);
+    setCompanySaving(true);
+    try {
+      await api.put(`/companies/${companyId}`, company);
+      const token = localStorage.getItem('access_token');
+      await fetch('/api/v1/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ company_name: company.name }),
+      });
+      localStorage.setItem('company_name', company.name);
+      setCompanySaved(true);
+      setTimeout(() => setCompanySaved(false), 3000);
+    } catch (e: unknown) {
+      setCompanyError((e as Error).message);
+    } finally {
+      setCompanySaving(false);
+    }
   }
 
   async function handleSaveBranding() {
@@ -179,8 +191,12 @@ export default function AdminHomePage() {
               />
             </div>
 
-            <button onClick={handleSaveCompany} className="rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
-              {companySaved ? 'Saved!' : 'Save company'}
+            {companyError && (
+              <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{companyError}</div>
+            )}
+            <button onClick={handleSaveCompany} disabled={companySaving}
+              className="rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60">
+              {companySaved ? '✓ Saved!' : companySaving ? 'Saving…' : 'Save company'}
             </button>
           </div>
         )}

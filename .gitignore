@@ -13,3 +13,8 @@ coverage/
 .vercel
 *.tsbuildinfo
 .env*.local
+# next-pwa generated service worker files (regenerated on each build)
+apps/web/public/sw.js
+apps/web/public/sw.js.map
+apps/web/public/workbox-*.js
+apps/web/public/workbox-*.js.map
