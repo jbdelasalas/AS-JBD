@@ -190,10 +190,22 @@ export default function CertificateDetailPage() {
         <div className="flex gap-2">
           {cert.status==='draft'  && <button onClick={()=>updateStatus('issued')} disabled={busy} className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50">Mark as Issued</button>}
           {cert.status==='issued' && <button onClick={()=>updateStatus('filed')}  disabled={busy} className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700 disabled:opacity-50">Mark as Filed</button>}
-          <a href={`/api/v1/bir/certificates/${id}/pdf`} target="_blank"
+          <button
+            onClick={async () => {
+              const token = localStorage.getItem('access_token') ?? '';
+              const res = await fetch(`/api/v1/bir/certificates/${id}/pdf`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (!res.ok) { alert('Failed to download PDF'); return; }
+              const blob = await res.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url; a.download = `BIR-2307-${cert.cert_no}.pdf`; a.click();
+              URL.revokeObjectURL(url);
+            }}
             className="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">
             Download PDF
-          </a>
+          </button>
           <Link href={`/dashboard/ap/bills/${cert.bill_id}`} className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">View Bill</Link>
         </div>
       </div>
