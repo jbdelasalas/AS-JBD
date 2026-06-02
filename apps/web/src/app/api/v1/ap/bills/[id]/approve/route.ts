@@ -16,6 +16,7 @@ export async function POST(
     await client.query('BEGIN');
 
     let billRows: Record<string, unknown>[];
+    await client.query('SAVEPOINT sp_bill_select');
     try {
       const r = await client.query(
         `SELECT b.*, s.ap_account_id, s.name AS supplier_name, s.ewt_rate AS supplier_ewt_rate,
@@ -28,7 +29,9 @@ export async function POST(
         [params.id],
       );
       billRows = r.rows;
+      await client.query('RELEASE SAVEPOINT sp_bill_select');
     } catch {
+      await client.query('ROLLBACK TO SAVEPOINT sp_bill_select');
       const r = await client.query(
         `SELECT b.*, s.ap_account_id, s.name AS supplier_name, s.ewt_rate AS supplier_ewt_rate
            FROM bills b
