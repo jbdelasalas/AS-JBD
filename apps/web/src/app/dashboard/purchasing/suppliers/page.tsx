@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { formatPHP } from '@/lib/format';
 import { Pagination } from '@/components/Pagination';
 import ImportExportButtons from '@/components/ImportExportButtons';
+import DataTable, { ColDef } from '@/components/DataTable';
 
 interface SupplierRow {
   id: string;
@@ -128,68 +129,22 @@ export default function SuppliersPage() {
         <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">{error}</div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
-        <table className="min-w-full text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
-            <tr>
-              <th className="px-3 py-2 text-left font-medium">Code</th>
-              <th className="px-3 py-2 text-left font-medium">Name</th>
-              <th className="px-3 py-2 text-left font-medium">Type</th>
-              <th className="px-3 py-2 text-left font-medium">Terms</th>
-              <th className="px-3 py-2 text-right font-medium">Open AP</th>
-              <th className="px-3 py-2 text-left font-medium">Status</th>
-              <th className="px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-slate-500">Loading…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-xs text-slate-500">
-                  No suppliers found.
-                </td>
-              </tr>
-            ) : paged.map((r) => (
-              <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
-                <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">{r.code}</td>
-                <td className="px-3 py-2">
-                  <Link href={`/dashboard/purchasing/suppliers/${r.id}`} className="font-medium text-brand-700 hover:underline dark:text-brand-400">
-                    {r.name}
-                  </Link>
-                  {r.email && <div className="text-xs text-slate-500 dark:text-slate-400">{r.email}</div>}
-                </td>
-                <td className="px-3 py-2 text-xs capitalize text-slate-600 dark:text-slate-400">{r.supplier_type}</td>
-                <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{r.payment_terms_days}d</td>
-                <td className="px-3 py-2 text-right font-mono text-xs">
-                  <span className={r.open_ap_balance > 0 ? 'font-medium text-amber-700 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'}>
-                    {formatPHP(r.open_ap_balance)}
-                  </span>
-                </td>
-                <td className="px-3 py-2">
-                  <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300' : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'}`}>
-                    {r.is_active ? 'active' : 'inactive'}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-right">
-                  <button
-                    disabled={toggling === r.id}
-                    onClick={() => toggleActive(r.id, r.is_active)}
-                    className={`rounded border px-2.5 py-1 text-xs font-medium disabled:opacity-50 ${
-                      r.is_active
-                        ? 'border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950'
-                        : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950'
-                    }`}
-                  >
-                    {toggling === r.id ? '…' : r.is_active ? 'Deactivate' : 'Activate'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onChange={setPage} />
-      </div>
+      {(() => {
+        const COLS: ColDef<SupplierRow>[] = [
+          { key: 'code',               header: 'Code',    render: r => <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{r.code}</span>, exportValue: r => r.code },
+          { key: 'name',               header: 'Name',    render: r => <><Link href={`/dashboard/purchasing/suppliers/${r.id}`} className="font-medium text-brand-700 hover:underline dark:text-brand-400">{r.name}</Link>{r.email && <div className="text-xs text-slate-500">{r.email}</div>}</>, exportValue: r => r.name },
+          { key: 'supplier_type',      header: 'Type',    render: r => <span className="text-xs capitalize text-slate-600 dark:text-slate-400">{r.supplier_type}</span>, exportValue: r => r.supplier_type },
+          { key: 'payment_terms_days', header: 'Terms',   render: r => <span className="text-xs text-slate-600 dark:text-slate-400">{r.payment_terms_days}d</span>, exportValue: r => `${r.payment_terms_days}d` },
+          { key: 'open_ap_balance',    header: 'Open AP', align: 'right', render: r => <span className={`font-mono text-xs ${r.open_ap_balance > 0 ? 'font-medium text-amber-700 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'}`}>{formatPHP(r.open_ap_balance)}</span>, exportValue: r => String(r.open_ap_balance) },
+          { key: 'is_active',          header: 'Status',  render: r => <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{r.is_active ? 'active' : 'inactive'}</span>, exportValue: r => r.is_active ? 'active' : 'inactive' },
+          { key: 'action',             header: '',        render: r => <button disabled={toggling === r.id} onClick={() => toggleActive(r.id, r.is_active)} className={`rounded border px-2.5 py-1 text-xs font-medium disabled:opacity-50 ${r.is_active ? 'border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400' : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400'}`}>{toggling === r.id ? '…' : r.is_active ? 'Deactivate' : 'Activate'}</button> },
+        ];
+        return (
+          <DataTable id="ap-suppliers" columns={COLS} rows={paged} exportRows={rows} loading={loading} filename="suppliers" showExport={false}>
+            <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onChange={setPage} />
+          </DataTable>
+        );
+      })()}
     </div>
   );
 }

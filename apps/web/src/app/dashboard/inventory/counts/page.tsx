@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { Pagination } from '@/components/Pagination';
+import DataTable, { ColDef } from '@/components/DataTable';
 
 interface CountRow {
   id: string;
@@ -27,6 +28,16 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const STATUSES = ['all', 'in_progress', 'posted', 'voided'] as const;
+
+const COLUMNS: ColDef<CountRow>[] = [
+  { key: 'count_no',       header: 'Count No.',  render: r => <Link href={`/dashboard/inventory/counts/${r.id}`} className="font-mono text-xs text-brand-700 hover:underline dark:text-brand-400">{r.count_no}</Link>, exportValue: r => r.count_no },
+  { key: 'started_at',    header: 'Started',     render: r => <span className="text-xs text-slate-600 dark:text-slate-400">{r.started_at ? formatDate(r.started_at) : '—'}</span>, exportValue: r => r.started_at ? formatDate(r.started_at) : '' },
+  { key: 'warehouse_name',header: 'Warehouse',   render: r => <span className="text-xs text-slate-700 dark:text-slate-300">{r.warehouse_name}</span>, exportValue: r => r.warehouse_name },
+  { key: 'count_type',    header: 'Type',        render: r => <span className="text-xs text-slate-600 dark:text-slate-400">{r.count_type}</span>, exportValue: r => r.count_type },
+  { key: 'line_count',    header: 'Lines',       align: 'right', render: r => <span className="text-xs text-slate-600 dark:text-slate-400">{r.line_count}</span>, exportValue: r => String(r.line_count) },
+  { key: 'posted_at',     header: 'Posted',      render: r => <span className="text-xs text-slate-500 dark:text-slate-400">{r.posted_at ? formatDate(r.posted_at) : '—'}</span>, exportValue: r => r.posted_at ? formatDate(r.posted_at) : '' },
+  { key: 'status',        header: 'Status',      render: r => <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[r.status] ?? STATUS_STYLES.draft}`}>{r.status.replace(/_/g, ' ')}</span>, exportValue: r => r.status },
+];
 
 export default function StockCountsPage() {
   const [rows, setRows] = useState<CountRow[]>([]);
@@ -79,47 +90,10 @@ export default function StockCountsPage() {
 
       {error && <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-        <table className="min-w-full text-sm">
-          <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
-            <tr>
-              <th className="px-3 py-2 text-left font-medium">Count no.</th>
-              <th className="px-3 py-2 text-left font-medium">Started</th>
-              <th className="px-3 py-2 text-left font-medium">Warehouse</th>
-              <th className="px-3 py-2 text-left font-medium">Type</th>
-              <th className="px-3 py-2 text-right font-medium">Lines</th>
-              <th className="px-3 py-2 text-left font-medium">Posted</th>
-              <th className="px-3 py-2 text-left font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">Loading…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={7} className="px-3 py-8 text-center text-xs text-slate-500 dark:text-slate-400">No counts found. Click <em>+ Start count</em> to begin one.</td></tr>
-            ) : paged.map((r) => (
-              <tr key={r.id} className="border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800">
-                <td className="px-3 py-2">
-                  <Link href={`/dashboard/inventory/counts/${r.id}`} className="font-mono text-xs text-brand-700 hover:underline">
-                    {r.count_no}
-                  </Link>
-                </td>
-                <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{r.started_at ? formatDate(r.started_at) : '—'}</td>
-                <td className="px-3 py-2 text-xs text-slate-700 dark:text-slate-300">{r.warehouse_name}</td>
-                <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{r.count_type}</td>
-                <td className="px-3 py-2 text-right text-xs text-slate-600 dark:text-slate-400">{r.line_count}</td>
-                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{r.posted_at ? formatDate(r.posted_at) : '—'}</td>
-                <td className="px-3 py-2">
-                  <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[r.status] ?? STATUS_STYLES.draft}`}>
-                    {r.status.replace(/_/g, ' ')}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <DataTable id="inventory-counts" columns={COLUMNS} rows={paged} exportRows={rows} loading={loading} filename="stock-counts"
+        emptyMessage="No counts found. Click + Start count to begin one.">
         <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onChange={setPage} />
-      </div>
+      </DataTable>
     </div>
   );
 }

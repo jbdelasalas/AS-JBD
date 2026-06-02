@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { formatPHP } from '@/lib/format';
 import type { TrialBalanceRow } from '@perpet/shared';
+import DataTable, { ColDef } from '@/components/DataTable';
 
 interface TrialBalanceResponse {
   as_of: string;
@@ -12,6 +13,19 @@ interface TrialBalanceResponse {
   total_credit: number;
   is_balanced: boolean;
 }
+
+interface DisplayRow extends TrialBalanceRow {
+  net_debit: number;
+  net_credit: number;
+}
+
+const COLUMNS: ColDef<DisplayRow>[] = [
+  { key: 'account_code', header: 'Code',    render: r => <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{r.account_code}</span>, exportValue: r => r.account_code },
+  { key: 'account_name', header: 'Account', render: r => <span className="text-slate-900 dark:text-slate-100">{r.account_name}</span>, exportValue: r => r.account_name },
+  { key: 'account_type', header: 'Type',    render: r => <span className="text-xs text-slate-600 dark:text-slate-400">{r.account_type}</span>, exportValue: r => r.account_type },
+  { key: 'net_debit',    header: 'Debit',   align: 'right', render: r => <span className="font-mono text-xs text-slate-900 dark:text-slate-100">{r.net_debit > 0 ? formatPHP(r.net_debit) : ''}</span>, exportValue: r => r.net_debit > 0 ? String(r.net_debit) : '' },
+  { key: 'net_credit',   header: 'Credit',  align: 'right', render: r => <span className="font-mono text-xs text-slate-900 dark:text-slate-100">{r.net_credit > 0 ? formatPHP(r.net_credit) : ''}</span>, exportValue: r => r.net_credit > 0 ? String(r.net_credit) : '' },
+];
 
 export default function TrialBalancePage() {
   const [asOf, setAsOf] = useState(() => new Date().toISOString().slice(0, 10));
@@ -37,6 +51,20 @@ export default function TrialBalancePage() {
   }
 
   useEffect(() => { load(); /* eslint-disable-line */ }, []);
+
+  const displayRows: DisplayRow[] = (data?.rows ?? []).map((r) => {
+    const isDr = ['ASSET', 'EXPENSE'].includes(r.account_type);
+    const net = r.debit - r.credit;
+    return { ...r, net_debit: isDr ? Math.max(net, 0) : Math.max(-net, 0), net_credit: isDr ? Math.max(-net, 0) : Math.max(net, 0) };
+  });
+
+  const totalsRow = data ? (
+    <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm font-medium">
+      <td colSpan={3} className="px-3 py-2 text-right text-xs text-slate-600 dark:text-slate-400">Totals</td>
+      <td className="px-3 py-2 text-right font-mono text-xs text-slate-900 dark:text-slate-100">{formatPHP(data.total_debit)}</td>
+      <td className="px-3 py-2 text-right font-mono text-xs text-slate-900 dark:text-slate-100">{formatPHP(data.total_credit)}</td>
+    </tr>
+  ) : undefined;
 
   return (
     <div>
@@ -75,48 +103,15 @@ export default function TrialBalancePage() {
             <span className="text-slate-600 dark:text-slate-400">{data.rows.length} accounts with movement</span>
           </div>
 
-          <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white">
-            <table className="min-w-full text-sm">
-              <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
-                <tr>
-                  <th className="px-3 py-2 text-left font-medium">Code</th>
-                  <th className="px-3 py-2 text-left font-medium">Account</th>
-                  <th className="px-3 py-2 text-left font-medium">Type</th>
-                  <th className="px-3 py-2 text-right font-medium">Debit</th>
-                  <th className="px-3 py-2 text-right font-medium">Credit</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.rows.length === 0 ? (
-                  <tr><td colSpan={5} className="px-3 py-8 text-center text-xs text-slate-500 dark:text-slate-400">No posted entries yet.</td></tr>
-                ) : (
-                  data.rows.map((r) => {
-                    // Show net balance on the normal side
-                    const isDr = ['ASSET', 'EXPENSE'].includes(r.account_type);
-                    const net = r.debit - r.credit;
-                    const dr = isDr ? Math.max(net, 0)  : Math.max(-net, 0);
-                    const cr = isDr ? Math.max(-net, 0) : Math.max(net, 0);
-                    return (
-                      <tr key={r.account_code} className="border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:bg-slate-800">
-                        <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">{r.account_code}</td>
-                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.account_name}</td>
-                        <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{r.account_type}</td>
-                        <td className="px-3 py-2 num">{dr > 0 ? formatPHP(dr) : ''}</td>
-                        <td className="px-3 py-2 num">{cr > 0 ? formatPHP(cr) : ''}</td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-              <tfoot className="bg-slate-50 dark:bg-slate-800 text-sm font-medium">
-                <tr className="border-t border-slate-200 dark:border-slate-700">
-                  <td colSpan={3} className="px-3 py-2 text-right text-xs text-slate-600 dark:text-slate-400">Totals</td>
-                  <td className="px-3 py-2 num">{formatPHP(data.total_debit)}</td>
-                  <td className="px-3 py-2 num">{formatPHP(data.total_credit)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <DataTable
+            id="gl-trial-balance"
+            columns={COLUMNS}
+            rows={displayRows}
+            loading={loading}
+            filename="trial-balance"
+            emptyMessage="No posted entries yet."
+            footer={totalsRow}
+          />
         </>
       )}
     </div>

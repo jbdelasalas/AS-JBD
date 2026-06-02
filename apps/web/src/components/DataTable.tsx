@@ -18,6 +18,8 @@ interface Props<T extends object> {
   loading?: boolean;
   emptyMessage?: string;
   filename?: string;
+  showExport?: boolean;  // set false when the parent already provides export
+  footer?: React.ReactNode; // rendered as <tfoot> inside the table
   children?: React.ReactNode;
 }
 
@@ -43,7 +45,7 @@ function download(filename: string, csv: string) {
 }
 
 export default function DataTable<T extends object>({
-  id, columns, rows, exportRows, loading, emptyMessage = 'No records found.', filename, children,
+  id, columns, rows, exportRows, loading, emptyMessage = 'No records found.', filename, showExport = true, footer, children,
 }: Props<T>) {
   const defaultOrder = () => columns.map(c => c.key);
 
@@ -112,16 +114,18 @@ export default function DataTable<T extends object>({
         <span className="text-[11px] text-slate-400 dark:text-slate-500 select-none">
           Drag column headers to reorder
         </span>
-        <button
-          type="button"
-          onClick={() => download(`${filename ?? id}.csv`, toCsv(orderedCols, (exportRows ?? rows) as T[]))}
-          className="flex items-center gap-1.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M8 12l4 4m0 0l4-4m-4 4V4" />
-          </svg>
-          Export CSV
-        </button>
+        {showExport && (
+          <button
+            type="button"
+            onClick={() => download(`${filename ?? id}.csv`, toCsv(orderedCols, (exportRows ?? rows) as T[]))}
+            className="flex items-center gap-1.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M8 12l4 4m0 0l4-4m-4 4V4" />
+            </svg>
+            Export CSV
+          </button>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -177,6 +181,7 @@ export default function DataTable<T extends object>({
               </tr>
             ))}
           </tbody>
+          {footer && <tfoot>{footer}</tfoot>}
         </table>
       </div>
 

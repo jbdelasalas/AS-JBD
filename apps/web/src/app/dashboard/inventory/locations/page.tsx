@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
+import DataTable, { ColDef } from '@/components/DataTable';
 
 interface Location {
   id: string;
@@ -20,9 +21,7 @@ export default function LocationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [formMsg, setFormMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-
-  // "add" mode: showAdd=true + editId=null; "edit" mode: showAdd=false + editId=<id>
-  const [showAdd, setShowAdd] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Location>>(blank());
 
@@ -42,18 +41,18 @@ export default function LocationsPage() {
     setEditId(null);
     setForm(blank());
     setFormMsg(null);
-    setShowAdd(true);
+    setShowForm(true);
   }
 
   function startEdit(loc: Location) {
-    setShowAdd(false);
-    setFormMsg(null);
     setForm({ code: loc.code, name: loc.name, address: loc.address ?? '', is_active: loc.is_active });
     setEditId(loc.id);
+    setFormMsg(null);
+    setShowForm(true);
   }
 
   function cancelForm() {
-    setShowAdd(false);
+    setShowForm(false);
     setEditId(null);
     setFormMsg(null);
   }
@@ -89,53 +88,14 @@ export default function LocationsPage() {
   const inp = 'w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100';
   const lbl = 'mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400';
 
-  const InlineForm = (
-    <form onSubmit={submit} className="rounded-lg border border-brand-200 dark:border-brand-800 bg-white dark:bg-slate-900 p-5 mb-5">
-      <div className="mb-3 text-sm font-medium text-slate-700 dark:text-slate-300">
-        {editId ? 'Edit Location' : 'New Location'}
-      </div>
-      <div className="grid grid-cols-4 gap-4">
-        <div>
-          <label className={lbl}>Code *</label>
-          <input required value={form.code ?? ''} maxLength={20}
-            onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
-            placeholder="WH-MAIN" className={inp} />
-        </div>
-        <div className="col-span-2">
-          <label className={lbl}>Name *</label>
-          <input required value={form.name ?? ''}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            placeholder="Main Warehouse" className={inp} />
-        </div>
-        <div>
-          <label className={lbl}>Active</label>
-          <select value={form.is_active ? 'true' : 'false'}
-            onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.value === 'true' }))}
-            className={inp}>
-            <option value="true">Active</option>
-            <option value="false">Inactive</option>
-          </select>
-        </div>
-        <div className="col-span-4">
-          <label className={lbl}>Address</label>
-          <input value={form.address ?? ''}
-            onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-            placeholder="Street, City" className={inp} />
-        </div>
-      </div>
-      {formMsg && <p className="mt-2 text-xs text-red-600">{formMsg}</p>}
-      <div className="mt-4 flex gap-2">
-        <button type="submit" disabled={saving}
-          className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
-          {saving ? 'Saving…' : editId ? 'Save Changes' : 'Add Location'}
-        </button>
-        <button type="button" onClick={cancelForm}
-          className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
-          Cancel
-        </button>
-      </div>
-    </form>
-  );
+  const COLUMNS: ColDef<Location>[] = [
+    { key: 'code',      header: 'Code',    render: r => <span className="font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">{r.code}</span>, exportValue: r => r.code },
+    { key: 'name',      header: 'Name',    render: r => <span className="font-medium text-slate-900 dark:text-slate-100">{r.name}</span>, exportValue: r => r.name },
+    { key: 'address',   header: 'Address', render: r => <span className="text-xs text-slate-500 dark:text-slate-400">{r.address ?? '—'}</span>, exportValue: r => r.address ?? '' },
+    { key: 'item_count',header: 'Items',   align: 'right', render: r => <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{r.item_count}</span>, exportValue: r => String(r.item_count) },
+    { key: 'is_active', header: 'Status',  render: r => <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{r.is_active ? 'active' : 'inactive'}</span>, exportValue: r => r.is_active ? 'active' : 'inactive' },
+    { key: 'actions',   header: '',        render: r => <button onClick={() => startEdit(r)} className="text-xs text-brand-700 hover:underline dark:text-brand-400">Edit</button>, exportValue: () => '' },
+  ];
 
   return (
     <div>
@@ -144,7 +104,7 @@ export default function LocationsPage() {
           <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Locations</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">Warehouses and storage locations for inventory tracking.</p>
         </div>
-        {!showAdd && !editId && (
+        {!showForm && (
           <button onClick={startAdd}
             className="rounded bg-brand-600 px-3 py-1.5 text-sm text-white hover:bg-brand-700">
             + Add Location
@@ -156,65 +116,56 @@ export default function LocationsPage() {
         <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
       )}
 
-      {showAdd && InlineForm}
-
-      {loading ? (
-        <div className="py-10 text-center text-sm text-slate-500">Loading…</div>
-      ) : (
-        <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
-              <tr>
-                <th className="px-4 py-2.5 text-left font-medium">Code</th>
-                <th className="px-4 py-2.5 text-left font-medium">Name</th>
-                <th className="px-4 py-2.5 text-left font-medium">Address</th>
-                <th className="px-4 py-2.5 text-right font-medium">Items</th>
-                <th className="px-4 py-2.5 text-left font-medium">Status</th>
-                <th className="px-4 py-2.5" />
-              </tr>
-            </thead>
-            <tbody>
-              {locations.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-xs text-slate-400">
-                    No locations yet. Click &quot;+ Add Location&quot; to create one.
-                  </td>
-                </tr>
-              ) : locations.map((loc) => (
-                <>
-                  <tr key={loc.id}
-                    className="border-t border-slate-100 dark:border-slate-700">
-                    <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">{loc.code}</td>
-                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{loc.name}</td>
-                    <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">{loc.address ?? '—'}</td>
-                    <td className="px-4 py-3 text-right font-mono text-xs text-slate-600 dark:text-slate-400">{loc.item_count}</td>
-                    <td className="px-4 py-3">
-                      <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${loc.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                        {loc.is_active ? 'active' : 'inactive'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {editId === loc.id ? null : (
-                        <button onClick={() => startEdit(loc)}
-                          className="text-xs text-brand-700 hover:underline dark:text-brand-400">
-                          Edit
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                  {editId === loc.id && (
-                    <tr key={`${loc.id}-edit`} className="border-t border-brand-100 dark:border-brand-900">
-                      <td colSpan={6} className="px-4 py-4 bg-brand-50 dark:bg-slate-800">
-                        {InlineForm}
-                      </td>
-                    </tr>
-                  )}
-                </>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {showForm && (
+        <form onSubmit={submit} className="rounded-lg border border-brand-200 dark:border-brand-800 bg-white dark:bg-slate-900 p-5 mb-5">
+          <div className="mb-3 text-sm font-medium text-slate-700 dark:text-slate-300">
+            {editId ? 'Edit Location' : 'New Location'}
+          </div>
+          <div className="grid grid-cols-4 gap-4">
+            <div>
+              <label className={lbl}>Code *</label>
+              <input required value={form.code ?? ''} maxLength={20}
+                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
+                placeholder="WH-MAIN" className={inp} />
+            </div>
+            <div className="col-span-2">
+              <label className={lbl}>Name *</label>
+              <input required value={form.name ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="Main Warehouse" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Active</label>
+              <select value={form.is_active ? 'true' : 'false'}
+                onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.value === 'true' }))}
+                className={inp}>
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+              </select>
+            </div>
+            <div className="col-span-4">
+              <label className={lbl}>Address</label>
+              <input value={form.address ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                placeholder="Street, City" className={inp} />
+            </div>
+          </div>
+          {formMsg && <p className="mt-2 text-xs text-red-600">{formMsg}</p>}
+          <div className="mt-4 flex gap-2">
+            <button type="submit" disabled={saving}
+              className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+              {saving ? 'Saving…' : editId ? 'Save Changes' : 'Add Location'}
+            </button>
+            <button type="button" onClick={cancelForm}
+              className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+              Cancel
+            </button>
+          </div>
+        </form>
       )}
+
+      <DataTable id="inventory-locations" columns={COLUMNS} rows={locations} loading={loading} filename="locations"
+        emptyMessage='No locations yet. Click "+ Add Location" to create one.' />
     </div>
   );
 }

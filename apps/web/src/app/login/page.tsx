@@ -8,8 +8,8 @@ import { loadBranding, getBrandingBg } from '@/lib/branding';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('admin@perpet.com.ph');
-  const [password, setPassword] = useState('Perpet2026!');
+  const [email, setEmail] = useState('admin@afcc.ph');
+  const [password, setPassword] = useState('artfresh2026');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loginBg, setLoginBg] = useState<string | null>(null);

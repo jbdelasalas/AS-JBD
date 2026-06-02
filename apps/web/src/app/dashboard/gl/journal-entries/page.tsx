@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { formatPHP, formatDate } from '@/lib/format';
 import type { PaginatedResponse } from '@perpet/shared';
 import { Pagination } from '@/components/Pagination';
+import DataTable, { ColDef } from '@/components/DataTable';
 
 interface JeListRow {
   id: string;
@@ -17,6 +18,22 @@ interface JeListRow {
   posted_at: string | null;
   total_debit: number;
 }
+
+const STATUS_STYLES: Record<string, string> = {
+  draft:   'bg-slate-100 text-slate-700 dark:text-slate-300',
+  pending: 'bg-amber-100 text-amber-700',
+  posted:  'bg-emerald-100 text-emerald-700',
+  voided:  'bg-red-100 text-red-700',
+};
+
+const COLUMNS: ColDef<JeListRow>[] = [
+  { key: 'entry_no',   header: 'Entry No.',  render: r => <Link href={`/dashboard/gl/journal-entries/${r.id}`} className="text-brand-700 hover:underline dark:text-brand-400">{r.entry_no}</Link>, exportValue: r => r.entry_no },
+  { key: 'entry_date', header: 'Date',       render: r => <span className="text-slate-700 dark:text-slate-300">{formatDate(r.entry_date)}</span>, exportValue: r => formatDate(r.entry_date) },
+  { key: 'reference',  header: 'Reference',  render: r => <span className="text-xs text-slate-600 dark:text-slate-400">{r.reference ?? '—'}</span>, exportValue: r => r.reference ?? '' },
+  { key: 'memo',       header: 'Memo',       render: r => <span className="text-xs text-slate-600 dark:text-slate-400">{r.memo ?? '—'}</span>, exportValue: r => r.memo ?? '' },
+  { key: 'total_debit',header: 'Amount',     align: 'right', render: r => <span className="font-mono text-xs text-slate-900 dark:text-slate-100">{formatPHP(r.total_debit)}</span>, exportValue: r => String(r.total_debit) },
+  { key: 'status',     header: 'Status',     render: r => <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[r.status] ?? STATUS_STYLES.draft}`}>{r.status}</span>, exportValue: r => r.status },
+];
 
 export default function JournalEntriesPage() {
   const [data, setData] = useState<JeListRow[]>([]);
@@ -67,7 +84,7 @@ export default function JournalEntriesPage() {
             className={`rounded px-3 py-1 text-xs ${
               statusFilter === s
                 ? 'bg-brand-600 text-white'
-                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 hover:bg-slate-50 dark:bg-slate-800'
+                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
             }`}
           >
             {s}
@@ -79,63 +96,10 @@ export default function JournalEntriesPage() {
         <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white">
-        <table className="min-w-full text-sm">
-          <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
-            <tr>
-              <th className="px-3 py-2 text-left font-medium">Entry no.</th>
-              <th className="px-3 py-2 text-left font-medium">Date</th>
-              <th className="px-3 py-2 text-left font-medium">Reference</th>
-              <th className="px-3 py-2 text-left font-medium">Memo</th>
-              <th className="px-3 py-2 text-right font-medium">Amount</th>
-              <th className="px-3 py-2 text-left font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={6} className="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">Loading...</td></tr>
-            ) : data.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-xs text-slate-500 dark:text-slate-400">
-                  No journal entries yet. Click <em>+ New entry</em> to create one.
-                </td>
-              </tr>
-            ) : (
-              paged.map((e) => (
-                <tr key={e.id} className="border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:bg-slate-800">
-                  <td className="px-3 py-2">
-                    <Link href={`/dashboard/gl/journal-entries/${e.id}`} className="text-brand-700 hover:underline">
-                      {e.entry_no}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{formatDate(e.entry_date)}</td>
-                  <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{e.reference ?? '—'}</td>
-                  <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{e.memo ?? '—'}</td>
-                  <td className="px-3 py-2 num text-slate-900 dark:text-slate-100">{formatPHP(e.total_debit)}</td>
-                  <td className="px-3 py-2">
-                    <StatusBadge status={e.status} />
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      <DataTable id="gl-journal-entries" columns={COLUMNS} rows={paged} exportRows={data} loading={loading} filename="journal-entries"
+        emptyMessage="No journal entries yet. Click + New entry to create one.">
         <Pagination page={page} total={data.length} pageSize={PAGE_SIZE} onChange={setPage} />
-      </div>
+      </DataTable>
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    draft:   'bg-slate-100 text-slate-700 dark:text-slate-300',
-    pending: 'bg-amber-100 text-amber-700',
-    posted:  'bg-emerald-100 text-emerald-700',
-    voided:  'bg-red-100 text-red-700',
-  };
-  return (
-    <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-medium ${styles[status] ?? styles.draft}`}>
-      {status}
-    </span>
   );
 }

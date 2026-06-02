@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { formatPHP } from '@/lib/format';
 import { Pagination } from '@/components/Pagination';
 import ImportExportButtons from '@/components/ImportExportButtons';
+import DataTable, { ColDef } from '@/components/DataTable';
 
 interface ItemRow {
   id: string;
@@ -26,6 +27,18 @@ const TYPE_COLORS: Record<string, string> = {
   service: 'bg-violet-100 text-violet-700',
   bundle:  'bg-amber-100 text-amber-700',
 };
+
+const COLUMNS: ColDef<ItemRow>[] = [
+  { key: 'sku',           header: 'SKU',          render: r => <Link href={`/dashboard/inventory/items/${r.id}`} className="font-mono text-xs text-brand-700 hover:underline dark:text-brand-400">{r.sku}</Link>, exportValue: r => r.sku },
+  { key: 'name',          header: 'Name',         render: r => <span className="font-medium text-slate-900 dark:text-slate-100">{r.name}</span>, exportValue: r => r.name },
+  { key: 'category_name', header: 'Category',     render: r => <span className="text-xs text-slate-600 dark:text-slate-400">{r.category_name ?? '—'}</span>, exportValue: r => r.category_name ?? '' },
+  { key: 'uom',           header: 'UOM',          render: r => <span className="text-xs text-slate-600 dark:text-slate-400">{r.uom}</span>, exportValue: r => r.uom },
+  { key: 'item_type',     header: 'Type',         render: r => <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-medium ${TYPE_COLORS[r.item_type] ?? 'bg-slate-100 text-slate-700'}`}>{r.item_type}</span>, exportValue: r => r.item_type },
+  { key: 'standard_cost', header: 'Std Cost',     align: 'right', render: r => <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{formatPHP(r.standard_cost)}</span>, exportValue: r => String(r.standard_cost) },
+  { key: 'selling_price', header: 'Selling Price',align: 'right', render: r => <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{formatPHP(r.selling_price)}</span>, exportValue: r => String(r.selling_price) },
+  { key: 'reorder_point', header: 'Reorder Pt',  align: 'right', render: r => <span className="text-xs text-slate-600 dark:text-slate-400">{r.reorder_point}</span>, exportValue: r => String(r.reorder_point) },
+  { key: 'is_active',     header: 'Status',       render: r => <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{r.is_active ? 'active' : 'inactive'}</span>, exportValue: r => r.is_active ? 'active' : 'inactive' },
+];
 
 export default function ItemsPage() {
   const [rows, setRows] = useState<ItemRow[]>([]);
@@ -58,6 +71,7 @@ export default function ItemsPage() {
         </div>
         <div className="flex items-center gap-2">
           <ImportExportButtons
+            showExport={false}
             rows={rows as unknown as Record<string, unknown>[]}
             exportColumns={[
               { key: 'sku', header: 'SKU' },
@@ -124,53 +138,9 @@ export default function ItemsPage() {
         <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-        <table className="min-w-full text-sm">
-          <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
-            <tr>
-              <th className="px-3 py-2 text-left font-medium">SKU</th>
-              <th className="px-3 py-2 text-left font-medium">Name</th>
-              <th className="px-3 py-2 text-left font-medium">Category</th>
-              <th className="px-3 py-2 text-left font-medium">UOM</th>
-              <th className="px-3 py-2 text-left font-medium">Type</th>
-              <th className="px-3 py-2 text-right font-medium">Std Cost</th>
-              <th className="px-3 py-2 text-right font-medium">Selling Price</th>
-              <th className="px-3 py-2 text-right font-medium">Reorder Pt</th>
-              <th className="px-3 py-2 text-left font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={9} className="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">Loading…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={9} className="px-3 py-8 text-center text-xs text-slate-500 dark:text-slate-400">No items found.</td></tr>
-            ) : paged.map((r) => (
-              <tr key={r.id} className="border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800">
-                <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">{r.sku}</td>
-                <td className="px-3 py-2 font-medium text-slate-900 dark:text-slate-100">
-                  <Link href={`/dashboard/inventory/items/${r.id}`} className="text-brand-700 hover:underline dark:text-brand-400">{r.name}</Link>
-                </td>
-                <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{r.category_name ?? '—'}</td>
-                <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{r.uom}</td>
-                <td className="px-3 py-2">
-                  <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-medium ${TYPE_COLORS[r.item_type] ?? 'bg-slate-100 text-slate-700'}`}>
-                    {r.item_type}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-xs text-slate-700 dark:text-slate-300">{formatPHP(r.standard_cost)}</td>
-                <td className="px-3 py-2 text-right font-mono text-xs text-slate-700 dark:text-slate-300">{formatPHP(r.selling_price)}</td>
-                <td className="px-3 py-2 text-right text-xs text-slate-600 dark:text-slate-400">{r.reorder_point}</td>
-                <td className="px-3 py-2">
-                  <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                    {r.is_active ? 'active' : 'inactive'}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <DataTable id="inventory-items" columns={COLUMNS} rows={paged} exportRows={rows} loading={loading} filename="items">
         <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onChange={setPage} />
-      </div>
+      </DataTable>
     </div>
   );
 }

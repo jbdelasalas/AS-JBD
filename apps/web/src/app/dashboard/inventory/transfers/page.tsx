@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { Pagination } from '@/components/Pagination';
+import DataTable, { ColDef } from '@/components/DataTable';
 
 interface TransferRow {
   id: string;
@@ -26,6 +27,16 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const STATUSES = ['all', 'draft', 'in_transit', 'received', 'cancelled'] as const;
+
+const COLUMNS: ColDef<TransferRow>[] = [
+  { key: 'transfer_no',         header: 'Transfer No.',  render: r => <Link href={`/dashboard/inventory/transfers/${r.id}`} className="font-mono text-xs text-brand-700 hover:underline dark:text-brand-400">{r.transfer_no}</Link>, exportValue: r => r.transfer_no },
+  { key: 'created_at',          header: 'Created',       render: r => <span className="text-xs text-slate-600 dark:text-slate-400">{formatDate(r.created_at)}</span>, exportValue: r => formatDate(r.created_at) },
+  { key: 'from_warehouse_name', header: 'From',          render: r => <span className="text-xs text-slate-700 dark:text-slate-300">{r.from_warehouse_name}</span>, exportValue: r => r.from_warehouse_name },
+  { key: 'to_warehouse_name',   header: 'To',            render: r => <span className="text-xs text-slate-700 dark:text-slate-300">{r.to_warehouse_name}</span>, exportValue: r => r.to_warehouse_name },
+  { key: 'sent_at',             header: 'Sent',          render: r => <span className="text-xs text-slate-500 dark:text-slate-400">{r.sent_at ? formatDate(r.sent_at) : '—'}</span>, exportValue: r => r.sent_at ? formatDate(r.sent_at) : '' },
+  { key: 'received_at',         header: 'Received',      render: r => <span className="text-xs text-slate-500 dark:text-slate-400">{r.received_at ? formatDate(r.received_at) : '—'}</span>, exportValue: r => r.received_at ? formatDate(r.received_at) : '' },
+  { key: 'status',              header: 'Status',        render: r => <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[r.status] ?? STATUS_STYLES.draft}`}>{r.status.replace(/_/g, ' ')}</span>, exportValue: r => r.status },
+];
 
 export default function TransfersPage() {
   const [rows, setRows] = useState<TransferRow[]>([]);
@@ -78,47 +89,10 @@ export default function TransfersPage() {
 
       {error && <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-        <table className="min-w-full text-sm">
-          <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
-            <tr>
-              <th className="px-3 py-2 text-left font-medium">Transfer no.</th>
-              <th className="px-3 py-2 text-left font-medium">Created</th>
-              <th className="px-3 py-2 text-left font-medium">From</th>
-              <th className="px-3 py-2 text-left font-medium">To</th>
-              <th className="px-3 py-2 text-left font-medium">Sent</th>
-              <th className="px-3 py-2 text-left font-medium">Received</th>
-              <th className="px-3 py-2 text-left font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">Loading…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={7} className="px-3 py-8 text-center text-xs text-slate-500 dark:text-slate-400">No transfers found. Click <em>+ New transfer</em> to create one.</td></tr>
-            ) : paged.map((r) => (
-              <tr key={r.id} className="border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800">
-                <td className="px-3 py-2">
-                  <Link href={`/dashboard/inventory/transfers/${r.id}`} className="font-mono text-xs text-brand-700 hover:underline">
-                    {r.transfer_no}
-                  </Link>
-                </td>
-                <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{formatDate(r.created_at)}</td>
-                <td className="px-3 py-2 text-xs text-slate-700 dark:text-slate-300">{r.from_warehouse_name}</td>
-                <td className="px-3 py-2 text-xs text-slate-700 dark:text-slate-300">{r.to_warehouse_name}</td>
-                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{r.sent_at ? formatDate(r.sent_at) : '—'}</td>
-                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{r.received_at ? formatDate(r.received_at) : '—'}</td>
-                <td className="px-3 py-2">
-                  <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[r.status] ?? STATUS_STYLES.draft}`}>
-                    {r.status.replace(/_/g, ' ')}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <DataTable id="inventory-transfers" columns={COLUMNS} rows={paged} exportRows={rows} loading={loading} filename="transfers"
+        emptyMessage="No transfers found. Click + New transfer to create one.">
         <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onChange={setPage} />
-      </div>
+      </DataTable>
     </div>
   );
 }

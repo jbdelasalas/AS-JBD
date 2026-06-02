@@ -11,6 +11,7 @@ interface Props {
   rows: Record<string, unknown>[];
   exportColumns: CsvColumn[];
   filename: string;
+  showExport?: boolean;
   importColumns?: CsvColumn[];
   onImportRow?: (row: Record<string, string>) => Promise<void>;
   onImportComplete?: () => void;
@@ -55,6 +56,7 @@ export default function ImportExportButtons({
   rows,
   exportColumns,
   filename,
+  showExport = true,
   importColumns,
   onImportRow,
   onImportComplete,
@@ -102,13 +104,15 @@ export default function ImportExportButtons({
 
   return (
     <div className="relative flex items-center gap-2">
-      <button
-        type="button"
-        onClick={handleExport}
-        className="rounded border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-      >
-        Export CSV
-      </button>
+      {showExport && (
+        <button
+          type="button"
+          onClick={handleExport}
+          className="rounded border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+        >
+          Export CSV
+        </button>
+      )}
 
       {onImportRow && (
         <div className="relative">

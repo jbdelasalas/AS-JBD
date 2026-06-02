@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { formatPHP } from '@/lib/format';
 import { Pagination } from '@/components/Pagination';
 import ImportExportButtons from '@/components/ImportExportButtons';
+import DataTable, { ColDef } from '@/components/DataTable';
 
 interface CustomerRow {
   id: string;
@@ -119,58 +120,22 @@ export default function CustomersPage() {
         <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white">
-        <table className="min-w-full text-sm">
-          <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
-            <tr>
-              <th className="px-3 py-2 text-left font-medium">Code</th>
-              <th className="px-3 py-2 text-left font-medium">Name</th>
-              <th className="px-3 py-2 text-left font-medium">Type</th>
-              <th className="px-3 py-2 text-left font-medium">Terms</th>
-              <th className="px-3 py-2 text-right font-medium">Credit Limit</th>
-              <th className="px-3 py-2 text-right font-medium">Open AR</th>
-              <th className="px-3 py-2 text-left font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">Loading…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-xs text-slate-500 dark:text-slate-400">
-                  No customers found.
-                </td>
-              </tr>
-            ) : paged.map((r) => (
-              <tr key={r.id} className="border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:bg-slate-800">
-                <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">{r.code}</td>
-                <td className="px-3 py-2">
-                  <Link href={`/dashboard/ar/customers/${r.id}`} className="font-medium text-brand-700 hover:underline">
-                    {r.name}
-                  </Link>
-                  {r.email && <div className="text-xs text-slate-500 dark:text-slate-400">{r.email}</div>}
-                </td>
-                <td className="px-3 py-2 text-xs capitalize text-slate-600 dark:text-slate-400">{r.customer_type}</td>
-                <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{r.payment_terms_days}d</td>
-                <td className="px-3 py-2 text-right font-mono text-xs">
-                  {r.credit_limit > 0 ? formatPHP(r.credit_limit) : '—'}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-xs">
-                  <span className={r.open_ar_balance > 0 ? 'text-amber-700 font-medium' : 'text-slate-600 dark:text-slate-400'}>
-                    {formatPHP(r.open_ar_balance)}
-                  </span>
-                </td>
-                <td className="px-3 py-2">
-                  <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                    {r.is_active ? 'active' : 'inactive'}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onChange={setPage} />
-      </div>
+      {(() => {
+        const COLS: ColDef<CustomerRow>[] = [
+          { key: 'code',               header: 'Code',         render: r => <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{r.code}</span>, exportValue: r => r.code },
+          { key: 'name',               header: 'Name',         render: r => <><Link href={`/dashboard/ar/customers/${r.id}`} className="font-medium text-brand-700 hover:underline">{r.name}</Link>{r.email && <div className="text-xs text-slate-500">{r.email}</div>}</>, exportValue: r => r.name },
+          { key: 'customer_type',      header: 'Type',         render: r => <span className="text-xs capitalize text-slate-600 dark:text-slate-400">{r.customer_type}</span>, exportValue: r => r.customer_type },
+          { key: 'payment_terms_days', header: 'Terms',        render: r => <span className="text-xs text-slate-600 dark:text-slate-400">{r.payment_terms_days}d</span>, exportValue: r => `${r.payment_terms_days}d` },
+          { key: 'credit_limit',       header: 'Credit Limit', align: 'right', render: r => <span className="font-mono text-xs">{r.credit_limit > 0 ? formatPHP(r.credit_limit) : '—'}</span>, exportValue: r => String(r.credit_limit) },
+          { key: 'open_ar_balance',    header: 'Open AR',      align: 'right', render: r => <span className={`font-mono text-xs ${r.open_ar_balance > 0 ? 'text-amber-700 font-medium' : 'text-slate-600 dark:text-slate-400'}`}>{formatPHP(r.open_ar_balance)}</span>, exportValue: r => String(r.open_ar_balance) },
+          { key: 'is_active',          header: 'Status',       render: r => <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{r.is_active ? 'active' : 'inactive'}</span>, exportValue: r => r.is_active ? 'active' : 'inactive' },
+        ];
+        return (
+          <DataTable id="ar-customers" columns={COLS} rows={paged} exportRows={rows} loading={loading} filename="customers" showExport={false}>
+            <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onChange={setPage} />
+          </DataTable>
+        );
+      })()}
     </div>
   );
 }
