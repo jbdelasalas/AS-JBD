@@ -4,25 +4,38 @@ import { query, getPool } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
 
+const GC_BASE_SELECT = (liveJoin: boolean) => `
+  SELECT g.*, b.batch_no, b.date_received, b.heads_in AS batch_heads_in,
+         b.item_id,
+         i.name AS item_name, i.sku,
+         ${liveJoin ? 'li.name AS live_item_name, li.sku AS live_item_sku,' : 'NULL AS live_item_name, NULL AS live_item_sku,'}
+         fb.name AS building_name, fb.code AS building_code,
+         br.name AS branch_name, br.code AS branch_code,
+         cc.name AS cost_center_name, cc.code AS cost_center_code
+    FROM grow_cycles g
+    JOIN chick_batches b ON b.id = g.batch_id
+    JOIN items i ON i.id = b.item_id
+    ${liveJoin ? 'LEFT JOIN items li ON li.id = g.live_item_id' : ''}
+    LEFT JOIN farm_buildings fb ON fb.id = g.building_id
+    LEFT JOIN branches br ON br.id = g.branch_id
+    LEFT JOIN cost_centers cc ON cc.id = g.cost_center_id
+   WHERE g.id = $1`;
+
+async function fetchGrowCycle(id: string) {
+  try {
+    const rows = await query(GC_BASE_SELECT(true), [id]);
+    return rows[0] ?? null;
+  } catch {
+    // live_item_id column may not exist yet (migration pending) — fall back
+    const rows = await query(GC_BASE_SELECT(false), [id]);
+    return rows[0] ?? null;
+  }
+}
+
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try { await requireAuth(_req); } catch (e) { return e as Response; }
   try {
-    const [hdr] = await query(
-      `SELECT g.*, b.batch_no, b.date_received, b.heads_in AS batch_heads_in,
-              b.item_id,
-              i.name AS item_name, i.sku,
-              li.name AS live_item_name, li.sku AS live_item_sku,
-              fb.name AS building_name, fb.code AS building_code,
-              br.name AS branch_name, br.code AS branch_code,
-              cc.name AS cost_center_name, cc.code AS cost_center_code
-         FROM grow_cycles g
-         JOIN chick_batches b ON b.id = g.batch_id
-         JOIN items i ON i.id = b.item_id
-         LEFT JOIN items li ON li.id = g.live_item_id
-         LEFT JOIN farm_buildings fb ON fb.id = g.building_id
-         LEFT JOIN branches br ON br.id = g.branch_id
-         LEFT JOIN cost_centers cc ON cc.id = g.cost_center_id
-        WHERE g.id = $1`, [params.id]);
+    const hdr = await fetchGrowCycle(params.id);
     if (!hdr) return err('Not found', 404);
 
     const [daily, weekly, consumption] = await Promise.all([
@@ -53,29 +66,54 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     // Update header fields
     const orNull = (v: unknown) => (v as string) || null;
-    await client.query(
-      `UPDATE grow_cycles SET
-         grow_reference             = COALESCE($2, grow_reference),
-         branch_id                  = COALESCE($3, branch_id),
-         building_id                = COALESCE($4, building_id),
-         cost_center_id             = COALESCE($5, cost_center_id),
-         start_date                 = COALESCE($6, start_date),
-         expected_end_date          = COALESCE($7, expected_end_date),
-         approx_heads               = COALESCE($8, approx_heads),
-         est_harvest_recovery       = COALESCE($9, est_harvest_recovery),
-         chick_price_per_head       = COALESCE($10, chick_price_per_head),
-         approx_chick_price_per_head= COALESCE($11, approx_chick_price_per_head),
-         culling_qty                = COALESCE($12, culling_qty),
-         remarks                    = COALESCE($13, remarks),
-         live_item_id               = COALESCE($14, live_item_id)
-       WHERE id = $1`,
-      [params.id,
-       orNull(dto.grow_reference), orNull(dto.branch_id), orNull(dto.building_id), orNull(dto.cost_center_id),
-       dto.start_date ?? null, dto.expected_end_date ?? null, dto.approx_heads ?? null,
-       dto.est_harvest_recovery ?? null, dto.chick_price_per_head ?? null,
-       dto.approx_chick_price_per_head ?? null, dto.culling_qty ?? null, orNull(dto.remarks),
-       orNull(dto.live_item_id)],
-    );
+    // Try with live_item_id; fall back to without if column not yet migrated
+    try {
+      await client.query(
+        `UPDATE grow_cycles SET
+           grow_reference             = COALESCE($2, grow_reference),
+           branch_id                  = COALESCE($3, branch_id),
+           building_id                = COALESCE($4, building_id),
+           cost_center_id             = COALESCE($5, cost_center_id),
+           start_date                 = COALESCE($6, start_date),
+           expected_end_date          = COALESCE($7, expected_end_date),
+           approx_heads               = COALESCE($8, approx_heads),
+           est_harvest_recovery       = COALESCE($9, est_harvest_recovery),
+           chick_price_per_head       = COALESCE($10, chick_price_per_head),
+           approx_chick_price_per_head= COALESCE($11, approx_chick_price_per_head),
+           culling_qty                = COALESCE($12, culling_qty),
+           remarks                    = COALESCE($13, remarks),
+           live_item_id               = COALESCE($14, live_item_id)
+         WHERE id = $1`,
+        [params.id,
+         orNull(dto.grow_reference), orNull(dto.branch_id), orNull(dto.building_id), orNull(dto.cost_center_id),
+         dto.start_date ?? null, dto.expected_end_date ?? null, dto.approx_heads ?? null,
+         dto.est_harvest_recovery ?? null, dto.chick_price_per_head ?? null,
+         dto.approx_chick_price_per_head ?? null, dto.culling_qty ?? null, orNull(dto.remarks),
+         orNull(dto.live_item_id)],
+      );
+    } catch {
+      await client.query(
+        `UPDATE grow_cycles SET
+           grow_reference             = COALESCE($2, grow_reference),
+           branch_id                  = COALESCE($3, branch_id),
+           building_id                = COALESCE($4, building_id),
+           cost_center_id             = COALESCE($5, cost_center_id),
+           start_date                 = COALESCE($6, start_date),
+           expected_end_date          = COALESCE($7, expected_end_date),
+           approx_heads               = COALESCE($8, approx_heads),
+           est_harvest_recovery       = COALESCE($9, est_harvest_recovery),
+           chick_price_per_head       = COALESCE($10, chick_price_per_head),
+           approx_chick_price_per_head= COALESCE($11, approx_chick_price_per_head),
+           culling_qty                = COALESCE($12, culling_qty),
+           remarks                    = COALESCE($13, remarks)
+         WHERE id = $1`,
+        [params.id,
+         orNull(dto.grow_reference), orNull(dto.branch_id), orNull(dto.building_id), orNull(dto.cost_center_id),
+         dto.start_date ?? null, dto.expected_end_date ?? null, dto.approx_heads ?? null,
+         dto.est_harvest_recovery ?? null, dto.chick_price_per_head ?? null,
+         dto.approx_chick_price_per_head ?? null, dto.culling_qty ?? null, orNull(dto.remarks)],
+      );
+    }
 
     // Daily mortality — bulk replace (delete + insert in one round-trip each)
     const dailyMortality = dto.daily_mortality as Array<{ day_no: number; qty: number }> | undefined;
@@ -130,19 +168,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       [auth.userId, existing.company_id, params.id]).catch(() => {});
 
     // Return full updated record
-    const [updated] = await query(
-      `SELECT g.*, b.batch_no, b.date_received, b.item_id,
-              i.name AS item_name, i.sku,
-              li.name AS live_item_name, li.sku AS live_item_sku,
-              fb.name AS building_name, fb.code AS building_code,
-              br.name AS branch_name, br.code AS branch_code,
-              cc.name AS cost_center_name, cc.code AS cost_center_code
-         FROM grow_cycles g JOIN chick_batches b ON b.id = g.batch_id JOIN items i ON i.id = b.item_id
-         LEFT JOIN items li ON li.id = g.live_item_id
-         LEFT JOIN farm_buildings fb ON fb.id = g.building_id
-         LEFT JOIN branches br ON br.id = g.branch_id
-         LEFT JOIN cost_centers cc ON cc.id = g.cost_center_id
-        WHERE g.id = $1`, [params.id]);
+    const updated = await fetchGrowCycle(params.id);
     const [daily2, weekly2, cons2] = await Promise.all([
       query(`SELECT day_no, qty FROM grow_daily_mortality WHERE grow_cycle_id=$1 ORDER BY day_no`, [params.id]),
       query(`SELECT week_no, weight_kg FROM grow_weekly_weights WHERE grow_cycle_id=$1 ORDER BY week_no`, [params.id]),
