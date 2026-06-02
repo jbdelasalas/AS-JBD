@@ -20,18 +20,28 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get('search');
   const limit = Math.min(parseInt(searchParams.get('limit') ?? '50'), 500);
   const offset = parseInt(searchParams.get('offset') ?? '0');
+  const minimal = searchParams.get('minimal') === 'true';
 
   const params: unknown[] = [companyId];
-  let where = `s.company_id = $1`;
+  let where = `s.company_id = $1 AND s.is_active = true`;
 
   if (search) {
     params.push(`%${search}%`);
     where += ` AND (s.name ILIKE $${params.length} OR s.code ILIKE $${params.length})`;
   }
 
-  params.push(limit, offset);
-
   try {
+    if (minimal) {
+      params.push(limit);
+      const rows = await query(
+        `SELECT id, code, name FROM suppliers s WHERE ${where} ORDER BY name ASC LIMIT $${params.length}`,
+        params,
+      );
+      return ok({ data: rows });
+    }
+
+    params.push(limit, offset);
+
     const rows = await query(
       `SELECT s.*,
               COALESCE(SUM(b.balance), 0) AS open_ap_balance

@@ -8,6 +8,8 @@ interface Batch {
   item_name: string; date_received: string; price_per_head: number;
   grn_no: string | null; grn_date: string | null;
   po_id: string | null; po_no: string | null;
+  grn_branch_id: string | null; grn_building_id: string | null; grn_grow_reference_id: string | null;
+  po_branch_id: string | null;  po_building_id: string | null;  po_grow_reference_id: string | null;
 }
 interface Building { id: string; code: string; name: string; branch_id: string | null; }
 interface Branch { id: string; name: string; code: string; }
@@ -46,8 +48,24 @@ export default function NewGrowCyclePage() {
 
   // Filter buildings by selected location
   const filteredBuildings = form.branch_id
-    ? buildings.filter(b => b.branch_id === form.branch_id)
+    ? buildings.filter(b => !b.branch_id || b.branch_id === form.branch_id)
     : buildings;
+
+  // Resolve grow_reference name → UUID for batch filtering
+  const selectedGrowRefId = growRefs.find(g => g.name === form.grow_reference)?.id ?? null;
+
+  // Filter chick batches: only show batches whose GRN (or PO) match location, building, grow reference.
+  // A tag is only applied as a filter when the user has actually selected a value.
+  const filteredBatches = allBatches.filter(b => {
+    const branchId   = b.grn_branch_id   ?? b.po_branch_id;
+    const buildingId = b.grn_building_id ?? b.po_building_id;
+    const growRefId  = b.grn_grow_reference_id ?? b.po_grow_reference_id;
+
+    if (form.branch_id   && branchId   && branchId   !== form.branch_id)   return false;
+    if (form.building_id && buildingId && buildingId !== form.building_id)  return false;
+    if (selectedGrowRefId && growRefId && growRefId  !== selectedGrowRefId) return false;
+    return true;
+  });
 
   const selectedBatch = allBatches.find(b => b.id === form.batch_id);
 
@@ -55,6 +73,14 @@ export default function NewGrowCyclePage() {
 
   function handleLocationChange(branchId: string) {
     setForm(f => ({ ...f, branch_id: branchId, building_id: '', batch_id: '', heads: '', chick_price_per_head: '' }));
+  }
+
+  function handleBuildingChange(buildingId: string) {
+    setForm(f => ({ ...f, building_id: buildingId, batch_id: '', heads: '', chick_price_per_head: '' }));
+  }
+
+  function handleGrowRefChange(growRef: string) {
+    setForm(f => ({ ...f, grow_reference: growRef, batch_id: '', heads: '', chick_price_per_head: '' }));
   }
 
   function handleBatchChange(batchId: string) {
@@ -160,26 +186,26 @@ export default function NewGrowCyclePage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Grow Reference</label>
-              <select value={form.grow_reference} onChange={e => setField('grow_reference', e.target.value)}
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Grow Reference *</label>
+              <select required value={form.grow_reference} onChange={e => handleGrowRefChange(e.target.value)}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
-                <option value="">— none —</option>
+                <option value="">— select —</option>
                 {growRefs.map(g => <option key={g.id} value={g.name}>{g.code} — {g.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Cost Center</label>
-              <select value={form.cost_center_id} onChange={e => setField('cost_center_id', e.target.value)}
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Cost Center *</label>
+              <select required value={form.cost_center_id} onChange={e => setField('cost_center_id', e.target.value)}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
-                <option value="">— none —</option>
+                <option value="">— select —</option>
                 {costCenters.map(c => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
               </select>
             </div>
 
             {/* Row 4 — Building + Chick Batch (with PO tag) */}
             <div>
-              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Building</label>
-              <select value={form.building_id} onChange={e => setField('building_id', e.target.value)}
+              <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Building *</label>
+              <select required value={form.building_id} onChange={e => handleBuildingChange(e.target.value)}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                 <option value="">Select building…</option>
                 {filteredBuildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -190,7 +216,10 @@ export default function NewGrowCyclePage() {
               <select required value={form.batch_id} onChange={e => handleBatchChange(e.target.value)}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                 <option value="">Select batch…</option>
-                {allBatches.map(b => (
+                {filteredBatches.length === 0 && (form.branch_id || form.building_id || form.grow_reference) && (
+                  <option disabled value="">No batches match the selected location / building / grow</option>
+                )}
+                {filteredBatches.map(b => (
                   <option key={b.id} value={b.id}>
                     {b.item_name} — {b.batch_no}{b.po_no ? ` [${b.po_no}]` : ''}{b.grn_no ? ` · ${b.grn_no}` : ''} ({Number(b.heads_available).toLocaleString()} heads)
                   </option>

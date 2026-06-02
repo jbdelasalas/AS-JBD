@@ -15,10 +15,18 @@ export async function GET(
   }
 
   const rows = await query(
-    `SELECT gr.*, po.po_no, s.name AS supplier_name, s.code AS supplier_code
+    `SELECT gr.*, po.po_no, s.name AS supplier_name, s.code AS supplier_code,
+            br.code AS branch_code,    br.name AS branch_name,
+            fb.code AS building_code,  fb.name AS building_name,
+            cc.code AS cost_center_code, cc.name AS cost_center_name,
+            gref.code AS grow_ref_code,  gref.name AS grow_ref_name
        FROM goods_receipts gr
        JOIN purchase_orders po ON po.id = gr.po_id
-       JOIN suppliers s ON s.id = po.supplier_id
+       JOIN suppliers s        ON s.id  = po.supplier_id
+       LEFT JOIN branches br          ON br.id   = gr.branch_id
+       LEFT JOIN farm_buildings fb    ON fb.id   = gr.building_id
+       LEFT JOIN cost_centers cc      ON cc.id   = gr.cost_center_id
+       LEFT JOIN grow_references gref ON gref.id = gr.grow_reference_id
       WHERE gr.id = $1 LIMIT 1`,
     [params.id],
   );

@@ -14,6 +14,10 @@ interface GRNRow {
   po_no: string;
   supplier_name: string;
   status: string;
+  branch_code: string | null;   branch_name: string | null;
+  building_code: string | null; building_name: string | null;
+  cost_center_code: string | null;
+  grow_ref_code: string | null;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -62,19 +66,23 @@ export default function GoodsReceiptsPage() {
         <table className="min-w-full text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
             <tr>
-              <th className="px-3 py-2 text-left font-medium">GRN no.</th>
+              <th className="px-3 py-2 text-left font-medium">GRN No.</th>
               <th className="px-3 py-2 text-left font-medium">Date</th>
-              <th className="px-3 py-2 text-left font-medium">PO no.</th>
+              <th className="px-3 py-2 text-left font-medium">PO No.</th>
               <th className="px-3 py-2 text-left font-medium">Supplier</th>
-              <th className="px-3 py-2 text-left font-medium">Delivery no.</th>
+              <th className="px-3 py-2 text-left font-medium">Location</th>
+              <th className="px-3 py-2 text-left font-medium">Building</th>
+              <th className="px-3 py-2 text-left font-medium">Cost Center</th>
+              <th className="px-3 py-2 text-left font-medium">Grow</th>
+              <th className="px-3 py-2 text-left font-medium">Delivery No.</th>
               <th className="px-3 py-2 text-left font-medium">Status</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="px-3 py-6 text-center text-xs text-slate-500">Loading…</td></tr>
+              <tr><td colSpan={10} className="px-3 py-6 text-center text-xs text-slate-500">Loading…</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={6} className="px-3 py-8 text-center text-xs text-slate-500">No goods receipts found.</td></tr>
+              <tr><td colSpan={10} className="px-3 py-8 text-center text-xs text-slate-500">No goods receipts found.</td></tr>
             ) : paged.map((r) => (
               <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
                 <td className="px-3 py-2">
@@ -85,6 +93,10 @@ export default function GoodsReceiptsPage() {
                 <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{formatDate(r.receipt_date)}</td>
                 <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">{r.po_no}</td>
                 <td className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100">{r.supplier_name}</td>
+                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{r.branch_code ?? '—'}</td>
+                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{r.building_code ?? '—'}</td>
+                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{r.cost_center_code ?? '—'}</td>
+                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{r.grow_ref_code ?? '—'}</td>
                 <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{r.delivery_no ?? '—'}</td>
                 <td className="px-3 py-2">
                   <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[r.status] ?? STATUS_STYLES.draft}`}>

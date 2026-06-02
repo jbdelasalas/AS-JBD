@@ -18,7 +18,13 @@ export async function GET(request: NextRequest) {
     const rows = await query(
       `SELECT b.*, i.name AS item_name, i.sku,
               gr.grn_no, gr.receipt_date AS grn_date,
-              po.po_no
+              gr.branch_id        AS grn_branch_id,
+              gr.building_id      AS grn_building_id,
+              gr.grow_reference_id AS grn_grow_reference_id,
+              po.po_no,
+              po.branch_id        AS po_branch_id,
+              po.building_id      AS po_building_id,
+              po.grow_reference_id AS po_grow_reference_id
          FROM chick_batches b
          JOIN items i ON i.id = b.item_id
          LEFT JOIN goods_receipts gr ON gr.id = b.grn_id

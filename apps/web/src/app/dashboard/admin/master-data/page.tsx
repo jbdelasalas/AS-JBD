@@ -13,6 +13,7 @@ const MASTER_DATA = [
     items: [
       { href: '/dashboard/admin/master-data/buildings', title: 'Buildings', desc: 'Farm buildings and houses', icon: '🏠' },
       { href: '/dashboard/admin/master-data/grow-references', title: 'Grow References', desc: 'Grow cycle reference names (Grow 1, Grow 2…)', icon: '🌱' },
+      { href: '/dashboard/admin/master-data/delivery-methods', title: 'Delivery Methods', desc: 'IN HOUSE, PICK UP, THIRD PARTY, and more', icon: '🚚' },
     ],
   },
   {

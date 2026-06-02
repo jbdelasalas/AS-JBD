@@ -28,10 +28,14 @@ export function SearchableSelect({
 
   const selected = options.find(o => o.value === value);
 
+  const VISIBLE_CAP = 100;
+
   // Filter options by query
-  const filtered = query.trim()
+  const allFiltered = query.trim()
     ? options.filter(o => o.label.toLowerCase().includes(query.toLowerCase()))
     : options;
+  const filtered = allFiltered.slice(0, VISIBLE_CAP);
+  const truncated = allFiltered.length > VISIBLE_CAP;
 
   // Close on outside click
   useEffect(() => {
@@ -131,17 +135,24 @@ export function SearchableSelect({
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-xs text-slate-400">No matches</div>
           ) : (
-            filtered.map(opt => (
-              <div
-                key={opt.value}
-                onMouseDown={() => handleSelect(opt)}
-                className={`cursor-pointer px-3 py-1.5 text-sm truncate hover:bg-brand-50 dark:hover:bg-slate-700 ${
-                  opt.value === value ? 'bg-brand-50 text-brand-700 font-medium dark:bg-slate-700 dark:text-brand-400' : 'text-slate-800 dark:text-slate-200'
-                }`}
-              >
-                {opt.label}
-              </div>
-            ))
+            <>
+              {filtered.map(opt => (
+                <div
+                  key={opt.value}
+                  onMouseDown={() => handleSelect(opt)}
+                  className={`cursor-pointer px-3 py-1.5 text-sm truncate hover:bg-brand-50 dark:hover:bg-slate-700 ${
+                    opt.value === value ? 'bg-brand-50 text-brand-700 font-medium dark:bg-slate-700 dark:text-brand-400' : 'text-slate-800 dark:text-slate-200'
+                  }`}
+                >
+                  {opt.label}
+                </div>
+              ))}
+              {truncated && (
+                <div className="border-t border-slate-100 px-3 py-1.5 text-xs text-slate-400 dark:border-slate-700">
+                  Showing {VISIBLE_CAP} of {allFiltered.length} — type to filter
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

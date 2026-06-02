@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(parseInt(searchParams.get('limit') ?? '500'), 500);
   const search = searchParams.get('search') ?? '';
   const activeOnly = searchParams.get('active_only') !== 'false';
+  const minimal = searchParams.get('minimal') === 'true';
 
   const params: unknown[] = [companyId];
   let where = `i.company_id = $1`;
@@ -25,6 +26,14 @@ export async function GET(request: NextRequest) {
   params.push(limit);
 
   try {
+    if (minimal) {
+      const rows = await query(
+        `SELECT id, sku, name, selling_price FROM items i WHERE ${where} ORDER BY sku LIMIT $${params.length}`,
+        params,
+      );
+      return ok(rows.map((r) => ({ ...r, selling_price: Number(r.selling_price) })));
+    }
+
     const rows = await query(
       `SELECT i.id, i.sku, i.name, i.uom, i.item_type, i.costing_method,
               i.standard_cost, i.selling_price, i.reorder_point, i.is_active,

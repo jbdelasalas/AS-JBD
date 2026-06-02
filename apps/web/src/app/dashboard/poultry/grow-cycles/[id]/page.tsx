@@ -1,9 +1,8 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { api } from '@/lib/api';
-import { formatDate } from '@/lib/format';
+import { formatDate, formatPHP } from '@/lib/format';
 
 interface Cycle {
   id: string; doc_no: string; status: string; year: number;
@@ -12,14 +11,37 @@ interface Cycle {
   est_harvest_recovery: number | null; grow_reference: string | null;
   approx_heads: number; chick_price_per_head: number; approx_chick_price_per_head: number;
   culling_qty: number; remarks: string | null;
-  item_name: string; sku: string; batch_no: string;
-  building_name: string | null; branch_name: string | null;
+  item_id: string; item_name: string; sku: string; batch_no: string;
+  branch_id: string | null; building_id: string | null; cost_center_id: string | null;
+  building_name: string | null; building_code: string | null;
+  branch_name: string | null; branch_code: string | null;
+  cost_center_name: string | null; cost_center_code: string | null;
   daily_mortality: Array<{ day_no: number; qty: number }>;
   weekly_weights: Array<{ week_no: number; weight_kg: number }>;
   item_consumption: Array<{ id: string; line_no: number; item_id: string; item_name: string; sku: string; quantity: number; uom: string; unit_cost: number; total_cost: number; remarks: string | null }>;
 }
 
-interface Item { id: string; sku: string; name: string; }
+interface Building { id: string; code: string; name: string; branch_id: string | null; }
+interface Branch { id: string; code: string; name: string; }
+interface GrowRef { id: string; code: string; name: string; }
+interface CostCenter { id: string; code: string; name: string; }
+interface Uom { id: string; code: string; name: string; }
+interface TallySheet {
+  id: string; doc_no: string; status: string; transfer_date: string;
+  harvested_heads: number; net_heads: number; net_kgs: number;
+  received_by: string | null; created_at: string;
+}
+
+interface Item { id: string; sku: string; name: string; uom: string; qty_on_hand: number; avg_cost: number; }
+
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{label}</div>
+      <div className="text-sm text-slate-900 dark:text-slate-100">{value ?? <span className="text-slate-400">—</span>}</div>
+    </div>
+  );
+}
 
 const DAYS = Array.from({ length: 35 }, (_, i) => i + 1);
 const WEEKS = [0, 7, 14, 21, 25, 32];
@@ -30,22 +52,49 @@ export default function GrowCycleDetailPage() {
   const router = useRouter();
   const [doc, setDoc] = useState<Cycle | null>(null);
   const [items, setItems] = useState<Item[]>([]);
+  const [buildings, setBuildings] = useState<Building[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [growRefs, setGrowRefs] = useState<GrowRef[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+  const [uoms, setUoms] = useState<Uom[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [msgType, setMsgType] = useState<'error' | 'success'>('error');
 
-  // Edit state
+  // Harvest panel state
+  const [showHarvest, setShowHarvest] = useState(false);
+  const [harvestHeads, setHarvestHeads] = useState('');
+  const [tallySheets, setTallySheets] = useState<TallySheet[]>([]);
+  const [harvesting, setHarvesting] = useState(false);
+  const [harvestError, setHarvestError] = useState<string | null>(null);
+
+  // Header edit state
+  const [editingHeader, setEditingHeader] = useState(false);
+  const [headerForm, setHeaderForm] = useState({
+    branch_id: '', building_id: '', grow_reference: '', cost_center_id: '',
+    start_date: '', expected_end_date: '', remarks: '',
+  });
+
+  // Operations edit state
   const [dailyMortality, setDailyMortality] = useState<Record<number, string>>({});
   const [culling, setCulling] = useState('');
   const [weeklyWeights, setWeeklyWeights] = useState<Record<number, string>>({});
   const [consumption, setConsumption] = useState<Array<{ item_id: string; quantity: string; uom: string; unit_cost: string; remarks: string }>>([]);
 
   const load = useCallback(() => {
-    const cid = localStorage.getItem('company_id') ?? '';
     api.get<Cycle>(`/poultry/grow-cycles/${id}`).then(d => {
       setDoc(d);
-      // Populate edit states
+      setHeaderForm({
+        branch_id: d.branch_id ?? '',
+        building_id: d.building_id ?? '',
+        grow_reference: d.grow_reference ?? '',
+        cost_center_id: d.cost_center_id ?? '',
+        start_date: d.start_date ?? '',
+        expected_end_date: d.expected_end_date ?? '',
+        remarks: d.remarks ?? '',
+      });
+      // Populate operations edit states
       const dm: Record<number, string> = {};
       (d.daily_mortality ?? []).forEach(m => { dm[m.day_no] = String(m.qty || ''); });
       setDailyMortality(dm);
@@ -57,11 +106,67 @@ export default function GrowCycleDetailPage() {
         item_id: c.item_id, quantity: String(c.quantity), uom: c.uom, unit_cost: String(c.unit_cost), remarks: c.remarks ?? '',
       })));
     }).catch(() => {}).finally(() => setLoading(false));
-    // Load items for consumption
-    if (cid) api.get<Item[]>(`/inventory/items?company_id=${cid}&limit=500`).then(r => setItems(Array.isArray(r) ? r : [])).catch(() => {});
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Load reference data for dropdowns independently of the cycle reload
+  useEffect(() => {
+    const cid = localStorage.getItem('company_id');
+    if (!cid) return;
+    api.get<Item[]>(`/poultry/grow-cycles/${id}/consumable-items`).then(r => setItems(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<Branch[]>(`/admin/branches?company_id=${cid}`).then(r => setBranches(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<Building[]>(`/poultry/buildings?company_id=${cid}`).then(r => setBuildings(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<GrowRef[]>(`/poultry/grow-references?company_id=${cid}`).then(r => setGrowRefs(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<CostCenter[]>(`/admin/cost-centers?company_id=${cid}&limit=100`).then(r => setCostCenters(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<Uom[]>(`/admin/uoms?company_id=${cid}`).then(r => setUoms(Array.isArray(r) ? r : [])).catch(() => {});
+  }, []);
+
+  function openHarvest() {
+    setShowHarvest(true);
+    setHarvestHeads(String(doc?.heads_available ?? ''));
+    setHarvestError(null);
+    const cid = localStorage.getItem('company_id');
+    if (cid) {
+      api.get<{ data: TallySheet[] }>(`/poultry/tally-sheets?company_id=${cid}&grow_cycle_id=${id}&limit=50`)
+        .then(r => setTallySheets(r.data ?? [])).catch(() => {});
+    }
+  }
+
+  async function executeHarvest() {
+    const heads = parseInt(harvestHeads) || 0;
+    if (heads <= 0) { setHarvestError('Enter a valid number of heads'); return; }
+    if (!doc) return;
+    setHarvesting(true); setHarvestError(null);
+    try {
+      const cid = localStorage.getItem('company_id')!;
+      const today = new Date().toISOString().split('T')[0];
+      const ts = await api.post<{ id: string }>('/poultry/tally-sheets', {
+        company_id:        cid,
+        grow_cycle_id:     id,
+        tally_type:        'harvest',
+        transfer_date:     today,
+        harvested_heads:   heads,
+        destination_id:    doc.branch_id    || null,
+        branch_id:         doc.branch_id    || null,
+        building_id:       doc.building_id  || null,
+        cost_center_id:    doc.cost_center_id || null,
+        remarks:           `Generated from growing ${doc.doc_no}`,
+        lines: [{
+          item_id:   doc.item_id,
+          heads,
+          gross_kgs: 0,
+          crate_kgs: 0,
+          net_kgs:   0,
+        }],
+      });
+      router.push(`/dashboard/poultry/tally-sheets/${ts.id}`);
+    } catch (e: unknown) {
+      setHarvestError((e as Error).message ?? 'Failed to create tally sheet');
+    } finally {
+      setHarvesting(false);
+    }
+  }
 
   async function save() {
     setSaving(true); setMsg(null);
@@ -73,13 +178,25 @@ export default function GrowCycleDetailPage() {
         unit_cost: parseFloat(c.unit_cost) || 0, remarks: c.remarks || undefined,
       }));
       await api.patch(`/poultry/grow-cycles/${id}`, {
+        ...(editingHeader ? {
+          branch_id:         headerForm.branch_id || null,
+          building_id:       headerForm.building_id || null,
+          grow_reference:    headerForm.grow_reference || null,
+          cost_center_id:    headerForm.cost_center_id || null,
+          start_date:        headerForm.start_date || null,
+          expected_end_date: headerForm.expected_end_date || null,
+          remarks:           headerForm.remarks || null,
+        } : {}),
         culling_qty: parseFloat(culling) || 0,
         daily_mortality: dm,
         weekly_weights: ww,
         item_consumption: cons,
       });
       setMsg('Saved successfully'); setMsgType('success');
+      setEditingHeader(false);
       load();
+      // Refresh consumable items in case location/building changed
+      api.get<Item[]>(`/poultry/grow-cycles/${id}/consumable-items`).then(r => setItems(Array.isArray(r) ? r : [])).catch(() => {});
     } catch (e: unknown) { setMsg((e as Error).message); setMsgType('error'); } finally { setSaving(false); }
   }
 
@@ -110,10 +227,21 @@ export default function GrowCycleDetailPage() {
                 className="rounded bg-brand-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
                 {saving ? 'Saving…' : 'Save'}
               </button>
-              <Link href={`/dashboard/poultry/tally-sheets/new?grow_cycle_id=${doc.id}`}
-                className="rounded border border-brand-300 px-4 py-1.5 text-sm text-brand-600 hover:bg-brand-50 dark:border-brand-700 dark:text-brand-400">
-                Create Tally Sheet
-              </Link>
+              {!editingHeader ? (
+                <button onClick={() => setEditingHeader(true)}
+                  className="rounded border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300">
+                  Edit Header
+                </button>
+              ) : (
+                <button onClick={() => { setEditingHeader(false); setHeaderForm({ branch_id: doc.branch_id ?? '', building_id: doc.building_id ?? '', grow_reference: doc.grow_reference ?? '', cost_center_id: doc.cost_center_id ?? '', start_date: doc.start_date ?? '', expected_end_date: doc.expected_end_date ?? '', remarks: doc.remarks ?? '' }); }}
+                  className="rounded border border-slate-300 px-4 py-1.5 text-sm text-slate-500 hover:bg-slate-50 dark:border-slate-600">
+                  Cancel Edit
+                </button>
+              )}
+              <button onClick={openHarvest}
+                className="rounded border border-brand-300 px-4 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-50 dark:border-brand-700 dark:text-brand-400">
+                Harvest
+              </button>
               <button onClick={complete} disabled={saving}
                 className="rounded border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50">
                 Mark Completed
@@ -130,78 +258,160 @@ export default function GrowCycleDetailPage() {
 
       {/* Header card */}
       <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6">
+        {editingHeader && <div className="mb-4 text-xs font-medium text-brand-600 dark:text-brand-400">Editing header — click Save to apply changes</div>}
         <div className="grid grid-cols-4 gap-x-8 gap-y-5 text-sm">
-          <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Transaction Number</div>
-            <div className="text-slate-900 dark:text-slate-100 font-mono">{doc.doc_no}</div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Start Date</div>
-            <div className="text-slate-900 dark:text-slate-100">{formatDate(doc.start_date)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Est. Harvest Recovery</div>
-            <div className={`text-slate-900 dark:text-slate-100 ${!doc.est_harvest_recovery ? 'text-red-500' : ''}`}>
-              {doc.est_harvest_recovery != null ? Number(doc.est_harvest_recovery).toFixed(2) : '—'}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Remarks</div>
-            <div className="text-slate-900 dark:text-slate-100">{doc.remarks ?? '—'}</div>
-          </div>
 
-          <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Year</div>
-            <div className="text-slate-900 dark:text-slate-100">{doc.year}</div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Grow Reference</div>
-            <div className="text-slate-900 dark:text-slate-100">{doc.grow_reference ?? '—'}</div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">End Date</div>
-            <div className="text-slate-900 dark:text-slate-100">{doc.expected_end_date ? formatDate(doc.expected_end_date) : '—'}</div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Approx Heads</div>
-            <div className="text-slate-900 dark:text-slate-100">{Number(doc.approx_heads).toLocaleString()}</div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Status</div>
-            <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[doc.status] ?? 'bg-slate-100 text-slate-600'}`}>{doc.status}</span>
-          </div>
+          {/* Fixed / read-only fields */}
+          <Field label="Transaction Number" value={<span className="font-mono">{doc.doc_no}</span>} />
+          <Field label="Status" value={<span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[doc.status] ?? 'bg-slate-100 text-slate-600'}`}>{doc.status}</span>} />
+          <Field label="Year" value={doc.year} />
+          <Field label="Chick Batch" value={`${doc.item_name} ${doc.batch_no}`} />
+          <Field label="Heads" value={<span className="font-semibold">{Number(doc.heads_in).toLocaleString()}</span>} />
+          <Field label="Available / Harvested" value={<span className="text-emerald-600 font-semibold">{Number(doc.heads_available).toLocaleString()} / {Number(doc.heads_harvested).toLocaleString()}</span>} />
+          <Field label="Chick Price/Head" value={Number(doc.chick_price_per_head).toFixed(6)} />
+          <Field label="Approx Chick Price/Head" value={Number(doc.approx_chick_price_per_head).toFixed(6)} />
+          <Field label="Est. Harvest Recovery" value={doc.est_harvest_recovery != null ? Number(doc.est_harvest_recovery).toFixed(2) : <span className="text-red-500">—</span>} />
 
-          <div className="col-span-2">
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Location</div>
-            <div className="text-slate-900 dark:text-slate-100">{doc.branch_name ?? '—'}</div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Chick Price/Head</div>
-            <div className="text-slate-900 dark:text-slate-100">{Number(doc.chick_price_per_head).toFixed(6)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Approx Chick Price/Head</div>
-            <div className="text-slate-900 dark:text-slate-100">{Number(doc.approx_chick_price_per_head).toFixed(6)}</div>
-          </div>
-
-          <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Building</div>
-            <div className="text-slate-900 dark:text-slate-100">{doc.building_name ?? '—'}</div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Chick Batch</div>
-            <div className="text-slate-900 dark:text-slate-100">{doc.item_name} {doc.batch_no}</div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Heads</div>
-            <div className="text-slate-900 dark:text-slate-100 font-semibold">{Number(doc.heads_in).toLocaleString()}</div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Available / Harvested</div>
-            <div className="text-emerald-600 font-semibold">{Number(doc.heads_available).toLocaleString()} / {Number(doc.heads_harvested).toLocaleString()}</div>
-          </div>
+          {/* Editable fields */}
+          {editingHeader ? (
+            <>
+              <div className="col-span-2">
+                <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Location *</label>
+                <select required value={headerForm.branch_id} onChange={e => setHeaderForm(f => ({ ...f, branch_id: e.target.value, building_id: '' }))}
+                  className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                  <option value="">Select location…</option>
+                  {branches.map(b => <option key={b.id} value={b.id}>{b.code} — {b.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Building *</label>
+                <select required value={headerForm.building_id} onChange={e => setHeaderForm(f => ({ ...f, building_id: e.target.value }))}
+                  className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                  <option value="">Select building…</option>
+                  {buildings.filter(b => !headerForm.branch_id || !b.branch_id || b.branch_id === headerForm.branch_id).map(b => <option key={b.id} value={b.id}>{b.code} — {b.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Grow Reference *</label>
+                <select required value={headerForm.grow_reference} onChange={e => setHeaderForm(f => ({ ...f, grow_reference: e.target.value }))}
+                  className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                  <option value="">— select —</option>
+                  {growRefs.map(g => <option key={g.id} value={g.name}>{g.code} — {g.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Cost Center *</label>
+                <select required value={headerForm.cost_center_id} onChange={e => setHeaderForm(f => ({ ...f, cost_center_id: e.target.value }))}
+                  className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                  <option value="">— select —</option>
+                  {costCenters.map(c => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Start Date</label>
+                <input type="date" value={headerForm.start_date} onChange={e => setHeaderForm(f => ({ ...f, start_date: e.target.value }))}
+                  className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">End Date</label>
+                <input type="date" value={headerForm.expected_end_date} onChange={e => setHeaderForm(f => ({ ...f, expected_end_date: e.target.value }))}
+                  className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+              </div>
+              <div className="col-span-2">
+                <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Remarks</label>
+                <input type="text" value={headerForm.remarks} onChange={e => setHeaderForm(f => ({ ...f, remarks: e.target.value }))}
+                  className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="col-span-2"><Field label="Location" value={doc.branch_name ? `${doc.branch_code} — ${doc.branch_name}` : null} /></div>
+              <Field label="Building" value={doc.building_name ? `${doc.building_code} — ${doc.building_name}` : null} />
+              <Field label="Grow Reference" value={doc.grow_reference} />
+              <Field label="Cost Center" value={doc.cost_center_name ? `${doc.cost_center_code} — ${doc.cost_center_name}` : null} />
+              <Field label="Start Date" value={formatDate(doc.start_date)} />
+              <Field label="End Date" value={doc.expected_end_date ? formatDate(doc.expected_end_date) : null} />
+              <div className="col-span-2"><Field label="Remarks" value={doc.remarks} /></div>
+            </>
+          )}
         </div>
       </div>
+
+      {/* Partial Harvest Panel */}
+      {showHarvest && (
+        <div className="rounded-lg border border-brand-200 bg-brand-50 dark:border-brand-800 dark:bg-slate-900 p-6">
+          <div className="mb-4 text-base font-semibold text-slate-800 dark:text-slate-100">Partial Harvest</div>
+          <div className="mb-5 h-px bg-slate-200 dark:bg-slate-700" />
+
+          <div className="mb-6 grid grid-cols-2 gap-6 max-w-sm">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Remaining Heads *</label>
+              <div className="border-b border-slate-300 py-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {Number(doc.heads_available).toLocaleString()}
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Heads *</label>
+              <input
+                type="number" min={1} max={doc.heads_available} step={1}
+                value={harvestHeads}
+                onChange={e => setHarvestHeads(e.target.value)}
+                className="w-full border-b border-slate-300 bg-transparent py-1 text-sm text-slate-900 dark:text-slate-100 focus:border-brand-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Tally Sheet History */}
+          <table className="min-w-full text-xs mb-6">
+            <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">Tally Sheet ID</th>
+                <th className="px-3 py-2 text-right font-medium">Heads</th>
+                <th className="px-3 py-2 text-right font-medium">Actual Heads</th>
+                <th className="px-3 py-2 text-right font-medium">Net KGS</th>
+                <th className="px-3 py-2 text-left font-medium">Harvest Date</th>
+                <th className="px-3 py-2 text-left font-medium">Harvest By</th>
+                <th className="px-3 py-2 text-left font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tallySheets.length === 0 ? (
+                <tr><td colSpan={7} className="px-3 py-4 text-center text-slate-400">No harvest tally sheets yet</td></tr>
+              ) : tallySheets.map(ts => (
+                <tr key={ts.id} className="border-b border-slate-100 dark:border-slate-700">
+                  <td className="px-3 py-2 font-mono text-brand-700 dark:text-brand-400">{ts.doc_no}</td>
+                  <td className="px-3 py-2 text-right font-mono">{Number(ts.harvested_heads).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right font-mono">{Number(ts.net_heads).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right font-mono">{Number(ts.net_kgs).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
+                  <td className="px-3 py-2 text-slate-500">{formatDate(ts.transfer_date)}</td>
+                  <td className="px-3 py-2 text-slate-500">{ts.received_by ?? '—'}</td>
+                  <td className="px-3 py-2">
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${ts.status === 'confirmed' ? 'bg-emerald-100 text-emerald-700' : ts.status === 'voided' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
+                      {ts.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {harvestError && (
+            <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+              {harvestError}
+            </div>
+          )}
+          <div className="flex justify-end gap-4">
+            <button onClick={() => { setShowHarvest(false); setHarvestError(null); }}
+              className="px-4 py-1.5 text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 uppercase tracking-wide">
+              Cancel
+            </button>
+            <button onClick={executeHarvest} disabled={harvesting}
+              className="px-4 py-1.5 text-sm font-semibold text-brand-600 hover:text-brand-800 dark:text-brand-400 disabled:opacity-50 uppercase tracking-wide">
+              {harvesting ? 'Creating…' : 'Harvest'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Daily Mortality Heads */}
       <div className="mt-6 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
@@ -291,13 +501,65 @@ export default function GrowCycleDetailPage() {
         </div>
       </div>
 
+      {/* Available Inventory */}
+      <div className="mt-6 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+        <div className="border-b border-slate-200 dark:border-slate-700 px-6 py-3 flex items-center justify-between">
+          <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300">Available Inventory</h2>
+          <span className="text-xs text-slate-400">Filtered by location, building &amp; grow reference</span>
+        </div>
+        {items.length === 0 ? (
+          <div className="px-6 py-4 text-xs text-slate-400">No inventory found for this location / building / grow reference.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-xs">
+              <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                <tr>
+                  <th className="px-4 py-2 text-left font-medium">SKU</th>
+                  <th className="px-4 py-2 text-left font-medium">Item</th>
+                  <th className="px-4 py-2 text-left font-medium w-16">UOM</th>
+                  <th className="px-4 py-2 text-right font-medium w-28">On Hand</th>
+                  <th className="px-4 py-2 text-right font-medium w-28">Avg Cost</th>
+                  <th className="px-4 py-2 text-right font-medium w-28">Stock Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map(it => (
+                  <tr key={it.id} className="border-b border-slate-50 dark:border-slate-700 last:border-0">
+                    <td className="px-4 py-2 font-mono text-slate-500 dark:text-slate-400">{it.sku}</td>
+                    <td className="px-4 py-2 dark:text-slate-300">{it.name}</td>
+                    <td className="px-4 py-2 text-slate-500 dark:text-slate-400">{it.uom}</td>
+                    <td className={`px-4 py-2 text-right font-mono font-semibold ${it.qty_on_hand > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+                      {Number(it.qty_on_hand).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-2 text-right font-mono dark:text-slate-300">
+                      ₱{Number(it.avg_cost).toLocaleString('en-PH', { minimumFractionDigits: 4 })}
+                    </td>
+                    <td className="px-4 py-2 text-right font-mono dark:text-slate-300">
+                      ₱{(it.qty_on_hand * it.avg_cost).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                  <td colSpan={5} className="px-4 py-2 text-right text-xs font-medium text-slate-500 dark:text-slate-400">Total Stock Value</td>
+                  <td className="px-4 py-2 text-right font-mono font-semibold text-slate-900 dark:text-slate-100">
+                    ₱{items.reduce((s, it) => s + it.qty_on_hand * it.avg_cost, 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Item Consumption */}
       <div className="mt-6 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
         <div className="border-b border-slate-200 dark:border-slate-700 px-6 py-3 flex items-center justify-between">
           <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300">Item Consumption</h2>
           {isEditable && (
             <button type="button"
-              onClick={() => setConsumption(c => [...c, { item_id: '', quantity: '', uom: 'bags', unit_cost: '', remarks: '' }])}
+              onClick={() => setConsumption(c => [...c, { item_id: '', quantity: '', uom: uoms[0]?.code ?? '', unit_cost: '', remarks: '' }])}
               className="text-xs text-brand-600 hover:underline">+ Add line</button>
           )}
         </div>
@@ -324,11 +586,27 @@ export default function GrowCycleDetailPage() {
                     <tr key={i} className="border-b border-slate-50 dark:border-slate-700 last:border-0">
                       <td className="py-2 pr-3">
                         <select value={c.item_id}
-                          onChange={e => setConsumption(prev => { const n = [...prev]; n[i] = { ...n[i], item_id: e.target.value }; return n; })}
+                          onChange={e => {
+                            const item = items.find(it => it.id === e.target.value);
+                            setConsumption(prev => {
+                              const n = [...prev];
+                              n[i] = {
+                                ...n[i],
+                                item_id: e.target.value,
+                                uom: item?.uom ?? n[i].uom,
+                                unit_cost: item?.avg_cost ? String(item.avg_cost) : n[i].unit_cost,
+                              };
+                              return n;
+                            });
+                          }}
                           disabled={!isEditable}
                           className="w-full rounded border border-slate-300 px-1 py-1 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 disabled:bg-transparent disabled:border-0">
                           <option value="">Select item…</option>
-                          {items.map(it => <option key={it.id} value={it.id}>{it.sku} — {it.name}</option>)}
+                          {items.map(it => (
+                            <option key={it.id} value={it.id}>
+                              {it.sku} — {it.name} (on hand: {Number(it.qty_on_hand).toLocaleString()})
+                            </option>
+                          ))}
                         </select>
                       </td>
                       <td className="py-2 pr-3">
@@ -338,10 +616,20 @@ export default function GrowCycleDetailPage() {
                           className="w-full border-0 border-b border-slate-300 bg-transparent px-0 py-1 text-right focus:outline-none disabled:text-slate-400" />
                       </td>
                       <td className="py-2 pr-3">
-                        <input type="text" value={c.uom}
-                          onChange={e => setConsumption(prev => { const n = [...prev]; n[i] = { ...n[i], uom: e.target.value }; return n; })}
-                          disabled={!isEditable}
-                          className="w-full border-0 border-b border-slate-300 bg-transparent px-0 py-1 focus:outline-none disabled:text-slate-400" />
+                        {isEditable ? (
+                          <select value={c.uom}
+                            onChange={e => setConsumption(prev => { const n = [...prev]; n[i] = { ...n[i], uom: e.target.value }; return n; })}
+                            className="w-full rounded border border-slate-300 px-1 py-1 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                            <option value="">— UOM —</option>
+                            {uoms.map(u => <option key={u.id} value={u.code}>{u.code}</option>)}
+                            {/* keep current value selectable even if not in list */}
+                            {c.uom && !uoms.find(u => u.code === c.uom) && (
+                              <option value={c.uom}>{c.uom}</option>
+                            )}
+                          </select>
+                        ) : (
+                          <span className="text-slate-500 dark:text-slate-400">{c.uom}</span>
+                        )}
                       </td>
                       <td className="py-2 pr-3">
                         <input type="number" min={0} step="any" value={c.unit_cost}

@@ -2507,5 +2507,22 @@ export async function POST(request: NextRequest) {
     catch (e) { results.push(`030 ${label}: ${(e as Error).message}`); }
   }
 
+  // 031 — purchase_orders tagging columns + GL line support
+  const po031: [string, string][] = [
+    ['purchase_orders.remarks',            `ALTER TABLE purchase_orders       ADD COLUMN IF NOT EXISTS remarks          text`],
+    ['purchase_orders.building_id',        `ALTER TABLE purchase_orders       ADD COLUMN IF NOT EXISTS building_id      uuid REFERENCES farm_buildings(id)`],
+    ['purchase_orders.cost_center_id',     `ALTER TABLE purchase_orders       ADD COLUMN IF NOT EXISTS cost_center_id   uuid REFERENCES cost_centers(id)`],
+    ['purchase_orders.grow_reference_id',  `ALTER TABLE purchase_orders       ADD COLUMN IF NOT EXISTS grow_reference_id uuid REFERENCES grow_references(id)`],
+    ['purchase_order_lines.branch_id',     `ALTER TABLE purchase_order_lines  ADD COLUMN IF NOT EXISTS branch_id        uuid REFERENCES branches(id)`],
+    ['purchase_order_lines.building_id',   `ALTER TABLE purchase_order_lines  ADD COLUMN IF NOT EXISTS building_id      uuid REFERENCES farm_buildings(id)`],
+    ['purchase_order_lines.cost_center_id',`ALTER TABLE purchase_order_lines  ADD COLUMN IF NOT EXISTS cost_center_id   uuid REFERENCES cost_centers(id)`],
+    ['purchase_order_lines.gl_account_id', `ALTER TABLE purchase_order_lines  ADD COLUMN IF NOT EXISTS gl_account_id    uuid REFERENCES accounts(id)`],
+    ['purchase_order_lines.item_id nullable', `ALTER TABLE purchase_order_lines ALTER COLUMN item_id DROP NOT NULL`],
+  ];
+  for (const [label, sql] of po031) {
+    try { await query(sql); results.push(`031 ${label}: ok`); }
+    catch (e) { results.push(`031 ${label}: ${(e as Error).message}`); }
+  }
+
   return ok({ results });
 }

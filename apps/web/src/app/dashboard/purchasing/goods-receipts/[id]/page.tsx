@@ -29,6 +29,10 @@ interface GRN {
   po_id: string;
   supplier_name: string;
   supplier_code: string;
+  branch_code: string | null;    branch_name: string | null;
+  building_code: string | null;  building_name: string | null;
+  cost_center_code: string | null; cost_center_name: string | null;
+  grow_ref_code: string | null;  grow_ref_name: string | null;
   lines: GRNLine[];
 }
 
@@ -69,18 +73,46 @@ export default function GRNDetailPage() {
         </Link>
       </div>
 
-      <div className="mb-5 grid grid-cols-4 gap-3">
-        {[
-          { label: 'Receipt Date', value: formatDate(grn.receipt_date) },
-          { label: 'PO no.', value: grn.po_no },
-          { label: 'Delivery Note', value: grn.delivery_no ?? '—' },
-          { label: 'Notes', value: grn.notes ?? '—' },
-        ].map((f) => (
-          <div key={f.label} className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-            <div className="text-xs text-slate-500 dark:text-slate-400">{f.label}</div>
-            <div className="mt-0.5 font-medium text-slate-900 dark:text-slate-100">{f.value}</div>
+      <div className="mb-5 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+        <div className="grid grid-cols-4 gap-x-6 gap-y-4 text-sm">
+          {[
+            { label: 'Receipt Date',  value: formatDate(grn.receipt_date) },
+            { label: 'PO No.',        value: grn.po_no },
+            { label: 'Delivery Note', value: grn.delivery_no ?? '—' },
+            { label: 'Notes',         value: grn.notes ?? '—' },
+          ].map(f => (
+            <div key={f.label}>
+              <div className="text-xs text-slate-500 dark:text-slate-400">{f.label}</div>
+              <div className="mt-0.5 font-medium text-slate-900 dark:text-slate-100">{f.value}</div>
+            </div>
+          ))}
+
+          {/* Tagging row */}
+          <div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">Location</div>
+            <div className="mt-0.5 font-medium text-slate-900 dark:text-slate-100">
+              {grn.branch_name ? `${grn.branch_code} — ${grn.branch_name}` : '—'}
+            </div>
           </div>
-        ))}
+          <div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">Building</div>
+            <div className="mt-0.5 font-medium text-slate-900 dark:text-slate-100">
+              {grn.building_name ? `${grn.building_code} — ${grn.building_name}` : '—'}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">Cost Center</div>
+            <div className="mt-0.5 font-medium text-slate-900 dark:text-slate-100">
+              {grn.cost_center_name ? `${grn.cost_center_code} — ${grn.cost_center_name}` : '—'}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">Grow Reference</div>
+            <div className="mt-0.5 font-medium text-slate-900 dark:text-slate-100">
+              {grn.grow_ref_name ? `${grn.grow_ref_code} — ${grn.grow_ref_name}` : '—'}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">

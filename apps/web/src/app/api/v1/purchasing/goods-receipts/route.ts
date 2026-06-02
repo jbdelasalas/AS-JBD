@@ -27,10 +27,18 @@ export async function GET(request: NextRequest) {
 
   const rows = await query(
     `SELECT gr.id, gr.grn_no, gr.receipt_date, gr.delivery_no, gr.notes, gr.status,
-            po.po_no, s.name AS supplier_name
+            po.po_no, s.name AS supplier_name,
+            br.code AS branch_code,    br.name AS branch_name,
+            fb.code AS building_code,  fb.name AS building_name,
+            cc.code AS cost_center_code,
+            gref.code AS grow_ref_code
        FROM goods_receipts gr
        JOIN purchase_orders po ON po.id = gr.po_id
-       JOIN suppliers s ON s.id = po.supplier_id
+       JOIN suppliers s        ON s.id  = po.supplier_id
+       LEFT JOIN branches br          ON br.id   = gr.branch_id
+       LEFT JOIN farm_buildings fb    ON fb.id   = gr.building_id
+       LEFT JOIN cost_centers cc      ON cc.id   = gr.cost_center_id
+       LEFT JOIN grow_references gref ON gref.id = gr.grow_reference_id
       WHERE ${where}
       ORDER BY gr.receipt_date DESC, gr.grn_no DESC
       LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -101,12 +109,15 @@ export async function POST(request: NextRequest) {
        RETURNING *`,
       [
         companyId, grnNo, poId,
-        dto.warehouse_id ?? null,
+        (dto.warehouse_id as string) || null,
         dto.receipt_date,
-        dto.delivery_no ?? null,
-        dto.notes ?? null,
+        (dto.delivery_no as string) || null,
+        (dto.notes as string) || null,
         auth.userId,
-        dto.branch_id ?? null, dto.building_id ?? null, dto.cost_center_id ?? null, dto.grow_reference_id ?? null,
+        (dto.branch_id as string) || null,
+        (dto.building_id as string) || null,
+        (dto.cost_center_id as string) || null,
+        (dto.grow_reference_id as string) || null,
       ],
     );
     const header = headerRows.rows[0];
@@ -211,8 +222,8 @@ export async function POST(request: NextRequest) {
 
     return ok({ ...fullRows[0], lines: grnLines }, 201);
   } catch (e) {
-    await client.query('ROLLBACK');
-    throw e;
+    await client.query('ROLLBACK').catch(() => {});
+    return err((e as Error).message ?? 'Unknown error', 500);
   } finally {
     client.release();
   }

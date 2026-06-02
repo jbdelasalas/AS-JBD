@@ -53,21 +53,28 @@ export async function POST(request: NextRequest) {
     const srcKgs = Number(dto.source_kgs ?? 0);
     const yieldPct = srcKgs > 0 ? parseFloat(((totalOut / srcKgs) * 100).toFixed(2)) : null;
 
+    const orNull = (v: unknown) => (v as string) || null;
     const { rows: [hdr] } = await client.query(
-      `INSERT INTO conversions (company_id, doc_no, branch_id, warehouse_id, transaction_date, tally_sheet_id,
-         source_item_id, source_heads, source_kgs, remarks, status, total_output_kgs, yield_pct, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'saved',$11,$12,$13) RETURNING *`,
-      [companyId, docNo, dto.branch_id ?? null, dto.warehouse_id ?? null, dto.transaction_date,
-       dto.tally_sheet_id ?? null, dto.source_item_id, dto.source_heads ?? 0, srcKgs,
-       dto.remarks ?? null, totalOut, yieldPct, auth.userId],
+      `INSERT INTO conversions (company_id, doc_no, branch_id, target_branch_id, po_id, transaction_date,
+         tally_sheet_id, source_item_id, source_heads, source_kgs, doa_heads, doa_kgs,
+         short_over_heads, short_over_kgs, remarks, status, total_output_kgs, yield_pct, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'saved',$16,$17,$18) RETURNING *`,
+      [companyId, docNo, orNull(dto.branch_id), orNull(dto.target_branch_id), orNull(dto.po_id),
+       dto.transaction_date, orNull(dto.tally_sheet_id), dto.source_item_id,
+       dto.source_heads ?? 0, srcKgs,
+       dto.doa_heads ?? 0, dto.doa_kgs ?? 0,
+       dto.short_over_heads ?? 0, dto.short_over_kgs ?? 0,
+       orNull(dto.remarks), totalOut, yieldPct, auth.userId],
     );
     for (let i = 0; i < outputs.length; i++) {
       const o = outputs[i];
       await client.query(
-        `INSERT INTO conversion_outputs (conversion_id, line_no, output_item_id, heads, kgs, unit_cost, total_cost, remarks)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [hdr.id, i + 1, o.output_item_id, o.heads ?? 0, o.kgs ?? 0, o.unit_cost ?? 0,
-         Number(o.kgs ?? 0) * Number(o.unit_cost ?? 0), o.remarks ?? null],
+        `INSERT INTO conversion_outputs (conversion_id, line_no, output_item_id, category, heads, kgs, unit_cost, total_cost, delivery_ref_no, remarks)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [hdr.id, i + 1, o.output_item_id, o.category ?? null,
+         o.heads ?? 0, o.kgs ?? 0, o.unit_cost ?? 0,
+         Number(o.kgs ?? 0) * Number(o.unit_cost ?? 0),
+         o.delivery_ref_no ?? null, o.remarks ?? null],
       );
     }
     await client.query('COMMIT');

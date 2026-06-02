@@ -53,8 +53,8 @@ export default function NewPurchaseOrderPage() {
   useEffect(() => {
     const cid = localStorage.getItem('company_id');
     if (!cid) return;
-    api.get<{ data: Supplier[] }>(`/ap/suppliers?company_id=${cid}&limit=500`).then(r => setSuppliers(r.data)).catch(() => {});
-    api.get<Item[]>(`/inventory/items?company_id=${cid}&limit=500`).then(r => setItems(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<{ data: Supplier[] }>(`/ap/suppliers?company_id=${cid}&limit=500&minimal=true`).then(r => setSuppliers(r.data)).catch(() => {});
+    api.get<Item[]>(`/inventory/items?company_id=${cid}&limit=500&minimal=true`).then(r => setItems(Array.isArray(r) ? r : [])).catch(() => {});
     api.get<{ data: Account[] }>(`/gl/accounts?company_id=${cid}&limit=500`).then(r => setAccounts(r.data ?? [])).catch(() => {});
   }, []);
 

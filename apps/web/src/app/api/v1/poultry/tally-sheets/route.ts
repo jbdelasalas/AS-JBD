@@ -14,12 +14,15 @@ export async function GET(request: NextRequest) {
   const offset = parseInt(searchParams.get('offset') ?? '0');
   const params: unknown[] = [companyId];
   let where = `t.company_id = $1`;
+  const growCycleId = searchParams.get('grow_cycle_id');
   if (status) { params.push(status); where += ` AND t.status = $${params.length}`; }
+  if (growCycleId) { params.push(growCycleId); where += ` AND t.grow_cycle_id = $${params.length}`; }
   params.push(limit, offset);
   try {
     const rows = await query(
       `SELECT t.id, t.doc_no, t.tally_type, t.transfer_date, t.status,
               t.harvested_heads, t.net_heads, t.net_kgs, t.plate_number, t.driver,
+              t.received_by, t.created_at,
               g.doc_no AS grow_cycle_no
          FROM tally_sheets t
          LEFT JOIN grow_cycles g ON g.id = t.grow_cycle_id
@@ -58,19 +61,22 @@ export async function POST(request: NextRequest) {
     const netHeads = lines.reduce((s, l) => s + Number(l.heads ?? 0), 0);
     const netKgs = lines.reduce((s, l) => s + Number(l.net_kgs ?? 0), 0);
 
+    const orNull = (v: unknown) => (v as string) || null;
     const { rows: [hdr] } = await client.query(
-      `INSERT INTO tally_sheets (company_id, doc_no, tally_type, grow_cycle_id, supplier_id, destination_id, warehouse_id,
+      `INSERT INTO tally_sheets (company_id, doc_no, tally_type, grow_cycle_id, supplier_id, destination_id,
          transfer_date, reference_id, harvested_heads, reject_kgs, reject_heads, replacement_kgs, replacement_heads,
          net_heads, net_kgs, received_by, issued_by, checked_by, delivery_method, plate_number, driver, helper,
-         start_time, end_time, remarks, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,'saved',$27) RETURNING *`,
-      [companyId, docNo, dto.tally_type ?? 'harvest', dto.grow_cycle_id ?? null, dto.supplier_id ?? null,
-       dto.destination_id ?? null, dto.warehouse_id ?? null, dto.transfer_date, dto.reference_id ?? null,
+         start_time, end_time, remarks, branch_id, building_id, cost_center_id, grow_reference_id, status, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,'saved',$30) RETURNING *`,
+      [companyId, docNo, dto.tally_type ?? 'harvest', orNull(dto.grow_cycle_id), orNull(dto.supplier_id),
+       orNull(dto.destination_id), dto.transfer_date, orNull(dto.reference_id),
        dto.harvested_heads ?? netHeads, dto.reject_kgs ?? 0, dto.reject_heads ?? 0,
        dto.replacement_kgs ?? 0, dto.replacement_heads ?? 0, netHeads, netKgs,
-       dto.received_by ?? null, dto.issued_by ?? null, dto.checked_by ?? null,
-       dto.delivery_method ?? null, dto.plate_number ?? null, dto.driver ?? null, dto.helper ?? null,
-       dto.start_time ?? null, dto.end_time ?? null, dto.remarks ?? null, auth.userId],
+       orNull(dto.received_by), orNull(dto.issued_by), orNull(dto.checked_by),
+       orNull(dto.delivery_method), orNull(dto.plate_number), orNull(dto.driver), orNull(dto.helper),
+       orNull(dto.start_time), orNull(dto.end_time), orNull(dto.remarks),
+       orNull(dto.branch_id), orNull(dto.building_id), orNull(dto.cost_center_id), orNull(dto.grow_reference_id),
+       auth.userId],
     );
     for (let i = 0; i < lines.length; i++) {
       const l = lines[i];

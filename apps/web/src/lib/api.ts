@@ -65,7 +65,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       typeof body === 'object' && body !== null
         ? Array.isArray((body as { message?: unknown }).message)
           ? (body as { message: string[] }).message.join(', ')
-          : (body as { message?: string }).message ?? friendlyStatus[res.status] ?? `HTTP ${res.status}`
+          : (body as { message?: string; error?: string }).message
+            ?? (body as { error?: string }).error
+            ?? friendlyStatus[res.status]
+            ?? `HTTP ${res.status}`
         : friendlyStatus[res.status] ?? `HTTP ${res.status}`;
     throw new ApiError(res.status, body, message);
   }

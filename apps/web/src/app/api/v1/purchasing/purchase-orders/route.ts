@@ -115,6 +115,8 @@ export async function POST(request: NextRequest) {
     const totVat = mappedLines.reduce((s, l) => s + l.lineVat, 0);
     const totTotal = mappedLines.reduce((s, l) => s + l.lineTotal, 0);
 
+    const orNull = (v: unknown) => (v as string) || null;
+
     const headerRows = await client.query(
       `INSERT INTO purchase_orders
          (company_id, branch_id, po_no, supplier_id, po_date, expected_date, remarks,
@@ -123,11 +125,11 @@ export async function POST(request: NextRequest) {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'draft',$11,$12,$13,$14)
        RETURNING *`,
       [
-        companyId, dto.branch_id ?? null, poNo, supplierId,
-        dto.po_date, dto.expected_date ?? null, dto.remarks ?? null,
+        companyId, orNull(dto.branch_id), poNo, supplierId,
+        dto.po_date, orNull(dto.expected_date), orNull(dto.remarks),
         totSubtotal.toFixed(2), totVat.toFixed(2), totTotal.toFixed(2),
         auth.userId,
-        dto.building_id ?? null, dto.cost_center_id ?? null, dto.grow_reference_id ?? null,
+        orNull(dto.building_id), orNull(dto.cost_center_id), orNull(dto.grow_reference_id),
       ],
     );
     const header = headerRows.rows[0];
@@ -135,16 +137,18 @@ export async function POST(request: NextRequest) {
     for (const l of mappedLines) {
       await client.query(
         `INSERT INTO purchase_order_lines
-           (po_id, line_no, item_id, description, quantity, qty_received, unit_price, vat_rate, line_total,
+           (po_id, line_no, item_id, gl_account_id, description, quantity, qty_received, unit_price, vat_rate, line_total,
             grow_reference_id, branch_id, building_id, cost_center_id)
-         VALUES ($1,$2,$3,$4,$5,0,$6,$7,$8,$9,$10,$11,$12)`,
+         VALUES ($1,$2,$3,$4,$5,$6,0,$7,$8,$9,$10,$11,$12,$13)`,
         [
-          header.id, l.line_no, l.item_id ?? null, l.description,
+          header.id, l.line_no, orNull(l.item_id),
+          orNull((l as Record<string,unknown>).gl_account_id),
+          l.description,
           l.qty, l.price, l.vatRate, l.lineTotal.toFixed(2),
-          (l as Record<string,unknown>).grow_reference_id ?? null,
-          (l as Record<string,unknown>).branch_id ?? null,
-          (l as Record<string,unknown>).building_id ?? null,
-          (l as Record<string,unknown>).cost_center_id ?? null,
+          orNull((l as Record<string,unknown>).grow_reference_id),
+          orNull((l as Record<string,unknown>).branch_id),
+          orNull((l as Record<string,unknown>).building_id),
+          orNull((l as Record<string,unknown>).cost_center_id),
         ],
       );
     }
@@ -188,8 +192,8 @@ export async function POST(request: NextRequest) {
       }),
     }, 201);
   } catch (e) {
-    await client.query('ROLLBACK');
-    throw e;
+    await client.query('ROLLBACK').catch(() => {});
+    return err((e as Error).message ?? 'Unknown error', 500);
   } finally {
     client.release();
   }
