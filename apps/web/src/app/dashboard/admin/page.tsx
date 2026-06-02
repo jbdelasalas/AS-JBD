@@ -45,14 +45,34 @@ export default function AdminHomePage() {
       .finally(() => setCompanyLoading(false));
   }, []);
 
+  function compressImage(dataUrl: string, maxPx = 400, quality = 0.85): Promise<string> {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width: w, height: h } = img;
+        if (w > maxPx || h > maxPx) {
+          if (w >= h) { h = Math.round(h * maxPx / w); w = maxPx; }
+          else { w = Math.round(w * maxPx / h); h = maxPx; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = dataUrl;
+    });
+  }
+
   function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const data = ev.target?.result as string;
-      setLogoPreview(data);
-      setCompany((c) => ({ ...c, logo: data }));
+    reader.onload = async (ev) => {
+      const raw = ev.target?.result as string;
+      const compressed = await compressImage(raw);
+      setLogoPreview(compressed);
+      setCompany((c) => ({ ...c, logo: compressed }));
     };
     reader.readAsDataURL(file);
   }
@@ -65,7 +85,11 @@ export default function AdminHomePage() {
     setCompanyError(null);
     setCompanySaving(true);
     try {
-      await api.put(`/companies/${companyId}`, company);
+      const payload = { ...company };
+      if (payload.logo && payload.logo.startsWith('data:')) {
+        payload.logo = await compressImage(payload.logo);
+      }
+      await api.put(`/companies/${companyId}`, payload);
       const token = localStorage.getItem('access_token');
       await fetch('/api/v1/settings', {
         method: 'PUT',
