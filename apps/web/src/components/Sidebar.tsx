@@ -16,7 +16,14 @@ const NAV: NavItem[] = [
   { href: '/dashboard/gl',         label: 'General ledger' },
   { href: '/dashboard/ar',         label: 'Receivables' },
   { href: '/dashboard/ap',         label: 'Payables' },
-  { href: '/dashboard/sales',      label: 'Sales & CRM' },
+  {
+    href: '/dashboard/sales',
+    label: 'Sales & CRM',
+    children: [
+      { href: '/dashboard/sales/orders',      label: 'Sales Orders' },
+      { href: '/dashboard/sales/allocations', label: 'Order Allocations' },
+    ],
+  },
   { href: '/dashboard/purchasing', label: 'Purchasing' },
   { href: '/dashboard/inventory',  label: 'Inventory' },
   {

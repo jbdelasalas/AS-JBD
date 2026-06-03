@@ -154,6 +154,94 @@ export async function POST(request: NextRequest) {
           WHERE b.company_id = a.company_id AND b.gl_account_id = a.id
         )
     `],
+
+    // ── Order Allocation module ───────────────────────────────────────────────
+    ['order_allocations table', `
+      CREATE TABLE IF NOT EXISTS order_allocations (
+        id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id        uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        allocation_no     varchar(50) NOT NULL,
+        so_id             uuid REFERENCES sales_orders(id),
+        customer_id       uuid NOT NULL REFERENCES customers(id),
+        customer_name     text,
+        allocation_date   date NOT NULL,
+        delivery_date     date,
+        reference         text,
+        notes             text,
+        status            varchar(20) NOT NULL DEFAULT 'draft',
+        with_si           boolean NOT NULL DEFAULT true,
+        branch_id         uuid REFERENCES branches(id),
+        building_id       uuid REFERENCES farm_buildings(id),
+        cost_center_id    uuid REFERENCES cost_centers(id),
+        grow_reference_id uuid REFERENCES grow_references(id),
+        tally_sheet_id    uuid,
+        posted_by         uuid REFERENCES users(id),
+        posted_at         timestamptz,
+        created_by        uuid REFERENCES users(id),
+        created_at        timestamptz NOT NULL DEFAULT now(),
+        updated_at        timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, allocation_no)
+      )
+    `],
+    ['order_allocation_lines table', `
+      CREATE TABLE IF NOT EXISTS order_allocation_lines (
+        id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        allocation_id     uuid NOT NULL REFERENCES order_allocations(id) ON DELETE CASCADE,
+        line_no           int NOT NULL,
+        item_id           uuid REFERENCES items(id),
+        description       text NOT NULL DEFAULT '',
+        qty_ordered       numeric(14,4) NOT NULL DEFAULT 0,
+        qty_allocated     numeric(14,4) NOT NULL DEFAULT 0,
+        allocation_unit   varchar(20) NOT NULL DEFAULT 'Pcs',
+        unit_price        numeric(14,4) NOT NULL DEFAULT 0,
+        discount_pct      numeric(5,2) NOT NULL DEFAULT 0,
+        vat_rate          numeric(5,2) NOT NULL DEFAULT 12,
+        branch_id         uuid REFERENCES branches(id),
+        building_id       uuid REFERENCES farm_buildings(id),
+        cost_center_id    uuid REFERENCES cost_centers(id),
+        grow_reference_id uuid REFERENCES grow_references(id)
+      )
+    `],
+
+    // ── Sales Tally Sheets (auto-created on allocation post) ──────────────────
+    ['sales_tally_sheets table', `
+      CREATE TABLE IF NOT EXISTS sales_tally_sheets (
+        id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id        uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        tally_no          varchar(50) NOT NULL,
+        allocation_id     uuid REFERENCES order_allocations(id),
+        customer_id       uuid NOT NULL REFERENCES customers(id),
+        customer_name     text,
+        tally_date        date NOT NULL,
+        delivery_date     date,
+        reference         text,
+        notes             text,
+        status            varchar(20) NOT NULL DEFAULT 'draft',
+        branch_id         uuid REFERENCES branches(id),
+        building_id       uuid REFERENCES farm_buildings(id),
+        cost_center_id    uuid REFERENCES cost_centers(id),
+        grow_reference_id uuid REFERENCES grow_references(id),
+        created_by        uuid REFERENCES users(id),
+        created_at        timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, tally_no)
+      )
+    `],
+    ['sales_tally_lines table', `
+      CREATE TABLE IF NOT EXISTS sales_tally_lines (
+        id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        tally_id            uuid NOT NULL REFERENCES sales_tally_sheets(id) ON DELETE CASCADE,
+        line_no             int NOT NULL,
+        allocation_line_id  uuid REFERENCES order_allocation_lines(id),
+        item_id             uuid REFERENCES items(id),
+        description         text NOT NULL DEFAULT '',
+        qty_allocated       numeric(14,4) NOT NULL DEFAULT 0,
+        allocation_unit     varchar(20) NOT NULL DEFAULT 'Pcs',
+        actual_qty          numeric(14,4) NOT NULL DEFAULT 0,
+        actual_weight_kgs   numeric(14,4) NOT NULL DEFAULT 0,
+        unit_price          numeric(14,4) NOT NULL DEFAULT 0,
+        remarks             text
+      )
+    `],
   ];
 
   const results: string[] = [];
