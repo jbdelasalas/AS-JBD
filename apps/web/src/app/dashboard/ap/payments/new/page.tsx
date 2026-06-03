@@ -8,7 +8,7 @@ import { useTaggingData } from '@/hooks/useTaggingData';
 import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
 
 interface Supplier { id: string; code: string; name: string; }
-interface Account { id: string; code: string; name: string; account_type: string; }
+interface BankAccount { id: string; account_name: string; bank_name: string | null; account_number: string | null; gl_account_id: string | null; }
 interface OpenBill {
   id: string;
   internal_no: string;
@@ -25,7 +25,7 @@ function NewPaymentForm() {
   const preSupplierId = params.get('supplier_id') ?? '';
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [openBills, setOpenBills] = useState<OpenBill[]>([]);
   const [selectedBills, setSelectedBills] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -48,10 +48,10 @@ function NewPaymentForm() {
     if (!companyId) return;
     Promise.all([
       api.get<{ data: Supplier[] }>(`/ap/suppliers?company_id=${companyId}&limit=500`),
-      api.get<{ data: Account[] }>(`/gl/accounts?company_id=${companyId}&limit=500`),
-    ]).then(([s, a]) => {
+      api.get<{ data: BankAccount[] }>(`/bank-accounts?company_id=${companyId}`),
+    ]).then(([s, b]) => {
       setSuppliers(s.data);
-      setAccounts(a.data.filter((a) => a.account_type === 'ASSET'));
+      setBankAccounts(b.data.filter((b) => b.gl_account_id));
     }).catch(() => {});
   }, []);
 
@@ -92,7 +92,7 @@ function NewPaymentForm() {
         payment_method: form.payment_method,
         reference: form.reference || undefined,
         amount,
-        bank_account_id: form.bank_account_id || undefined,
+        bank_account_id: bankAccounts.find((b) => b.id === form.bank_account_id)?.gl_account_id || undefined,
         bill_ids: [...selectedBills],
         branch_id: tags.branch_id || undefined,
         building_id: tags.building_id || undefined,
@@ -168,7 +168,11 @@ function NewPaymentForm() {
                 onChange={(e) => setForm((f) => ({ ...f, bank_account_id: e.target.value }))}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                 <option value="">— select —</option>
-                {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+                {bankAccounts.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.account_name}{b.bank_name ? ` — ${b.bank_name}` : ''}{b.account_number ? ` (${b.account_number})` : ''}
+                  </option>
+                ))}
               </select>
             </div>
 

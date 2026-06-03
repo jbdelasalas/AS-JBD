@@ -90,6 +90,64 @@ export async function POST(request: NextRequest) {
 
     // ── poultry_inventory_balance avg_cost ───────────────────────────────────
     ['poultry_inventory_balance.avg_cost', `ALTER TABLE poultry_inventory_balance ADD COLUMN IF NOT EXISTS avg_cost numeric(18,6) DEFAULT 0`],
+
+    // ── goods_receipts GL columns ─────────────────────────────────────────────
+    ['goods_receipts.je_id',     `ALTER TABLE goods_receipts ADD COLUMN IF NOT EXISTS je_id uuid REFERENCES journal_entries(id)`],
+    ['goods_receipts.posted_by', `ALTER TABLE goods_receipts ADD COLUMN IF NOT EXISTS posted_by uuid REFERENCES users(id)`],
+
+    // ── GRNI account seed ─────────────────────────────────────────────────────
+    ['accounts.grni_seed', `
+      INSERT INTO accounts (company_id, code, name, account_type, is_active, is_control)
+      SELECT c.id, '21100', 'Goods Received Not Yet Invoiced', 'LIABILITY', true, false
+      FROM companies c
+      WHERE NOT EXISTS (
+        SELECT 1 FROM accounts a
+        WHERE a.company_id = c.id
+          AND (a.name ILIKE '%grni%' OR a.name ILIKE '%goods received not yet%' OR a.code = '21100')
+      )
+    `],
+
+    // ── bank_accounts master ──────────────────────────────────────────────────
+    ['bank_accounts table', `
+      CREATE TABLE IF NOT EXISTS bank_accounts (
+        id             uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id     uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        account_name   text NOT NULL,
+        bank_name      text,
+        account_number text,
+        gl_account_id  uuid REFERENCES accounts(id),
+        is_active      boolean NOT NULL DEFAULT true,
+        created_at     timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, account_name)
+      )
+    `],
+    ['bank_accounts seed from COA', `
+      INSERT INTO bank_accounts (company_id, account_name, bank_name, account_number, gl_account_id)
+      SELECT
+        a.company_id,
+        a.name,
+        CASE
+          WHEN a.name ILIKE '%BDO%'   THEN 'BDO Unibank'
+          WHEN a.name ILIKE '%SBC%'   THEN 'Security Bank'
+          WHEN a.name ILIKE '%Petty%' THEN NULL
+          ELSE NULL
+        END,
+        CASE
+          WHEN a.name ~ '\(([^)]+)\)' THEN substring(a.name FROM '\(([^)]+)\)')
+          ELSE NULL
+        END,
+        a.id
+      FROM accounts a
+      WHERE a.is_active = true
+        AND (
+          a.name ILIKE '%Cash in Bank%'
+          OR a.name ILIKE '%Petty Cash%'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM bank_accounts b
+          WHERE b.company_id = a.company_id AND b.gl_account_id = a.id
+        )
+    `],
   ];
 
   const results: string[] = [];

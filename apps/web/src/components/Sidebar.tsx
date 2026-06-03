@@ -35,6 +35,13 @@ const NAV: NavItem[] = [
   },
   { href: '/dashboard/reports',    label: 'Reports' },
   { href: '/dashboard/bir',        label: 'BIR compliance' },
+  {
+    href: '/dashboard/settings',
+    label: 'Settings',
+    children: [
+      { href: '/dashboard/settings/bank-accounts', label: 'Bank Accounts' },
+    ],
+  },
   { href: '/dashboard/admin',      label: 'Administration' },
 ];
 
