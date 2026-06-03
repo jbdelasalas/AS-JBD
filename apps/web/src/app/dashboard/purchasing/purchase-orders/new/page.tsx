@@ -132,6 +132,7 @@ export default function NewPurchaseOrderPage() {
         <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
           <div className="mb-4 text-sm font-medium text-slate-700 dark:text-slate-300">PO Details</div>
           <div className="grid grid-cols-4 gap-4">
+            {/* Row 1: Supplier | PO Date | Expected Delivery */}
             <div className="col-span-2">
               <label className={lbl}>Supplier *</label>
               <SearchableSelect
@@ -141,12 +142,6 @@ export default function NewPurchaseOrderPage() {
                 placeholder="Select supplier…"
                 options={suppliers.map(s => ({ value: s.id, label: `${s.code} — ${s.name}` }))}
               />
-              {(() => { const s = suppliers.find(x => x.id === form.supplier_id); return s ? (
-                <div className="mt-1.5 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
-                  <span className="font-medium">Terms:</span> {s.payment_terms_days} days
-                  {s.address && <><span className="mx-2 text-slate-300">|</span><span className="font-medium">Address:</span> {s.address}</>}
-                </div>
-              ) : null; })()}
             </div>
             <div>
               <label className={lbl}>PO Date *</label>
@@ -156,11 +151,26 @@ export default function NewPurchaseOrderPage() {
               <label className={lbl}>Expected Delivery</label>
               <input type="date" value={form.expected_date} onChange={e => setForm(f => ({ ...f, expected_date: e.target.value }))} className={inp} />
             </div>
-            <div className="col-span-3">
+
+            {/* Row 2: Payment Terms (read-only) | Supplier Address (read-only, col-span-3) */}
+            {(() => { const s = suppliers.find(x => x.id === form.supplier_id); return s ? (<>
+              <div>
+                <div className={lbl}>Payment Terms</div>
+                <div className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">{s.payment_terms_days} days</div>
+              </div>
+              <div className="col-span-3">
+                <div className={lbl}>Supplier Address</div>
+                <div className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">{s.address ?? '—'}</div>
+              </div>
+            </>) : null; })()}
+
+            {/* Remarks full-width */}
+            <div className="col-span-4">
               <label className={lbl}>Remarks</label>
               <input type="text" value={form.remarks} onChange={e => setForm(f => ({ ...f, remarks: e.target.value }))}
                 placeholder="Optional notes" className={inp} />
             </div>
+
             {/* Header tagging — auto-fills all lines */}
             <TaggingFields value={tags} data={tagData} onChange={handleTagChange} />
           </div>

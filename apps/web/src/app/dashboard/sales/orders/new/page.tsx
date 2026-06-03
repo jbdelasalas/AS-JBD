@@ -144,7 +144,8 @@ export default function NewSalesOrderPage() {
         {/* Header */}
         <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
           <div className="mb-4 text-sm font-medium text-slate-700 dark:text-slate-300">Order Details</div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
+            {/* Row 1: Customer | Order Date | Delivery Date */}
             <div className="col-span-2">
               <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Customer *</label>
               <select
@@ -165,79 +166,61 @@ export default function NewSalesOrderPage() {
                   <option key={c.id} value={c.id}>{c.code} — {c.name}</option>
                 ))}
               </select>
-              {(() => { const c = customers.find(x => x.id === form.customer_id); return c ? (
-                <div className="mt-1.5 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
-                  <span className="font-medium">Terms:</span> {c.payment_terms_days} days
-                  {c.address && <><span className="mx-2 text-slate-300">|</span><span className="font-medium">Address:</span> {c.address}</>}
-                </div>
-              ) : null; })()}
             </div>
-
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Order Date *</label>
-              <input
-                required
-                type="date"
-                value={form.order_date}
+              <input required type="date" value={form.order_date}
                 onChange={(e) => setForm((f) => ({ ...f, order_date: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
-
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Delivery Date</label>
-              <input
-                type="date"
-                value={form.delivery_date}
+              <input type="date" value={form.delivery_date}
                 onChange={(e) => setForm((f) => ({ ...f, delivery_date: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 
+            {/* Row 2: Payment Terms | Customer Address (read-only) */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Payment Terms (days)</label>
+              <input type="number" min={0} value={form.payment_terms_days}
+                onChange={(e) => setForm((f) => ({ ...f, payment_terms_days: parseInt(e.target.value) }))}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
+            <div className="col-span-3">
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Customer Address</label>
+              <div className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+                {customers.find(x => x.id === form.customer_id)?.address ?? '—'}
+              </div>
+            </div>
+
+            {/* Row 3: Warehouse | Reference */}
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Warehouse</label>
-              <select
-                value={form.warehouse_id}
+              <select value={form.warehouse_id}
                 onChange={(e) => setForm((f) => ({ ...f, warehouse_id: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              >
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                 <option value="">— any —</option>
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>{w.code} — {w.name}</option>
                 ))}
               </select>
             </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Payment Terms (days)</label>
-              <input
-                type="number"
-                min={0}
-                value={form.payment_terms_days}
-                onChange={(e) => setForm((f) => ({ ...f, payment_terms_days: parseInt(e.target.value) }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              />
-            </div>
-
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Reference</label>
-              <input
-                type="text"
-                value={form.reference}
+              <input type="text" value={form.reference}
                 onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))}
                 placeholder="PO no., contract ref…"
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
+            <div className="col-span-2" />
 
-            <div className="col-span-3">
+            {/* Notes full-width */}
+            <div className="col-span-4">
               <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Notes</label>
-              <textarea
-                rows={2}
-                value={form.notes}
+              <textarea rows={2} value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              />
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
             <TaggingFields value={tags} data={tagData} onChange={handleTagChange} />
           </div>
