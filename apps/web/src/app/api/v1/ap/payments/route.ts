@@ -198,8 +198,8 @@ export async function POST(request: NextRequest) {
       })),
     }, 201);
   } catch (e) {
-    await client.query('ROLLBACK');
-    throw e;
+    await client.query('ROLLBACK').catch(() => {});
+    return err((e as Error).message ?? 'Unknown error', 500);
   } finally {
     client.release();
   }
