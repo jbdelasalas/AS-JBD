@@ -81,29 +81,8 @@ const NAV: NavItem[] = [
       { href: '/dashboard/poultry/invoices',      label: 'Invoices' },
     ],
   },
-  {
-    href: '/dashboard/reports',
-    label: 'Reports',
-    children: [
-      { href: '/dashboard/reports/ar-aging',        label: 'AR Aging' },
-      { href: '/dashboard/reports/ap-aging',        label: 'AP Aging' },
-      { href: '/dashboard/reports/trial-balance',   label: 'Trial Balance' },
-      { href: '/dashboard/reports/income-statement', label: 'Income Statement' },
-      { href: '/dashboard/reports/sales',           label: 'Sales Report' },
-    ],
-  },
-  {
-    href: '/dashboard/bir',
-    label: 'BIR Compliance',
-    children: [
-      { href: '/dashboard/bir/certificates', label: 'BIR Form 2307' },
-      { href: '/dashboard/bir/tax-codes',    label: 'Tax Codes' },
-      { href: '/dashboard/bir/books',        label: 'Books of Accounts' },
-      { href: '/dashboard/bir/documents',    label: 'Documents' },
-      { href: '/dashboard/bir/filings',      label: 'Filings' },
-      { href: '/dashboard/bir/sc-pwd',       label: 'SC/PWD Discount' },
-    ],
-  },
+  { href: '/dashboard/reports', label: 'Reports' },
+  { href: '/dashboard/bir',     label: 'BIR Compliance' },
   { href: '/dashboard/admin', label: 'Administration' },
 ];
 
