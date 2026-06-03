@@ -153,16 +153,16 @@ export default function NewPurchaseOrderPage() {
             </div>
 
             {/* Row 2: Payment Terms (read-only) | Supplier Address (read-only, col-span-3) */}
-            {(() => { const s = suppliers.find(x => x.id === form.supplier_id); return s ? (<>
+            {(() => { const s = suppliers.find(x => x.id === form.supplier_id); return (<>
               <div>
                 <div className={lbl}>Payment Terms</div>
-                <div className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">{s.payment_terms_days} days</div>
+                <div className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">{s ? `${s.payment_terms_days} days` : '—'}</div>
               </div>
               <div className="col-span-3">
                 <div className={lbl}>Supplier Address</div>
-                <div className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">{s.address ?? '—'}</div>
+                <div className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">{s?.address ?? '—'}</div>
               </div>
-            </>) : null; })()}
+            </>); })()}
 
             {/* Remarks full-width */}
             <div className="col-span-4">

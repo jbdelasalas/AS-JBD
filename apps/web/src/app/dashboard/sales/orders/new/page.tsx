@@ -180,7 +180,7 @@ export default function NewSalesOrderPage() {
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 
-            {/* Row 2: Payment Terms | Customer Address (read-only) */}
+            {/* Row 2: Payment Terms (editable) | Customer Address (read-only, col-span-3) */}
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Payment Terms (days)</label>
               <input type="number" min={0} value={form.payment_terms_days}
