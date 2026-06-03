@@ -22,6 +22,7 @@ interface Payment {
   payment_date: string;
   payment_method: string;
   reference: string | null;
+  remarks: string | null;
   amount: number;
   status: string;
   supplier_name: string;
@@ -115,6 +116,13 @@ export default function PaymentDetailPage() {
           </div>
         ))}
       </div>
+
+      {payment.remarks && (
+        <div className="mb-5 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+          <div className="text-xs text-slate-500 dark:text-slate-400">Remarks</div>
+          <div className="mt-0.5 text-sm text-slate-900 dark:text-slate-100 whitespace-pre-wrap">{payment.remarks}</div>
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
         <div className="border-b border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:text-slate-300">

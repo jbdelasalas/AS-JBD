@@ -107,6 +107,9 @@ export async function POST(request: NextRequest) {
       )
     `],
 
+    // ── supplier_payments remarks ─────────────────────────────────────────────
+    ['supplier_payments.remarks', `ALTER TABLE supplier_payments ADD COLUMN IF NOT EXISTS remarks text`],
+
     // ── bank_accounts master ──────────────────────────────────────────────────
     ['bank_accounts table', `
       CREATE TABLE IF NOT EXISTS bank_accounts (

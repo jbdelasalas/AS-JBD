@@ -37,6 +37,7 @@ function NewPaymentForm() {
     payment_date: new Date().toISOString().split('T')[0],
     payment_method: 'bank_transfer',
     reference: '',
+    remarks: '',
     amount: '',
     bank_account_id: '',
   });
@@ -91,6 +92,7 @@ function NewPaymentForm() {
         payment_date: form.payment_date,
         payment_method: form.payment_method,
         reference: form.reference || undefined,
+        remarks: form.remarks || undefined,
         amount,
         bank_account_id: bankAccounts.find((b) => b.id === form.bank_account_id)?.gl_account_id || undefined,
         bill_ids: [...selectedBills],
@@ -181,6 +183,15 @@ function NewPaymentForm() {
               <input type="text" value={form.reference}
                 onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
+
+            <div className="col-span-3">
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Remarks</label>
+              <textarea value={form.remarks}
+                onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))}
+                rows={2}
+                placeholder="Optional notes or remarks for this payment"
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 resize-none" />
             </div>
           </div>
         </div>
