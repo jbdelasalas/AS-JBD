@@ -156,8 +156,8 @@ export async function POST(request: NextRequest) {
 
       await client.query(
         `UPDATE bills
-            SET amount_paid = $1, balance = $2,
-                status = CASE WHEN $2 <= 0 THEN 'paid' ELSE status END,
+            SET amount_paid = $1::numeric, balance = $2::numeric,
+                status = CASE WHEN $2::numeric <= 0 THEN 'paid' ELSE status END,
                 updated_at = now()
           WHERE id = $3`,
         [newAmountPaid.toFixed(2), newBalance.toFixed(2), billId],
