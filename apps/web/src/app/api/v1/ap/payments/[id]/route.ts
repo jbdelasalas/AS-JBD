@@ -15,7 +15,8 @@ export async function GET(
   }
 
   const rows = await query(
-    `SELECT sp.*, s.name AS supplier_name, s.code AS supplier_code
+    `SELECT sp.*, s.name AS supplier_name, s.code AS supplier_code,
+            s.address AS supplier_address, s.payment_terms_days AS supplier_terms
        FROM supplier_payments sp
        JOIN suppliers s ON s.id = sp.supplier_id
       WHERE sp.id = $1 LIMIT 1`,

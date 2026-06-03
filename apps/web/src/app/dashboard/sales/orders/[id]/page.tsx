@@ -129,6 +129,9 @@ export default function SalesOrderDetailPage() {
           <Field label="Order Date"     value={formatDate(order.order_date)} />
           <Field label="Delivery Date"  value={order.delivery_date ? formatDate(order.delivery_date) : null} />
           <Field label="Payment Terms"  value={`${order.payment_terms_days} days`} />
+          <div className="col-span-3">
+            <Field label="Customer Address" value={(order as unknown as { customer_address?: string }).customer_address ?? null} />
+          </div>
           <Field label="Discount"       value={order.discount_pct ? `${order.discount_pct}%` : null} />
           <Field label="Credit Checked" value={order.credit_checked ? '✓ Passed' : 'Not yet'} />
           <Field label="Reference"      value={order.reference} />

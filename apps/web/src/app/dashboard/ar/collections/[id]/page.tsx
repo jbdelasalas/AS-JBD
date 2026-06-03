@@ -93,12 +93,12 @@ export default function CollectionDetailPage() {
       )}
 
       {/* Summary cards */}
-      <div className="mb-5 grid grid-cols-4 gap-3">
+      <div className="mb-3 grid grid-cols-4 gap-3">
         {[
           { label: 'Payment Date', value: formatDate(pmt.payment_date) },
           { label: 'Method', value: pmt.payment_method.replace(/_/g, ' ') },
+          { label: 'Payment Terms', value: (pmt as unknown as { customer_terms?: number }).customer_terms != null ? `${(pmt as unknown as { customer_terms: number }).customer_terms} days` : '—' },
           { label: 'Amount', value: formatPHP(pmt.amount) },
-          { label: 'Unapplied', value: formatPHP(pmt.unapplied_amount) },
         ].map((f) => (
           <div key={f.label} className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3">
             <div className="text-xs text-slate-500 dark:text-slate-400">{f.label}</div>
@@ -106,6 +106,12 @@ export default function CollectionDetailPage() {
           </div>
         ))}
       </div>
+      {(pmt as unknown as { customer_address?: string }).customer_address && (
+        <div className="mb-5 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+          <div className="text-xs text-slate-500 dark:text-slate-400">Customer Address</div>
+          <div className="mt-0.5 text-sm text-slate-900 dark:text-slate-100">{(pmt as unknown as { customer_address: string }).customer_address}</div>
+        </div>
+      )}
 
       {pmt.reference && (
         <div className="mb-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 text-sm">

@@ -139,7 +139,7 @@ export default function SalesInvoiceDetailPage() {
       )}
 
       {/* Info cards */}
-      <div className="mb-5 grid grid-cols-4 gap-3">
+      <div className="mb-3 grid grid-cols-4 gap-3">
         {[
           { label: 'Invoice Date', value: formatDate(inv.invoice_date) },
           { label: 'Due Date', value: formatDate(inv.due_date) },
@@ -152,6 +152,12 @@ export default function SalesInvoiceDetailPage() {
           </div>
         ))}
       </div>
+      {(inv as unknown as { customer_address?: string }).customer_address && (
+        <div className="mb-5 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+          <div className="text-xs text-slate-500 dark:text-slate-400">Customer Address</div>
+          <div className="mt-0.5 text-sm text-slate-900 dark:text-slate-100">{(inv as unknown as { customer_address: string }).customer_address}</div>
+        </div>
+      )}
 
       {/* Lines */}
       <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white">

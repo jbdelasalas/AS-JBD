@@ -36,6 +36,8 @@ interface PO {
   supplier_name: string;
   supplier_code: string;
   supplier_id: string;
+  supplier_address: string | null;
+  supplier_terms: number | null;
   subtotal: number;
   vat_amount: number;
   total: number;
@@ -180,6 +182,10 @@ export default function PODetailPage() {
           </div>
           <Field label="PO Date" value={formatDate(po.po_date)} />
           <Field label="Expected Delivery" value={po.expected_date ? formatDate(po.expected_date) : null} />
+          <Field label="Payment Terms" value={po.supplier_terms != null ? `${po.supplier_terms} days` : null} />
+          <div className="col-span-3">
+            <Field label="Supplier Address" value={po.supplier_address} />
+          </div>
           <div className="col-span-4">
             <Field label="Remarks" value={po.remarks} />
           </div>

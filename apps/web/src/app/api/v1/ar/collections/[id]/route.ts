@@ -15,7 +15,9 @@ export async function GET(
   }
 
   const headers = await query(
-    `SELECT cp.*, c.name AS customer_name, c.code AS customer_code FROM customer_payments cp JOIN customers c ON c.id = cp.customer_id WHERE cp.id = $1 LIMIT 1`,
+    `SELECT cp.*, c.name AS customer_name, c.code AS customer_code,
+            c.address AS customer_address, c.payment_terms_days AS customer_terms
+       FROM customer_payments cp JOIN customers c ON c.id = cp.customer_id WHERE cp.id = $1 LIMIT 1`,
     [params.id],
   );
   if (!headers[0]) return err(`Payment ${params.id} not found`, 404);

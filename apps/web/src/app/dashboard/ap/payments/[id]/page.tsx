@@ -28,6 +28,8 @@ interface Payment {
   supplier_name: string;
   supplier_code: string;
   supplier_id: string;
+  supplier_address: string | null;
+  supplier_terms: number | null;
   je_id: string | null;
   applications: Application[];
 }
@@ -103,11 +105,11 @@ export default function PaymentDetailPage() {
         <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">{actionMsg}</div>
       )}
 
-      <div className="mb-5 grid grid-cols-4 gap-3">
+      <div className="mb-3 grid grid-cols-4 gap-3">
         {[
           { label: 'Payment Date', value: formatDate(payment.payment_date) },
           { label: 'Method', value: payment.payment_method.replace(/_/g, ' ') },
-          { label: 'Reference', value: payment.reference ?? '—' },
+          { label: 'Payment Terms', value: payment.supplier_terms != null ? `${payment.supplier_terms} days` : '—' },
           { label: 'Amount', value: formatPHP(payment.amount) },
         ].map((f) => (
           <div key={f.label} className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
@@ -116,6 +118,13 @@ export default function PaymentDetailPage() {
           </div>
         ))}
       </div>
+
+      {payment.supplier_address && (
+        <div className="mb-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+          <div className="text-xs text-slate-500 dark:text-slate-400">Supplier Address</div>
+          <div className="mt-0.5 text-sm text-slate-900 dark:text-slate-100">{payment.supplier_address}</div>
+        </div>
+      )}
 
       <div className="mb-5 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
         <div className="text-xs text-slate-500 dark:text-slate-400">Remarks</div>

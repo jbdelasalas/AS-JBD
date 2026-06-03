@@ -40,7 +40,8 @@ export async function GET(
   }
 
   const headers = await query(
-    `SELECT so.*, c.name AS customer_name, c.code AS customer_code, c.credit_limit, c.payment_terms_days AS customer_terms
+    `SELECT so.*, c.name AS customer_name, c.code AS customer_code, c.credit_limit,
+            c.payment_terms_days AS customer_terms, c.address AS customer_address
        FROM sales_orders so JOIN customers c ON c.id = so.customer_id WHERE so.id = $1 LIMIT 1`,
     [params.id],
   );

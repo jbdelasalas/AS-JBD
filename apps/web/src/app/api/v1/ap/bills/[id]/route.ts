@@ -46,6 +46,7 @@ export async function GET(
     rows = await query(
       `SELECT b.*,
               s.name AS supplier_name, s.code AS supplier_code,
+              s.address AS supplier_address, s.payment_terms_days AS supplier_terms,
               br.code AS branch_code, br.name AS branch_name,
               fb.code AS building_code, fb.name AS building_name,
               cc.code AS cost_center_code, cc.name AS cost_center_name,
@@ -69,6 +70,7 @@ export async function GET(
     rows = await query(
       `SELECT b.*,
               s.name AS supplier_name, s.code AS supplier_code,
+              s.address AS supplier_address, s.payment_terms_days AS supplier_terms,
               br.code AS branch_code, br.name AS branch_name,
               fb.code AS building_code, fb.name AS building_name,
               cc.code AS cost_center_code, cc.name AS cost_center_name,

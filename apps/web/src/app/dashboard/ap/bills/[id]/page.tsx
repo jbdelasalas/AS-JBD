@@ -42,6 +42,8 @@ interface Bill {
   supplier_name: string;
   supplier_code: string;
   supplier_id: string;
+  supplier_address: string | null;
+  supplier_terms: number | null;
   po_id: string | null;
   po_no: string | null;
   subtotal: number;
@@ -190,6 +192,10 @@ export default function BillDetailPage() {
           </div>
           <Field label="Bill Date" value={formatDate(bill.bill_date)} />
           <Field label="Due Date" value={bill.due_date ? formatDate(bill.due_date) : null} />
+          <Field label="Payment Terms" value={bill.supplier_terms != null ? `${bill.supplier_terms} days` : null} />
+          <div className="col-span-3">
+            <Field label="Supplier Address" value={bill.supplier_address} />
+          </div>
           <Field label="Supplier Invoice No." value={bill.bill_no} />
           <Field
             label="PO Reference"

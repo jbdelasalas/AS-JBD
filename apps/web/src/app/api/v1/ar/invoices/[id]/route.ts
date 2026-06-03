@@ -40,7 +40,9 @@ export async function GET(
   }
 
   const headers = await query(
-    `SELECT si.*, c.name AS customer_name, c.code AS customer_code, so.order_no, dr.dr_no
+    `SELECT si.*, c.name AS customer_name, c.code AS customer_code,
+            c.address AS customer_address, c.payment_terms_days AS customer_terms,
+            so.order_no, dr.dr_no
        FROM sales_invoices si
        JOIN customers c ON c.id = si.customer_id
        LEFT JOIN sales_orders so ON so.id = si.so_id
