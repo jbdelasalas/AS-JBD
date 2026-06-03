@@ -12,10 +12,34 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { href: '/dashboard',            label: 'Dashboard' },
-  { href: '/dashboard/gl',         label: 'General ledger' },
-  { href: '/dashboard/ar',         label: 'Receivables' },
-  { href: '/dashboard/ap',         label: 'Payables' },
+  { href: '/dashboard', label: 'Dashboard' },
+  {
+    href: '/dashboard/gl',
+    label: 'General Ledger',
+    children: [
+      { href: '/dashboard/gl/accounts',       label: 'Chart of Accounts' },
+      { href: '/dashboard/gl/journal-entries', label: 'Journal Entries' },
+      { href: '/dashboard/gl/trial-balance',  label: 'Trial Balance' },
+    ],
+  },
+  {
+    href: '/dashboard/ar',
+    label: 'Receivables',
+    children: [
+      { href: '/dashboard/ar/customers',    label: 'Customers' },
+      { href: '/dashboard/ar/invoices',     label: 'Invoices' },
+      { href: '/dashboard/ar/collections',  label: 'Collections' },
+      { href: '/dashboard/ar/credit-memos', label: 'Credit Memos' },
+    ],
+  },
+  {
+    href: '/dashboard/ap',
+    label: 'Payables',
+    children: [
+      { href: '/dashboard/ap/bills',    label: 'Bills' },
+      { href: '/dashboard/ap/payments', label: 'Payments' },
+    ],
+  },
   {
     href: '/dashboard/sales',
     label: 'Sales & CRM',
@@ -24,25 +48,62 @@ const NAV: NavItem[] = [
       { href: '/dashboard/sales/allocations', label: 'Order Allocations' },
     ],
   },
-  { href: '/dashboard/purchasing', label: 'Purchasing' },
-  { href: '/dashboard/inventory',  label: 'Inventory' },
+  {
+    href: '/dashboard/purchasing',
+    label: 'Purchasing',
+    children: [
+      { href: '/dashboard/purchasing/suppliers',       label: 'Suppliers' },
+      { href: '/dashboard/purchasing/purchase-orders', label: 'Purchase Orders' },
+      { href: '/dashboard/purchasing/goods-receipts',  label: 'Goods Receipts' },
+    ],
+  },
+  {
+    href: '/dashboard/inventory',
+    label: 'Inventory',
+    children: [
+      { href: '/dashboard/inventory/items',        label: 'Items' },
+      { href: '/dashboard/inventory/stock-on-hand', label: 'Stock on Hand' },
+      { href: '/dashboard/inventory/adjustments',  label: 'Adjustments' },
+      { href: '/dashboard/inventory/transfers',    label: 'Transfers' },
+      { href: '/dashboard/inventory/counts',       label: 'Counts' },
+    ],
+  },
   {
     href: '/dashboard/poultry',
     label: 'Poultry Operations',
     children: [
-      { href: '/dashboard/purchasing/purchase-orders', label: 'Purchase Orders' },
-      { href: '/dashboard/purchasing/goods-receipts',  label: 'Goods Receipts' },
-      { href: '/dashboard/poultry/grow-cycles',        label: 'Grow Cycles' },
-      { href: '/dashboard/poultry/tally-sheets',       label: 'Tally Sheets' },
-      { href: '/dashboard/poultry/conversions',        label: 'Conversions' },
-      { href: '/dashboard/poultry/sales-tallies',      label: 'Sales Tallies' },
-      { href: '/dashboard/poultry/deliveries',         label: 'Deliveries' },
-      { href: '/dashboard/poultry/invoices',           label: 'Invoices' },
+      { href: '/dashboard/poultry/grow-cycles',   label: 'Grow Cycles' },
+      { href: '/dashboard/poultry/tally-sheets',  label: 'Tally Sheets' },
+      { href: '/dashboard/poultry/conversions',   label: 'Conversions' },
+      { href: '/dashboard/poultry/sales-tallies', label: 'Sales Tallies' },
+      { href: '/dashboard/poultry/deliveries',    label: 'Deliveries' },
+      { href: '/dashboard/poultry/invoices',      label: 'Invoices' },
     ],
   },
-  { href: '/dashboard/reports',    label: 'Reports' },
-  { href: '/dashboard/bir',        label: 'BIR compliance' },
-  { href: '/dashboard/admin',      label: 'Administration' },
+  {
+    href: '/dashboard/reports',
+    label: 'Reports',
+    children: [
+      { href: '/dashboard/reports/ar-aging',        label: 'AR Aging' },
+      { href: '/dashboard/reports/ap-aging',        label: 'AP Aging' },
+      { href: '/dashboard/reports/trial-balance',   label: 'Trial Balance' },
+      { href: '/dashboard/reports/income-statement', label: 'Income Statement' },
+      { href: '/dashboard/reports/sales',           label: 'Sales Report' },
+    ],
+  },
+  {
+    href: '/dashboard/bir',
+    label: 'BIR Compliance',
+    children: [
+      { href: '/dashboard/bir/certificates', label: 'BIR Form 2307' },
+      { href: '/dashboard/bir/tax-codes',    label: 'Tax Codes' },
+      { href: '/dashboard/bir/books',        label: 'Books of Accounts' },
+      { href: '/dashboard/bir/documents',    label: 'Documents' },
+      { href: '/dashboard/bir/filings',      label: 'Filings' },
+      { href: '/dashboard/bir/sc-pwd',       label: 'SC/PWD Discount' },
+    ],
+  },
+  { href: '/dashboard/admin', label: 'Administration' },
 ];
 
 interface SidebarProps {
