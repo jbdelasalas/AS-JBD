@@ -10,10 +10,16 @@ const cards = [
     color: 'border-blue-200 bg-blue-50 text-blue-800',
   },
   {
-    href: '/dashboard/sales/orders',
+    href: '/dashboard/sales/delivery-receipts',
     title: 'Delivery Receipts',
     description: 'Post stock deliveries against approved sales orders.',
     color: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  },
+  {
+    href: '/dashboard/sales/allocations',
+    title: 'Order Allocations',
+    description: 'Allocate quantities per customer order and create sales tally sheets.',
+    color: 'border-amber-200 bg-amber-50 text-amber-800',
   },
 ];
 
