@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     if (minimal) {
       params.push(limit);
       const rows = await query(
-        `SELECT id, code, name FROM suppliers s WHERE ${where} ORDER BY name ASC LIMIT $${params.length}`,
+        `SELECT id, code, name, address, payment_terms_days FROM suppliers s WHERE ${where} ORDER BY name ASC LIMIT $${params.length}`,
         params,
       );
       return ok({ data: rows });

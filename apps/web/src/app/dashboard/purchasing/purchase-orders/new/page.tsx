@@ -8,7 +8,7 @@ import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
 import { SearchableSelect } from '@/components/SearchableSelect';
 import { NumericInput } from '@/components/NumericInput';
 
-interface Supplier { id: string; code: string; name: string; }
+interface Supplier { id: string; code: string; name: string; address: string | null; payment_terms_days: number; }
 interface Item     { id: string; sku: string; name: string; selling_price: number; }
 interface Account  { id: string; code: string; name: string; }
 
@@ -141,6 +141,12 @@ export default function NewPurchaseOrderPage() {
                 placeholder="Select supplier…"
                 options={suppliers.map(s => ({ value: s.id, label: `${s.code} — ${s.name}` }))}
               />
+              {(() => { const s = suppliers.find(x => x.id === form.supplier_id); return s ? (
+                <div className="mt-1.5 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+                  <span className="font-medium">Terms:</span> {s.payment_terms_days} days
+                  {s.address && <><span className="mx-2 text-slate-300">|</span><span className="font-medium">Address:</span> {s.address}</>}
+                </div>
+              ) : null; })()}
             </div>
             <div>
               <label className={lbl}>PO Date *</label>

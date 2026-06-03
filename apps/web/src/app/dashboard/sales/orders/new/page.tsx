@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import { useTaggingData } from '@/hooks/useTaggingData';
 import { TaggingFields, GrowSelect, type TaggingValues } from '@/components/TaggingPanel';
 
-interface Customer { id: string; code: string; name: string; payment_terms_days: number; credit_limit: number; }
+interface Customer { id: string; code: string; name: string; payment_terms_days: number; credit_limit: number; address: string | null; }
 interface Item { id: string; sku: string; name: string; selling_price: number; }
 interface Warehouse { id: string; code: string; name: string; }
 interface Account { id: string; code: string; name: string; }
@@ -165,6 +165,12 @@ export default function NewSalesOrderPage() {
                   <option key={c.id} value={c.id}>{c.code} — {c.name}</option>
                 ))}
               </select>
+              {(() => { const c = customers.find(x => x.id === form.customer_id); return c ? (
+                <div className="mt-1.5 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+                  <span className="font-medium">Terms:</span> {c.payment_terms_days} days
+                  {c.address && <><span className="mx-2 text-slate-300">|</span><span className="font-medium">Address:</span> {c.address}</>}
+                </div>
+              ) : null; })()}
             </div>
 
             <div>
