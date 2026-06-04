@@ -105,6 +105,7 @@ export default function POPrintPage() {
   const companyName = company?.name ?? 'ART FRESH CHICKEN CORP';
   const companyAddress = company?.address ?? '';
   const companyPhone = company?.phone ?? '';
+  const companyTin = company?.tin ?? null;
   const companyLogo = company?.logo ?? null;
 
   return (
@@ -207,6 +208,9 @@ export default function POPrintPage() {
                     )}
                     {companyPhone && (
                       <div style={{ fontSize: '12px', color: '#333' }}>Tel No. {companyPhone}</div>
+                    )}
+                    {companyTin && (
+                      <div style={{ fontSize: '12px', color: '#333' }}>TIN: {companyTin}</div>
                     )}
                   </div>
                 </div>
