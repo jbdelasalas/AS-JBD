@@ -129,10 +129,12 @@ export default function POPrintPage() {
           .no-print { display: none !important; }
           #po-print {
             width: 210mm !important;
-            min-height: 297mm;
+            min-height: 264mm;
             padding: 18mm 15mm 15mm 15mm !important;
             margin: 0 !important;
             box-shadow: none !important;
+            display: flex !important;
+            flex-direction: column !important;
           }
         }
         @media screen {
@@ -170,12 +172,18 @@ export default function POPrintPage() {
       {/* Print document */}
       <div id="po-print" style={{
         width: '210mm',
+        minHeight: '264mm',
         background: '#fff',
         fontFamily: 'var(--font-outfit), Arial, sans-serif',
         fontSize: '10px',
         color: '#000',
         padding: '8mm 10mm',
+        display: 'flex',
+        flexDirection: 'column',
       }}>
+
+        {/* ── MAIN CONTENT ── */}
+        <div>
 
         {/* ── HEADER ── */}
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '4px' }}>
@@ -408,6 +416,11 @@ export default function POPrintPage() {
           </tbody>
         </table>
 
+        </div>{/* end main content */}
+
+        {/* ── CONFORME + CONDITIONS pinned to bottom ── */}
+        <div style={{ marginTop: 'auto' }}>
+
         {/* ── CONFORME ── */}
         <div style={{ fontWeight: 700, fontSize: '11px', marginBottom: '8px' }}>CONFORME:</div>
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '24px' }}>
@@ -438,6 +451,8 @@ export default function POPrintPage() {
           or deduction of such damages shall not relieve the supplier from his obligations to complete the work or any other of his obligations
           and liabilities of this contract. This is a system generated PO.
         </div>
+
+        </div>{/* end bottom anchor */}
 
       </div>
     </>
