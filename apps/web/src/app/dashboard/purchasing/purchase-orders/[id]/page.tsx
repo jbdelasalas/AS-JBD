@@ -39,6 +39,7 @@ interface PO {
   supplier_id: string;
   supplier_address: string | null;
   supplier_terms: number | null;
+  supplier_tin: string | null;
   subtotal: number;
   vat_amount: number;
   total: number;
@@ -51,6 +52,8 @@ interface PO {
   cost_center_name: string | null;
   grow_ref_code: string | null;
   grow_ref_name: string | null;
+  created_by_name: string | null;
+  approved_by_name: string | null;
   lines: POLine[];
 }
 
@@ -283,6 +286,11 @@ export default function PODetailPage() {
       {/* Action buttons — mirrors the form footer */}
       <div className="flex items-center justify-between">
         <div className="flex gap-3">
+          <button
+            onClick={() => window.open(`/print/po/${id}`, '_blank')}
+            className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
+            Print PO
+          </button>
           {!isTerminal && (
             <>
               {po.status === 'draft' && (
