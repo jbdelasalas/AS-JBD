@@ -120,13 +120,13 @@ export default function POPrintPage() {
     <>
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #fff; }
+        html, body { background: #fff !important; color: #000 !important; color-scheme: light !important; }
         @media print {
           @page { size: A4 portrait; margin: 10mm 12mm; }
           .no-print { display: none !important; }
         }
         @media screen {
-          body { background: #e0e0e0; }
+          body { background: #e0e0e0 !important; }
           #po-print { margin: 24px auto; box-shadow: 0 2px 12px rgba(0,0,0,0.15); }
         }
       `}</style>
@@ -179,7 +179,14 @@ export default function POPrintPage() {
                     <img
                       src={companyLogo}
                       alt="Company Logo"
-                      style={{ width: '64px', height: '64px', objectFit: 'contain', flexShrink: 0 }}
+                      style={{
+                        width: '70px',
+                        height: '70px',
+                        objectFit: 'contain',
+                        flexShrink: 0,
+                        backgroundColor: '#fff',
+                        mixBlendMode: 'multiply',
+                      }}
                     />
                   )}
                   <div>
