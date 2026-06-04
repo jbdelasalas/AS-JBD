@@ -297,7 +297,7 @@ export default function POPrintPage() {
         </table>
 
         {/* ── LINE ITEMS TABLE ── */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', border: BK, marginBottom: '4px', fontSize: '12px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', border: BK, marginTop: '16px', marginBottom: '4px', fontSize: '12px' }}>
           <thead>
             <tr style={{ background: '#e8e8e8' }}>
               <th style={{ border: BK, padding: '4px 5px', textAlign: 'center', fontWeight: 700, width: '10%' }}>Item</th>
