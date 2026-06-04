@@ -122,8 +122,18 @@ export default function POPrintPage() {
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { background: #fff !important; color: #000 !important; color-scheme: light !important; }
         @media print {
-          @page { size: A4 portrait; margin: 10mm 12mm; }
+          @page {
+            size: A4 portrait;
+            margin: 0;
+          }
           .no-print { display: none !important; }
+          #po-print {
+            width: 210mm !important;
+            min-height: 297mm;
+            padding: 18mm 15mm 15mm 15mm !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+          }
         }
         @media screen {
           body { background: #e0e0e0 !important; }
