@@ -344,19 +344,19 @@ export default function POPrintPage() {
           <tbody>
             <tr>
               <td style={{ paddingRight: '16px', fontSize: '13px' }}>Subtotal</td>
-              <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>
+              <td style={{ fontFamily: 'monospace', fontSize: '13px', textAlign: 'right', minWidth: '140px' }}>
                 PHP{fmtNum(po.subtotal)}
               </td>
             </tr>
             <tr>
               <td style={{ paddingRight: '16px', fontSize: '13px' }}>VAT</td>
-              <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>
+              <td style={{ fontFamily: 'monospace', fontSize: '13px', textAlign: 'right' }}>
                 PHP{fmtNum(po.vat_amount)}
               </td>
             </tr>
             <tr>
               <td style={{ paddingRight: '16px', fontSize: '14px', fontWeight: 700 }}>Total</td>
-              <td style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, borderTop: BK }}>
+              <td style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, borderTop: BK, textAlign: 'right' }}>
                 PHP{fmtNum(po.total)}
               </td>
             </tr>
