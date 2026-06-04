@@ -175,7 +175,7 @@ export default function POPrintPage() {
         minHeight: '264mm',
         background: '#fff',
         fontFamily: 'var(--font-outfit), Arial, sans-serif',
-        fontSize: '10px',
+        fontSize: '12px',
         color: '#000',
         padding: '8mm 10mm',
         display: 'flex',
@@ -208,21 +208,21 @@ export default function POPrintPage() {
                     />
                   )}
                   <div>
-                    <div style={{ fontSize: '18px', fontWeight: 900, lineHeight: 1.1, letterSpacing: '0.5px' }}>
+                    <div style={{ fontSize: '22px', fontWeight: 900, lineHeight: 1.1, letterSpacing: '0.5px' }}>
                       {companyName}
                     </div>
                     {companyAddress && (
-                      <div style={{ fontSize: '9px', color: '#333', marginTop: '2px' }}>{companyAddress}</div>
+                      <div style={{ fontSize: '11px', color: '#333', marginTop: '2px' }}>{companyAddress}</div>
                     )}
                     {companyPhone && (
-                      <div style={{ fontSize: '9px', color: '#333' }}>Tel No. {companyPhone}</div>
+                      <div style={{ fontSize: '11px', color: '#333' }}>Tel No. {companyPhone}</div>
                     )}
                   </div>
                 </div>
               </td>
               {/* PO Number */}
               <td style={{ textAlign: 'right', verticalAlign: 'top' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700 }}>PO No.&nbsp;&nbsp;{po.po_no}</div>
+                <div style={{ fontSize: '13px', fontWeight: 700 }}>PO No.&nbsp;&nbsp;{po.po_no}</div>
               </td>
             </tr>
           </tbody>
@@ -230,7 +230,7 @@ export default function POPrintPage() {
 
         {/* ── TITLE ── */}
         <div style={{
-          textAlign: 'center', fontSize: '13px', fontWeight: 900,
+          textAlign: 'center', fontSize: '15px', fontWeight: 900,
           borderTop: BK, borderBottom: BK,
           padding: '4px 0', marginBottom: '6px', letterSpacing: '1px',
         }}>
@@ -238,7 +238,7 @@ export default function POPrintPage() {
         </div>
 
         {/* ── SUPPLIER / DATE INFO ── */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '6px', fontSize: '10px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '6px', fontSize: '12px' }}>
           <tbody>
             <tr>
               {/* Left: Supplier */}
@@ -304,7 +304,7 @@ export default function POPrintPage() {
         </table>
 
         {/* ── LINE ITEMS TABLE ── */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', border: BK, marginBottom: '4px', fontSize: '9.5px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', border: BK, marginBottom: '4px', fontSize: '11px' }}>
           <thead>
             <tr style={{ background: '#f0f0f0' }}>
               <th style={{ border: BK, padding: '4px 5px', textAlign: 'center', fontWeight: 700, width: '10%' }}>Item</th>
@@ -323,7 +323,7 @@ export default function POPrintPage() {
               const desc = l.description + (l.item_name && l.item_name !== l.description ? ` - ${l.item_name}` : '');
               return (
                 <tr key={l.id}>
-                  <td style={{ border: BK, padding: '4px 5px', textAlign: 'center', fontFamily: 'monospace', fontSize: '8.5px' }}>
+                  <td style={{ border: BK, padding: '4px 5px', textAlign: 'center', fontFamily: 'monospace', fontSize: '10px' }}>
                     {sku}
                   </td>
                   <td style={{ border: BK, padding: '4px 5px' }} />
@@ -366,20 +366,20 @@ export default function POPrintPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '8px' }}>
           <tbody>
             <tr>
-              <td style={{ textAlign: 'right', paddingRight: '8px', fontSize: '10px' }}>Subtotal</td>
-              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: '10px', width: '130px' }}>
+              <td style={{ textAlign: 'right', paddingRight: '8px', fontSize: '12px' }}>Subtotal</td>
+              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: '12px', width: '140px' }}>
                 PHP{fmtNum(po.subtotal)}
               </td>
             </tr>
             <tr>
-              <td style={{ textAlign: 'right', paddingRight: '8px', fontSize: '10px' }}>VAT</td>
-              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: '10px' }}>
+              <td style={{ textAlign: 'right', paddingRight: '8px', fontSize: '12px' }}>VAT</td>
+              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: '12px' }}>
                 PHP{fmtNum(po.vat_amount)}
               </td>
             </tr>
             <tr>
-              <td style={{ textAlign: 'right', paddingRight: '8px', fontSize: '11px', fontWeight: 700 }}>Total</td>
-              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: '11px', fontWeight: 700, borderTop: BK }}>
+              <td style={{ textAlign: 'right', paddingRight: '8px', fontSize: '13px', fontWeight: 700 }}>Total</td>
+              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, borderTop: BK }}>
                 PHP{fmtNum(po.total)}
               </td>
             </tr>
@@ -388,7 +388,7 @@ export default function POPrintPage() {
 
         {/* ── REMARKS ── */}
         {po.remarks && (
-          <div style={{ marginBottom: '12px', fontSize: '10px' }}>
+          <div style={{ marginBottom: '12px', fontSize: '12px' }}>
             <div style={{ fontWeight: 700, marginBottom: '2px' }}>Remarks</div>
             <div style={{ paddingLeft: '4px' }}>{po.remarks}</div>
           </div>
@@ -410,8 +410,8 @@ export default function POPrintPage() {
               </td>
             </tr>
             <tr>
-              <td style={{ textAlign: 'center', fontWeight: 700, fontSize: '10px', paddingTop: '4px' }}>Created By</td>
-              <td style={{ textAlign: 'center', fontWeight: 700, fontSize: '10px', paddingTop: '4px' }}>Approved By</td>
+              <td style={{ textAlign: 'center', fontWeight: 700, fontSize: '12px', paddingTop: '4px' }}>Created By</td>
+              <td style={{ textAlign: 'center', fontWeight: 700, fontSize: '12px', paddingTop: '4px' }}>Approved By</td>
             </tr>
           </tbody>
         </table>
@@ -422,7 +422,7 @@ export default function POPrintPage() {
         <div style={{ marginTop: 'auto' }}>
 
         {/* ── CONFORME ── */}
-        <div style={{ fontWeight: 700, fontSize: '11px', marginBottom: '8px' }}>CONFORME:</div>
+        <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '8px' }}>CONFORME:</div>
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '24px' }}>
           <tbody>
             <tr>
@@ -434,16 +434,16 @@ export default function POPrintPage() {
               </td>
             </tr>
             <tr>
-              <td style={{ textAlign: 'center', fontWeight: 700, fontSize: '10px', paddingTop: '4px' }}>
+              <td style={{ textAlign: 'center', fontWeight: 700, fontSize: '12px', paddingTop: '4px' }}>
                 Supplier&apos;s Authorized Representative
               </td>
-              <td style={{ textAlign: 'center', fontWeight: 700, fontSize: '10px', paddingTop: '4px' }}>Date</td>
+              <td style={{ textAlign: 'center', fontWeight: 700, fontSize: '12px', paddingTop: '4px' }}>Date</td>
             </tr>
           </tbody>
         </table>
 
         {/* ── CONDITIONS ── */}
-        <div style={{ borderTop: '1px solid #aaa', paddingTop: '8px', fontSize: '8px', color: '#222', lineHeight: '1.4', textAlign: 'justify' }}>
+        <div style={{ borderTop: '1px solid #aaa', paddingTop: '8px', fontSize: '10px', color: '#222', lineHeight: '1.4', textAlign: 'justify' }}>
           <strong>CONDITIONS:</strong> Failure of the supplier to deliver on the date and quality specified will make this P.O null and void.
           Delays incurred which are not fault of ARTFRESH will oblige the supplier to pay ARTFRESH the amount of 1% of the amount of
           the contract for everyday of delay as the liquidated damages. It is hereby understood that supplier expressly authorizes ARTFRESH
