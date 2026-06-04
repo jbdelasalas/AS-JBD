@@ -60,29 +60,31 @@ export async function GET(request: NextRequest) {
   if (toDate) { params.push(toDate); where += ` AND si.invoice_date <= $${params.length}`; }
 
   params.push(limit, offset);
-  const rows = await query(
-    `SELECT si.id, si.invoice_no, si.invoice_date, si.due_date,
-            si.subtotal, si.vat_amount, si.total, si.amount_paid, si.balance, si.status,
-            c.name AS customer_name, c.code AS customer_code
-       FROM sales_invoices si
-       JOIN customers c ON c.id = si.customer_id
-      WHERE ${where}
-      ORDER BY si.invoice_date DESC, si.invoice_no DESC
-      LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params,
-  );
-
-  const countRows = await query<{ c: number }>(
-    `SELECT count(*)::int AS c FROM sales_invoices si WHERE ${where}`,
-    params.slice(0, params.length - 2),
-  );
-
-  return ok({
-    data: rows.map((r) => mapRow(r as Record<string, unknown>)),
-    total: countRows[0].c,
-    page: Math.floor(offset / limit) + 1,
-    page_size: limit,
-  });
+  try {
+    const rows = await query(
+      `SELECT si.id, si.invoice_no, si.invoice_date, si.due_date,
+              si.subtotal, si.vat_amount, si.total, si.amount_paid, si.balance, si.status,
+              c.name AS customer_name, c.code AS customer_code
+         FROM sales_invoices si
+         JOIN customers c ON c.id = si.customer_id
+        WHERE ${where}
+        ORDER BY si.invoice_date DESC, si.invoice_no DESC
+        LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params,
+    );
+    const countRows = await query<{ c: number }>(
+      `SELECT count(*)::int AS c FROM sales_invoices si WHERE ${where}`,
+      params.slice(0, params.length - 2),
+    );
+    return ok({
+      data: rows.map((r) => mapRow(r as Record<string, unknown>)),
+      total: countRows[0].c,
+      page: Math.floor(offset / limit) + 1,
+      page_size: limit,
+    });
+  } catch (e) {
+    return err((e as Error).message ?? 'Failed to load invoices', 500);
+  }
 }
 
 export async function POST(request: NextRequest) {

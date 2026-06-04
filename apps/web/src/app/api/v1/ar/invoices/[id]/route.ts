@@ -39,27 +39,47 @@ export async function GET(
     return e as Response;
   }
 
-  const headers = await query(
-    `SELECT si.*, c.name AS customer_name, c.code AS customer_code,
-            c.address AS customer_address, c.payment_terms_days AS customer_terms,
-            so.order_no, dr.dr_no
-       FROM sales_invoices si
-       JOIN customers c ON c.id = si.customer_id
-       LEFT JOIN sales_orders so ON so.id = si.so_id
-       LEFT JOIN delivery_receipts dr ON dr.id = si.dr_id
-      WHERE si.id = $1 LIMIT 1`,
-    [params.id],
-  );
+  let headers: Record<string, unknown>[];
+  let lines: Record<string, unknown>[];
+  try {
+    headers = await query(
+      `SELECT si.*, c.name AS customer_name, c.code AS customer_code,
+              c.address AS customer_address, c.payment_terms_days AS customer_terms,
+              so.order_no, dr.dr_no
+         FROM sales_invoices si
+         JOIN customers c ON c.id = si.customer_id
+         LEFT JOIN sales_orders so ON so.id = si.so_id
+         LEFT JOIN delivery_receipts dr ON dr.id = si.dr_id
+        WHERE si.id = $1 LIMIT 1`,
+      [params.id],
+    ) as Record<string, unknown>[];
+  } catch {
+    // dr_id column may not exist yet — retry without the DR join
+    headers = await query(
+      `SELECT si.*, c.name AS customer_name, c.code AS customer_code,
+              c.address AS customer_address, c.payment_terms_days AS customer_terms,
+              so.order_no
+         FROM sales_invoices si
+         JOIN customers c ON c.id = si.customer_id
+         LEFT JOIN sales_orders so ON so.id = si.so_id
+        WHERE si.id = $1 LIMIT 1`,
+      [params.id],
+    ) as Record<string, unknown>[];
+  }
   if (!headers[0]) return err(`Invoice ${params.id} not found`, 404);
 
-  const lines = await query(
-    `SELECT sil.*, i.sku AS item_sku, i.name AS item_name, i.uom AS item_uom
-       FROM sales_invoice_lines sil
-       LEFT JOIN items i ON i.id = sil.item_id
-      WHERE sil.invoice_id = $1
-      ORDER BY sil.line_no`,
-    [params.id],
-  );
+  try {
+    lines = await query(
+      `SELECT sil.*, i.sku AS item_sku, i.name AS item_name, i.uom AS item_uom
+         FROM sales_invoice_lines sil
+         LEFT JOIN items i ON i.id = sil.item_id
+        WHERE sil.invoice_id = $1
+        ORDER BY sil.line_no`,
+      [params.id],
+    ) as Record<string, unknown>[];
+  } catch (e) {
+    return err((e as Error).message ?? 'Failed to load invoice lines', 500);
+  }
 
   return ok({
     ...mapRow(headers[0] as Record<string, unknown>),
