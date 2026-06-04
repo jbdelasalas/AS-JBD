@@ -7,12 +7,15 @@ import { ok, err } from '@/lib/api-response';
 async function findCustomer(id: string) {
   const rows = await query(
     `SELECT c.*,
-            COALESCE(SUM(si.balance), 0) AS open_ar_balance
+            COALESCE(SUM(si.balance), 0) AS open_ar_balance,
+            a.code AS ar_account_code,
+            a.name AS ar_account_name
        FROM customers c
        LEFT JOIN sales_invoices si ON si.customer_id = c.id
          AND si.status IN ('open','partially_paid','overdue')
+       LEFT JOIN accounts a ON a.id = c.ar_account_id
       WHERE c.id = $1
-      GROUP BY c.id`,
+      GROUP BY c.id, a.code, a.name`,
     [id],
   );
   if (!rows[0]) return null;

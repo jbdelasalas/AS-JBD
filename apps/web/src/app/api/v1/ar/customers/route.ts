@@ -97,6 +97,13 @@ export async function POST(request: NextRequest) {
   );
   if (existing.length) return err(`Customer code ${code} already exists`, 409);
 
+  // Auto-assign the AR control account
+  const arRows = await query<{ id: string }>(
+    `SELECT id FROM accounts WHERE company_id = $1 AND is_control = true AND account_type = 'ASSET' AND is_active = true ORDER BY code ASC LIMIT 1`,
+    [companyId],
+  );
+  const arAccountId = (dto.ar_account_id as string | undefined) ?? arRows[0]?.id ?? null;
+
   const rows = await query(
     `INSERT INTO customers
        (company_id, code, name, customer_type, tin, address, contact_person,
@@ -105,7 +112,7 @@ export async function POST(request: NextRequest) {
      RETURNING *`,
     [
       companyId, code, dto.name,
-      dto.customer_type ?? 'wholesale',
+      dto.customer_type ?? 'HRI',
       dto.tin ?? null,
       dto.address ?? null,
       dto.contact_person ?? null,
@@ -114,7 +121,7 @@ export async function POST(request: NextRequest) {
       dto.payment_terms_days ?? 30,
       dto.credit_limit ?? 0,
       dto.is_vat_exempt ?? false,
-      dto.ar_account_id ?? null,
+      arAccountId,
     ],
   );
   const customer = rows[0] as Record<string, unknown>;

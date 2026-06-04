@@ -29,7 +29,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   if (!rows[0]) return err('Allocation not found', 404);
 
   const lines = await query(
-    `SELECT al.*, i.sku AS item_sku, i.name AS item_name
+    `SELECT al.*, i.sku AS item_sku, i.name AS item_name, i.uom AS item_uom
        FROM order_allocation_lines al
        LEFT JOIN items i ON i.id = al.item_id
       WHERE al.allocation_id = $1

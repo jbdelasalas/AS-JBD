@@ -168,6 +168,7 @@ export default function SalesInvoiceDetailPage() {
               <th className="px-3 py-2 text-left font-medium">#</th>
               <th className="px-3 py-2 text-left font-medium">Description</th>
               <th className="px-3 py-2 text-right font-medium">Qty</th>
+              <th className="px-3 py-2 text-left font-medium">UOM</th>
               <th className="px-3 py-2 text-right font-medium">Unit Price</th>
               <th className="px-3 py-2 text-right font-medium">Disc %</th>
               <th className="px-3 py-2 text-right font-medium">VAT %</th>
@@ -182,6 +183,7 @@ export default function SalesInvoiceDetailPage() {
                 <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.line_no}</td>
                 <td className="px-3 py-2">{l.description}</td>
                 <td className="px-3 py-2 text-right font-mono text-xs">{l.quantity}</td>
+                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.item_uom ?? '—'}</td>
                 <td className="px-3 py-2 text-right font-mono text-xs">{formatPHP(l.unit_price)}</td>
                 <td className="px-3 py-2 text-right text-xs">{l.discount_pct}%</td>
                 <td className="px-3 py-2 text-right text-xs">{l.vat_rate}%</td>
@@ -197,12 +199,12 @@ export default function SalesInvoiceDetailPage() {
               { label: 'VAT (12%)', value: inv.vat_amount },
             ].map((row) => (
               <tr key={row.label} className="bg-slate-50 dark:bg-slate-800">
-                <td colSpan={8} className="px-3 py-1.5 text-right text-xs text-slate-600 dark:text-slate-400">{row.label}</td>
+                <td colSpan={9} className="px-3 py-1.5 text-right text-xs text-slate-600 dark:text-slate-400">{row.label}</td>
                 <td className="px-3 py-1.5 text-right font-mono text-xs">{formatPHP(row.value)}</td>
               </tr>
             ))}
             <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-              <td colSpan={8} className="px-3 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">Total</td>
+              <td colSpan={9} className="px-3 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">Total</td>
               <td className="px-3 py-2 text-right font-mono text-sm font-bold text-slate-900 dark:text-slate-100">{formatPHP(inv.total)}</td>
             </tr>
           </tfoot>

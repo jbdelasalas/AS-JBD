@@ -7,7 +7,7 @@ import { formatDate, formatPHP } from '@/lib/format';
 
 interface AllocLine {
   id: string; line_no: number; item_id: string | null;
-  item_sku: string | null; item_name: string | null; description: string;
+  item_sku: string | null; item_name: string | null; item_uom: string | null; description: string;
   qty_ordered: number; qty_allocated: number; allocation_unit: string;
   unit_price: number; discount_pct: number; vat_rate: number;
   branch_code: string | null; building_code: string | null;
@@ -145,6 +145,7 @@ export default function AllocationDetailPage() {
               <tr>
                 <th className="px-3 py-2 text-left font-medium w-8">#</th>
                 <th className="px-3 py-2 text-left font-medium">Item</th>
+                <th className="px-3 py-2 text-left font-medium w-14">UOM</th>
                 <th className="px-3 py-2 text-left font-medium">Description</th>
                 <th className="px-3 py-2 text-right font-medium w-24">Qty Ordered</th>
                 <th className="px-3 py-2 text-right font-medium w-24 bg-amber-50 dark:bg-amber-950">Qty Allocated</th>
@@ -163,6 +164,7 @@ export default function AllocationDetailPage() {
                 <tr key={l.id} className="border-b border-slate-100 dark:border-slate-700">
                   <td className="px-3 py-2 text-slate-400">{l.line_no}</td>
                   <td className="px-3 py-2 font-mono text-slate-500 dark:text-slate-400">{l.item_sku ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.item_uom ?? '—'}</td>
                   <td className="px-3 py-2 dark:text-slate-300">
                     {l.description}
                     {l.item_name && <span className="ml-1 text-slate-400">({l.item_name})</span>}
@@ -184,7 +186,7 @@ export default function AllocationDetailPage() {
             </tbody>
             <tfoot>
               <tr className="border-t border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
-                <td colSpan={3} className="px-3 py-2 text-right text-xs font-semibold text-slate-700 dark:text-slate-300">Total Allocated</td>
+                <td colSpan={4} className="px-3 py-2 text-right text-xs font-semibold text-slate-700 dark:text-slate-300">Total Allocated</td>
                 <td />
                 <td className="px-3 py-2 text-right font-mono font-bold text-amber-700 dark:text-amber-400">
                   {totalAllocated.toLocaleString('en-PH', { minimumFractionDigits: 2 })}

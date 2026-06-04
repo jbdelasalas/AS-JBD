@@ -7,6 +7,12 @@ import { api } from '@/lib/api';
 import { formatPHP, formatDate } from '@/lib/format';
 import type { Customer } from '@perpet/shared';
 
+interface CustomerWithAR extends Customer {
+  open_ar_balance: number;
+  ar_account_code: string | null;
+  ar_account_name: string | null;
+}
+
 interface InvoiceRow {
   id: string;
   invoice_no: string;
@@ -36,11 +42,11 @@ const SI_STATUS: Record<string, string> = {
   cancelled: 'bg-slate-100 text-slate-500 dark:text-slate-400',
 };
 
-const CUSTOMER_TYPES = ['wholesale', 'fleet', 'gov', 'retail'];
+const CUSTOMER_TYPES = ['HRI', 'Wet', 'Others'];
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [customer, setCustomer] = useState<(Customer & { open_ar_balance: number }) | null>(null);
+  const [customer, setCustomer] = useState<CustomerWithAR | null>(null);
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,7 +61,7 @@ export default function CustomerDetailPage() {
   const load = useCallback(() => {
     setLoading(true);
     Promise.all([
-      api.get<Customer & { open_ar_balance: number }>(`/ar/customers/${id}`),
+      api.get<CustomerWithAR>(`/ar/customers/${id}`),
       api.get<InvoiceRow[]>(`/ar/customers/${id}/outstanding`),
       api.get<{ data: Payment[] }>(`/ar/collections?company_id=${companyId}&customer_id=${id}&limit=20`),
     ]).then(([c, inv, pay]) => {
@@ -145,7 +151,7 @@ export default function CustomerDetailPage() {
             </div>
             <div>
               <label className={lbl}>Type</label>
-              <select value={form.customer_type ?? 'wholesale'} onChange={(e) => set('customer_type', e.target.value)} className={inp}>
+              <select value={form.customer_type ?? 'HRI'} onChange={(e) => set('customer_type', e.target.value)} className={inp}>
                 {CUSTOMER_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
@@ -213,6 +219,7 @@ export default function CustomerDetailPage() {
                 ['Email', customer.email ?? '—'],
                 ['Address', customer.address ?? '—'],
                 ['VAT Exempt', customer.is_vat_exempt ? 'Yes' : 'No'],
+                ['AR Account', customer.ar_account_code && customer.ar_account_name ? `${customer.ar_account_code} – ${customer.ar_account_name}` : '—'],
               ].map(([k, v]) => (
                 <div key={k}>
                   <span className="text-xs text-slate-500 dark:text-slate-400">{k}: </span>

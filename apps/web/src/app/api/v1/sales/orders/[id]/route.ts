@@ -48,7 +48,7 @@ export async function GET(
   if (!headers[0]) return err(`Sales order ${params.id} not found`, 404);
 
   const lines = await query(
-    `SELECT sol.*, i.sku AS item_sku, i.name AS item_name FROM sales_order_lines sol JOIN items i ON i.id = sol.item_id WHERE sol.order_id = $1 ORDER BY sol.line_no`,
+    `SELECT sol.*, i.sku AS item_sku, i.name AS item_name, i.uom AS item_uom FROM sales_order_lines sol LEFT JOIN items i ON i.id = sol.item_id WHERE sol.order_id = $1 ORDER BY sol.line_no`,
     [params.id],
   );
 

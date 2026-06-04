@@ -9,7 +9,8 @@ import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
 
 interface Customer { id: string; code: string; name: string; }
 interface InvoiceRow { id: string; invoice_no: string; due_date: string; balance: number; status: string; }
-interface BankAccount { id: string; code: string; name: string; account_type?: string; }
+interface BankAccount { id: string; account_name: string; bank_name: string | null; account_number: string | null; gl_account_id: string | null; }
+interface GLAccount { id: string; code: string; name: string; }
 
 interface Application { invoice_id: string; invoice_no: string; amount_applied: number; balance: number; }
 
@@ -21,6 +22,7 @@ function NewCollectionForm() {
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
+  const [glAccounts, setGlAccounts] = useState<GLAccount[]>([]);
   const [openInvoices, setOpenInvoices] = useState<InvoiceRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +37,12 @@ function NewCollectionForm() {
     amount: 0,
     bank_account_id: '',
     notes: '',
+    deduction1_account_id: '',
+    deduction1_label: 'CWT',
+    deduction1_amount: 0,
+    deduction2_account_id: '',
+    deduction2_label: '',
+    deduction2_amount: 0,
   });
 
   const [apps, setApps] = useState<Application[]>([]);
@@ -46,10 +54,12 @@ function NewCollectionForm() {
     if (!companyId) return;
     Promise.all([
       api.get<{ data: Customer[] }>(`/ar/customers?company_id=${companyId}&is_active=true&limit=200`),
-      api.get<{ data: BankAccount[] }>(`/gl/accounts?company_id=${companyId}&limit=200`),
-    ]).then(([c, a]) => {
+      api.get<{ data: BankAccount[] }>(`/bank-accounts?company_id=${companyId}`),
+      api.get<{ data: GLAccount[] }>(`/gl/accounts?company_id=${companyId}&limit=500`),
+    ]).then(([c, a, g]) => {
       setCustomers(c.data);
-      setAccounts(a.data.filter((x) => x.account_type === 'ASSET'));
+      setAccounts(a.data.filter(b => b.gl_account_id));
+      setGlAccounts(g.data ?? []);
     }).catch(() => {});
   }, []);
 
@@ -81,8 +91,10 @@ function NewCollectionForm() {
     setApps((prev) => prev.map((a) => a.invoice_id === invoiceId ? { ...a, amount_applied: amount } : a));
   }
 
+  const totalDeductions = (form.deduction1_amount || 0) + (form.deduction2_amount || 0);
+  const effectiveAmount = (form.amount || 0) + totalDeductions;
   const totalApplied = apps.reduce((s, a) => s + a.amount_applied, 0);
-  const unapplied = (form.amount || 0) - totalApplied;
+  const unapplied = effectiveAmount - totalApplied;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -101,8 +113,14 @@ function NewCollectionForm() {
         bank_ref: form.bank_ref || undefined,
         check_date: form.check_date || undefined,
         amount: form.amount,
-        bank_account_id: form.bank_account_id || undefined,
+        bank_account_id: accounts.find(a => a.id === form.bank_account_id)?.gl_account_id || undefined,
         notes: form.notes || undefined,
+        deduction1_account_id: form.deduction1_account_id || undefined,
+        deduction1_label: form.deduction1_label || undefined,
+        deduction1_amount: form.deduction1_amount || undefined,
+        deduction2_account_id: form.deduction2_account_id || undefined,
+        deduction2_label: form.deduction2_label || undefined,
+        deduction2_amount: form.deduction2_amount || undefined,
         branch_id: tags.branch_id || undefined,
         building_id: tags.building_id || undefined,
         cost_center_id: tags.cost_center_id || undefined,
@@ -197,7 +215,11 @@ function NewCollectionForm() {
                 onChange={(e) => setForm((f) => ({ ...f, bank_account_id: e.target.value }))}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                 <option value="">— auto-resolve —</option>
-                {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.account_name}{a.bank_name ? ` — ${a.bank_name}` : ''}{a.account_number ? ` (${a.account_number})` : ''}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -206,6 +228,64 @@ function NewCollectionForm() {
               <textarea rows={2} value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
+
+            {/* Deduction 1 (CWT etc.) */}
+            <div className="col-span-3 border-t border-slate-100 dark:border-slate-700 pt-3">
+              <div className="mb-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Deductions / Reductions</div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Deduction 1 Label</label>
+                  <input type="text" placeholder="e.g. CWT" value={form.deduction1_label}
+                    onChange={e => setForm(f => ({ ...f, deduction1_label: e.target.value }))}
+                    className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">GL Account (COA)</label>
+                  <select value={form.deduction1_account_id}
+                    onChange={e => setForm(f => ({ ...f, deduction1_account_id: e.target.value }))}
+                    className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                    <option value="">— none —</option>
+                    {glAccounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Amount</label>
+                  <input type="number" min={0} step="any" value={form.deduction1_amount || ''}
+                    onChange={e => setForm(f => ({ ...f, deduction1_amount: parseFloat(e.target.value) || 0 }))}
+                    className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm text-right dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+                </div>
+
+                {/* Deduction 2 */}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Deduction 2 Label</label>
+                  <input type="text" placeholder="e.g. Discount" value={form.deduction2_label}
+                    onChange={e => setForm(f => ({ ...f, deduction2_label: e.target.value }))}
+                    className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">GL Account (COA)</label>
+                  <select value={form.deduction2_account_id}
+                    onChange={e => setForm(f => ({ ...f, deduction2_account_id: e.target.value }))}
+                    className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                    <option value="">— none —</option>
+                    {glAccounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Amount</label>
+                  <input type="number" min={0} step="any" value={form.deduction2_amount || ''}
+                    onChange={e => setForm(f => ({ ...f, deduction2_amount: parseFloat(e.target.value) || 0 }))}
+                    className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm text-right dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+                </div>
+              </div>
+              {totalDeductions > 0 && (
+                <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                  Cash received: <strong className="text-slate-800 dark:text-slate-200">{(form.amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</strong>
+                  {' '}+ Deductions: <strong className="text-slate-800 dark:text-slate-200">{totalDeductions.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</strong>
+                  {' '}= Effective: <strong className="text-brand-700 dark:text-brand-400">{effectiveAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</strong>
+                </div>
+              )}
             </div>
           </div>
         </div>

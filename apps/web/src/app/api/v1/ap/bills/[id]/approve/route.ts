@@ -197,7 +197,7 @@ export async function POST(
     // Update account balances
     await client.query(
       `INSERT INTO account_balances (account_id, fiscal_period_id, debit_total, credit_total)
-       SELECT jel.account_id, $2, jel.debit, jel.credit FROM journal_entry_lines jel WHERE jel.entry_id = $1
+       SELECT jel.account_id, $2, SUM(jel.debit), SUM(jel.credit) FROM journal_entry_lines jel WHERE jel.entry_id = $1 GROUP BY jel.account_id
        ON CONFLICT (account_id, fiscal_period_id) DO UPDATE
          SET debit_total  = account_balances.debit_total  + EXCLUDED.debit_total,
              credit_total = account_balances.credit_total + EXCLUDED.credit_total`,

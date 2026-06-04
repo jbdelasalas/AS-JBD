@@ -19,6 +19,7 @@ interface POLine {
   line_total: number;
   item_sku: string | null;
   item_name: string | null;
+  item_uom: string | null;
   gl_account_code: string | null;
   gl_account_name: string | null;
   branch_code: string | null;
@@ -213,6 +214,7 @@ export default function PODetailPage() {
                 <th className="px-3 py-2 text-left font-medium">Item / Account</th>
                 <th className="px-3 py-2 text-left font-medium">Description</th>
                 <th className="px-3 py-2 text-right font-medium w-20">Qty</th>
+                <th className="px-3 py-2 text-left font-medium w-14">UOM</th>
                 <th className="px-3 py-2 text-right font-medium w-20">Received</th>
                 <th className="px-3 py-2 text-right font-medium w-28">Unit Price</th>
                 <th className="px-3 py-2 text-right font-medium w-12">VAT%</th>
@@ -241,6 +243,7 @@ export default function PODetailPage() {
                     {l.gl_account_name && <span className="ml-1 text-slate-400">({l.gl_account_name})</span>}
                   </td>
                   <td className="px-3 py-2 text-right font-mono dark:text-slate-300">{l.quantity}</td>
+                  <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.item_uom ?? '—'}</td>
                   <td className="px-3 py-2 text-right font-mono">
                     <span className={l.qty_received >= l.quantity ? 'text-emerald-600' : l.qty_received > 0 ? 'text-amber-600' : 'text-slate-400'}>
                       {l.qty_received}
@@ -258,17 +261,17 @@ export default function PODetailPage() {
             </tbody>
             <tfoot>
               <tr className="bg-slate-50 dark:bg-slate-800">
-                <td colSpan={7} className="px-3 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">Subtotal</td>
+                <td colSpan={8} className="px-3 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">Subtotal</td>
                 <td className="px-3 py-1.5 text-right font-mono text-xs dark:text-slate-300">{formatPHP(po.subtotal)}</td>
                 <td colSpan={4} />
               </tr>
               <tr className="bg-slate-50 dark:bg-slate-800">
-                <td colSpan={7} className="px-3 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">VAT</td>
+                <td colSpan={8} className="px-3 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">VAT</td>
                 <td className="px-3 py-1.5 text-right font-mono text-xs dark:text-slate-300">{formatPHP(po.vat_amount)}</td>
                 <td colSpan={4} />
               </tr>
               <tr className="border-t border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
-                <td colSpan={7} className="px-3 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">Total</td>
+                <td colSpan={8} className="px-3 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">Total</td>
                 <td className="px-3 py-2 text-right font-mono text-sm font-bold text-slate-900 dark:text-slate-100">{formatPHP(po.total)}</td>
                 <td colSpan={4} />
               </tr>

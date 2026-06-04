@@ -77,8 +77,6 @@ const NAV: NavItem[] = [
       { href: '/dashboard/poultry/tally-sheets',  label: 'Tally Sheets' },
       { href: '/dashboard/poultry/conversions',   label: 'Conversions' },
       { href: '/dashboard/poultry/sales-tallies', label: 'Sales Tallies' },
-      { href: '/dashboard/poultry/deliveries',    label: 'Deliveries' },
-      { href: '/dashboard/poultry/invoices',      label: 'Invoices' },
     ],
   },
   { href: '/dashboard/reports', label: 'Reports' },

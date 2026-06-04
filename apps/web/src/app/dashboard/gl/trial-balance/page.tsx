@@ -40,7 +40,7 @@ export default function TrialBalancePage() {
     setError(null);
     try {
       const res = await api.get<TrialBalanceResponse>(
-        `/gl/reports/trial-balance?company_id=${companyId}&as_of=${asOf}`,
+        `/gl/trial-balance?company_id=${companyId}&as_of_date=${asOf}`,
       );
       setData(res);
     } catch (e) {

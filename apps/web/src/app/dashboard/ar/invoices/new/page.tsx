@@ -7,7 +7,7 @@ import { useTaggingData } from '@/hooks/useTaggingData';
 import { TaggingFields, GrowSelect, type TaggingValues } from '@/components/TaggingPanel';
 
 interface Customer { id: string; code: string; name: string; payment_terms_days: number; }
-interface Item { id: string; sku: string; name: string; selling_price: number; }
+interface Item { id: string; sku: string; name: string; selling_price: number; uom: string; }
 interface Account { id: string; code: string; name: string; }
 
 interface Line {
@@ -19,6 +19,7 @@ interface Line {
   unit_price: number;
   discount_pct: number;
   vat_rate: number;
+  uom: string;
   grow_reference_id: string;
 }
 
@@ -44,9 +45,10 @@ function NewInvoiceForm() {
   });
 
   const [lines, setLines] = useState<Line[]>([
-    { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12, grow_reference_id: '' },
+    { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12, uom: '', grow_reference_id: '' },
   ]);
   const [tags, setTags] = useState<TaggingValues>({ branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '' });
+  const [drRef, setDrRef] = useState<string | null>(null);
 
   useEffect(() => {
     const companyId = localStorage.getItem('company_id');
@@ -55,7 +57,60 @@ function NewInvoiceForm() {
       api.get<{ data: Customer[] }>(`/ar/customers?company_id=${companyId}&is_active=true&limit=200`),
       api.get<Item[]>(`/inventory/items?company_id=${companyId}&limit=200`),
       api.get<{ data: Account[] }>(`/gl/accounts?company_id=${companyId}&limit=500`),
-    ]).then(([c, i, a]) => { setCustomers(c.data); setItems(i); setAccounts(a.data ?? []); }).catch(() => {});
+    ]).then(([c, i, a]) => {
+      setCustomers(c.data);
+      setItems(i);
+      setAccounts(a.data ?? []);
+
+      // Pre-fill from DR if coming from DR detail page
+      const raw = sessionStorage.getItem('pending_si_from_dr');
+      if (raw) {
+        try {
+          const d = JSON.parse(raw) as {
+            dr_id: string; dr_no: string;
+            customer_id: string; so_id: string;
+            invoice_date: string; payment_terms_days: number;
+            branch_id: string | null; building_id: string | null;
+            cost_center_id: string | null; grow_reference_id: string | null;
+            lines: Array<{
+              item_id: string; description: string; quantity: number;
+              unit_price: number; discount_pct: number; vat_rate: number;
+              uom: string; grow_reference_id: string;
+            }>;
+          };
+          setDrRef(d.dr_no);
+          setForm(f => ({
+            ...f,
+            customer_id: d.customer_id ?? f.customer_id,
+            invoice_date: d.invoice_date ? d.invoice_date.split('T')[0] : f.invoice_date,
+            payment_terms_days: d.payment_terms_days ?? f.payment_terms_days,
+            reference: d.dr_no ?? f.reference,
+          }));
+          const newTags = {
+            branch_id: d.branch_id ?? '',
+            building_id: d.building_id ?? '',
+            cost_center_id: d.cost_center_id ?? '',
+            grow_reference_id: d.grow_reference_id ?? '',
+          };
+          setTags(newTags);
+          if (d.lines?.length) {
+            setLines(d.lines.map(l => ({
+              line_type: 'item' as const,
+              item_id: l.item_id,
+              gl_account_id: '',
+              description: l.description,
+              quantity: l.quantity,
+              unit_price: l.unit_price,
+              discount_pct: l.discount_pct,
+              vat_rate: l.vat_rate,
+              uom: l.uom,
+              grow_reference_id: l.grow_reference_id || newTags.grow_reference_id,
+            })));
+          }
+          sessionStorage.removeItem('pending_si_from_dr');
+        } catch {}
+      }
+    }).catch(() => {});
   }, []);
 
   function handleTagChange(field: keyof TaggingValues, val: string) {
@@ -64,7 +119,7 @@ function NewInvoiceForm() {
   }
 
   function addLine() {
-    setLines((l) => [...l, { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12, grow_reference_id: tags.grow_reference_id }]);
+    setLines((l) => [...l, { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12, uom: '', grow_reference_id: tags.grow_reference_id }]);
   }
 
   function updateLine(idx: number, field: keyof Line, val: string | number) {
@@ -78,7 +133,7 @@ function NewInvoiceForm() {
       } else if (field === 'item_id' && typeof val === 'string') {
         const item = items.find((i) => i.id === val);
         line.item_id = val;
-        if (item) { line.description = item.name; line.unit_price = item.selling_price; }
+        if (item) { line.description = item.name; line.unit_price = item.selling_price; line.uom = item.uom; }
       } else {
         (line as Record<string, unknown>)[field] = val;
       }
@@ -123,6 +178,12 @@ function NewInvoiceForm() {
     <div>
       <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">New Sales Invoice</h1>
       <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">Create a draft invoice — post it to generate the GL entry and AR.</p>
+
+      {drRef && (
+        <div className="mb-4 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+          Pre-filled from Delivery Receipt <strong>{drRef}</strong> — review and save.
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
@@ -188,6 +249,7 @@ function NewInvoiceForm() {
                 <th className="px-2 py-1.5 text-left font-medium w-40">Account / Item</th>
                 <th className="px-2 py-1.5 text-left font-medium">Description *</th>
                 <th className="px-2 py-1.5 text-right font-medium w-16">Qty</th>
+                <th className="px-2 py-1.5 text-left font-medium w-14">UOM</th>
                 <th className="px-2 py-1.5 text-right font-medium w-24">Unit Price</th>
                 <th className="px-2 py-1.5 text-right font-medium w-14">Disc %</th>
                 <th className="px-2 py-1.5 text-right font-medium w-14">VAT %</th>
@@ -231,6 +293,7 @@ function NewInvoiceForm() {
                       onChange={(e) => updateLine(idx, 'quantity', parseFloat(e.target.value) || 0)}
                       className="w-full rounded border border-slate-300 px-1 py-1 text-right" />
                   </td>
+                  <td className="px-2 py-1 text-xs text-slate-500 dark:text-slate-400">{l.uom || '—'}</td>
                   <td className="px-2 py-1">
                     <input type="number" min={0} step="any" value={l.unit_price}
                       onChange={(e) => updateLine(idx, 'unit_price', parseFloat(e.target.value) || 0)}
@@ -263,7 +326,7 @@ function NewInvoiceForm() {
             </tbody>
             <tfoot>
               <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-                <td colSpan={8} className="px-2 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Grand Total (incl. VAT)</td>
+                <td colSpan={9} className="px-2 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Grand Total (incl. VAT)</td>
                 <td className="px-2 py-2 text-right font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">
                   ₱{grandTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </td>

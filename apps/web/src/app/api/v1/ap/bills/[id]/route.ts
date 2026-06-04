@@ -90,9 +90,11 @@ export async function GET(
   if (!rows[0]) return err(`Bill ${params.id} not found`, 404);
 
   const lines = await query(
-    `SELECT bl.*, a.name AS account_name, a.code AS account_code
+    `SELECT bl.*, a.name AS account_name, a.code AS account_code,
+            i.uom AS item_uom
        FROM bill_lines bl
        LEFT JOIN accounts a ON a.id = bl.expense_account_id
+       LEFT JOIN items i ON i.id = bl.item_id
       WHERE bl.bill_id = $1
       ORDER BY bl.line_no`,
     [params.id],

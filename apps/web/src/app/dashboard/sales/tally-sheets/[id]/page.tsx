@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatDate, formatPHP } from '@/lib/format';
@@ -16,6 +16,8 @@ interface TallySheet {
   id: string; tally_no: string; tally_date: string;
   delivery_date: string | null; status: string;
   allocation_id: string | null; allocation_no: string | null;
+  effective_so_id: string | null; so_no: string | null;
+  dr_id: string | null;
   customer_name_live: string; customer_code: string;
   customer_address: string | null; customer_terms: number | null;
   reference: string | null; notes: string | null;
@@ -37,10 +39,12 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function TallySheetDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [sheet, setSheet]   = useState<TallySheet | null>(null);
   const [editLines, setEditLines] = useState<TallyLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
+  const [creating, setCreating] = useState(false);
   const [msg, setMsg]         = useState<string | null>(null);
   const [dirty, setDirty]     = useState(false);
 
@@ -48,6 +52,7 @@ export default function TallySheetDetailPage() {
     setLoading(true);
     api.get<TallySheet>(`/sales/tally-sheets/${id}`)
       .then(s => { setSheet(s); setEditLines(s.lines.map(l => ({ ...l }))); })
+      .catch(() => { /* silent — don't overwrite save success message */ })
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -69,8 +74,22 @@ export default function TallySheetDetailPage() {
       setMsg('✓ Saved successfully');
       setDirty(false);
       load();
-    } catch (e: unknown) { setMsg((e as Error).message ?? 'Failed to save'); }
+    } catch (e: unknown) {
+      const msg = (e as Error).message ?? 'Failed to save';
+      setMsg(msg.startsWith('{') ? 'Failed to save — check connection' : msg);
+    }
     finally { setSaving(false); }
+  }
+
+  async function createDR() {
+    setCreating(true); setMsg(null);
+    try {
+      const res = await api.post<{ dr_id: string; dr_no: string }>(`/sales/tally-sheets/${id}/create-dr`);
+      setMsg(`✓ Delivery Receipt ${res.dr_no} created.`);
+      load();
+      router.push(`/dashboard/sales/delivery-receipts/${res.dr_id}`);
+    } catch (e: unknown) { setMsg((e as Error).message ?? 'Failed to create DR'); }
+    finally { setCreating(false); }
   }
 
   if (loading) return <div className="py-10 text-center text-sm text-slate-500">Loading…</div>;
@@ -116,6 +135,20 @@ export default function TallySheetDetailPage() {
             <Field label="Order Allocation" value={
               <Link href={`/dashboard/sales/allocations/${sheet.allocation_id}`} className="text-brand-700 hover:underline dark:text-brand-400">
                 {sheet.allocation_no}
+              </Link>
+            } />
+          )}
+          {sheet.effective_so_id && (
+            <Field label="Sales Order" value={
+              <Link href={`/dashboard/sales/orders/${sheet.effective_so_id}`} className="text-brand-700 hover:underline dark:text-brand-400">
+                {sheet.so_no ?? sheet.effective_so_id}
+              </Link>
+            } />
+          )}
+          {sheet.dr_id && (
+            <Field label="Delivery Receipt" value={
+              <Link href={`/dashboard/sales/delivery-receipts/${sheet.dr_id}`} className="text-brand-700 hover:underline dark:text-brand-400">
+                View DR →
               </Link>
             } />
           )}
@@ -208,7 +241,7 @@ export default function TallySheetDetailPage() {
         </div>
       </div>
 
-      {/* Save / DR button */}
+      {/* Actions */}
       <div className="flex gap-3">
         {dirty && (
           <button onClick={save} disabled={saving}
@@ -216,10 +249,22 @@ export default function TallySheetDetailPage() {
             {saving ? 'Saving…' : 'Save Actuals'}
           </button>
         )}
+        {sheet.dr_id ? (
+          <Link href={`/dashboard/sales/delivery-receipts/${sheet.dr_id}`}
+            className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+            View Delivery Receipt
+          </Link>
+        ) : sheet.effective_so_id ? (
+          <button onClick={createDR} disabled={creating || dirty}
+            className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+            title={dirty ? 'Save actuals first' : 'Create Delivery Receipt from this tally'}>
+            {creating ? 'Creating DR…' : 'Create DR'}
+          </button>
+        ) : null}
         <button
           onClick={() => window.print()}
           className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800">
-          Print / DR
+          Print
         </button>
       </div>
     </div>

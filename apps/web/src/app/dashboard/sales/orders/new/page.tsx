@@ -7,7 +7,7 @@ import { useTaggingData } from '@/hooks/useTaggingData';
 import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
 
 interface Customer { id: string; code: string; name: string; payment_terms_days: number; credit_limit: number; address: string | null; }
-interface Item { id: string; sku: string; name: string; selling_price: number; }
+interface Item { id: string; sku: string; name: string; selling_price: number; uom: string; }
 interface Account { id: string; code: string; name: string; }
 
 interface Line {
@@ -19,6 +19,7 @@ interface Line {
   unit_price: number;
   discount_pct: number;
   vat_rate: number;
+  uom: string;
   branch_id: string;
   building_id: string;
   cost_center_id: string;
@@ -32,7 +33,7 @@ const sel = 'w-full rounded border border-slate-300 px-1 py-1 text-xs dark:borde
 
 const EMPTY_LINE: Line = {
   line_type: 'item', item_id: '', gl_account_id: '', description: '',
-  quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12,
+  quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12, uom: '',
   branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '',
 };
 
@@ -68,11 +69,21 @@ export default function NewSalesOrderPage() {
 
   function handleTagChange(field: keyof TaggingValues, val: string) {
     setTags(t => ({ ...t, [field]: val }));
-    if (field === 'grow_reference_id') setLines(prev => prev.map(l => ({ ...l, grow_reference_id: val })));
+    const lineField = field === 'branch_id' ? 'branch_id'
+      : field === 'building_id' ? 'building_id'
+      : field === 'cost_center_id' ? 'cost_center_id'
+      : 'grow_reference_id';
+    setLines(prev => prev.map(l => ({ ...l, [lineField]: val })));
   }
 
   function addLine() {
-    setLines(l => [...l, { ...EMPTY_LINE, grow_reference_id: tags.grow_reference_id }]);
+    setLines(l => [...l, {
+      ...EMPTY_LINE,
+      branch_id: tags.branch_id,
+      building_id: tags.building_id,
+      cost_center_id: tags.cost_center_id,
+      grow_reference_id: tags.grow_reference_id,
+    }]);
   }
 
   function removeLine(idx: number) {
@@ -90,7 +101,7 @@ export default function NewSalesOrderPage() {
       } else if (field === 'item_id' && typeof val === 'string') {
         const item = items.find(i => i.id === val);
         line.item_id = val;
-        if (item) { line.description = item.name; line.unit_price = item.selling_price; }
+        if (item) { line.description = item.name; line.unit_price = item.selling_price; line.uom = item.uom; }
       } else {
         (line as Record<string, unknown>)[field] = val;
       }
@@ -231,6 +242,7 @@ export default function NewSalesOrderPage() {
                   <th className="px-2 py-1.5 text-left font-medium w-36">Account / Item</th>
                   <th className="px-2 py-1.5 text-left font-medium">Description</th>
                   <th className="px-2 py-1.5 text-right font-medium w-14">Qty</th>
+                  <th className="px-2 py-1.5 text-left font-medium w-14">UOM</th>
                   <th className="px-2 py-1.5 text-right font-medium w-22">Unit Price</th>
                   <th className="px-2 py-1.5 text-right font-medium w-12">Disc%</th>
                   <th className="px-2 py-1.5 text-right font-medium w-12">VAT%</th>
@@ -273,6 +285,7 @@ export default function NewSalesOrderPage() {
                         onChange={e => updateLine(idx, 'quantity', parseFloat(e.target.value) || 0)}
                         className="w-full rounded border border-slate-300 px-1 py-1 text-right text-xs" />
                     </td>
+                    <td className="px-2 py-1 text-xs text-slate-500 dark:text-slate-400">{l.uom || '—'}</td>
                     <td className="px-2 py-1">
                       <input type="number" min={0} step="any" value={l.unit_price}
                         onChange={e => updateLine(idx, 'unit_price', parseFloat(e.target.value) || 0)}

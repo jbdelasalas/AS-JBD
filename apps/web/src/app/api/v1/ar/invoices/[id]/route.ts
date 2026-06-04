@@ -53,7 +53,7 @@ export async function GET(
   if (!headers[0]) return err(`Invoice ${params.id} not found`, 404);
 
   const lines = await query(
-    `SELECT sil.*, i.sku AS item_sku, i.name AS item_name
+    `SELECT sil.*, i.sku AS item_sku, i.name AS item_name, i.uom AS item_uom
        FROM sales_invoice_lines sil
        LEFT JOIN items i ON i.id = sil.item_id
       WHERE sil.invoice_id = $1

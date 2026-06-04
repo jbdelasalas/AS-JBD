@@ -105,7 +105,7 @@ export interface LoginResponse extends AuthTokens {
 // ================================================================
 // CUSTOMERS
 // ================================================================
-export type CustomerType = 'wholesale' | 'retail' | 'fleet' | 'gov';
+export type CustomerType = 'HRI' | 'Wet' | 'Others';
 
 export interface Customer {
   id: string;
@@ -164,6 +164,7 @@ export interface SalesOrderLine {
   item_id: string;
   item_sku?: string;
   item_name?: string;
+  item_uom?: string;
   description: string;
   quantity: number;
   qty_delivered: number;
@@ -241,6 +242,7 @@ export interface DeliveryReceiptLine {
   item_id: string;
   item_sku?: string;
   item_name?: string;
+  item_uom?: string;
   description: string;
   qty_delivered: number;
   unit_cost: number;
@@ -300,6 +302,7 @@ export interface SalesInvoiceLine {
   item_id: string | null;
   item_sku?: string;
   item_name?: string;
+  item_uom?: string;
   description: string;
   quantity: number;
   unit_price: number;

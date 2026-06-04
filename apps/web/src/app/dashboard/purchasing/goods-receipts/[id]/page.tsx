@@ -16,6 +16,7 @@ interface GRNLine {
   unit_price: number;
   item_sku: string | null;
   item_name: string | null;
+  item_uom: string | null;
 }
 
 interface GRN {
@@ -157,6 +158,7 @@ export default function GRNDetailPage() {
               <th className="px-3 py-2 text-left font-medium">#</th>
               <th className="px-3 py-2 text-left font-medium">Description</th>
               <th className="px-3 py-2 text-right font-medium">PO Qty</th>
+              <th className="px-3 py-2 text-left font-medium">UOM</th>
               <th className="px-3 py-2 text-right font-medium">Qty Received</th>
               <th className="px-3 py-2 text-right font-medium">Unit Cost</th>
             </tr>
@@ -170,6 +172,7 @@ export default function GRNDetailPage() {
                   {l.item_sku && <span className="ml-1 text-xs text-slate-400 dark:text-slate-500">({l.item_sku})</span>}
                 </td>
                 <td className="px-3 py-2 text-right font-mono text-xs dark:text-slate-300">{l.po_qty}</td>
+                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.item_uom ?? '—'}</td>
                 <td className="px-3 py-2 text-right font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400">{l.qty_received}</td>
                 <td className="px-3 py-2 text-right font-mono text-xs dark:text-slate-300">
                   {l.unit_cost.toLocaleString('en-PH', { minimumFractionDigits: 2 })}

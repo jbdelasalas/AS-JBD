@@ -34,7 +34,7 @@ export async function GET(
 
   const lines = await query(
     `SELECT grl.*, pol.description, pol.quantity AS po_qty, pol.unit_price,
-            i.sku AS item_sku, i.name AS item_name
+            i.sku AS item_sku, i.name AS item_name, i.uom AS item_uom
        FROM goods_receipt_lines grl
        JOIN purchase_order_lines pol ON pol.id = grl.po_line_id
        LEFT JOIN items i ON i.id = pol.item_id

@@ -33,6 +33,7 @@ interface TallySheet {
   delivery_method: string | null; plate_number: string | null;
   driver: string | null; helper: string | null;
   start_time: string | null; end_time: string | null; remarks: string | null;
+  live_item_id: string | null;
   lines: Line[];
 }
 
@@ -59,6 +60,11 @@ export default function TallySheetDetailPage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showDRModal, setShowDRModal] = useState(false);
+  const [drSoId, setDrSoId] = useState('');
+  const [drOrders, setDrOrders] = useState<{ id: string; order_no: string; customer_name: string }[]>([]);
+  const [creatingDR, setCreatingDR] = useState(false);
+  const [drMsg, setDrMsg] = useState<string | null>(null);
 
   // Reference data
   const [suppliers, setSuppliers]   = useState<Supplier[]>([]);
@@ -114,6 +120,10 @@ export default function TallySheetDetailPage() {
       if (field === 'gross_kgs' || field === 'crate_kgs') {
         line.net_kgs = Math.max(0, Number(line.gross_kgs) - Number(line.crate_kgs));
       }
+      // In simplified mode, editing net_kgs directly (via gross_kgs field) also sets gross_kgs
+      if (field === 'gross_kgs' && line.crate_kgs === 0) {
+        line.net_kgs = Number(value);
+      }
       next[i] = line;
       return next;
     });
@@ -137,8 +147,51 @@ export default function TallySheetDetailPage() {
     finally { setBusy(false); }
   }
 
-  const netKgs   = lines.reduce((s, l) => s + Number(l.net_kgs), 0);
-  const netHeads = lines.reduce((s, l) => s + Number(l.heads), 0);
+  async function openDRModal() {
+    setDrMsg(null); setDrSoId(''); setShowDRModal(true);
+    const cid = localStorage.getItem('company_id'); if (!cid) return;
+    api.get<{ data: { id: string; order_no: string; customer_name: string }[] }>(
+      `/sales/orders?company_id=${cid}&status=approved&status=partially_delivered&limit=200`)
+      .then(r => setDrOrders(r.data ?? [])).catch(() => {});
+  }
+
+  async function createDR() {
+    if (!drSoId) { setDrMsg('Select a sales order'); return; }
+    setCreatingDR(true); setDrMsg(null);
+    try {
+      const res = await api.post<{ dr_id: string; dr_no: string }>(`/poultry/tally-sheets/${id}/create-dr`, { so_id: drSoId });
+      setShowDRModal(false);
+      router.push(`/dashboard/sales/delivery-receipts/${res.dr_id}`);
+    } catch (e: unknown) { setDrMsg((e as Error).message ?? 'Failed to create DR'); }
+    finally { setCreatingDR(false); }
+  }
+
+  const netKgs      = lines.reduce((s, l) => s + Number(l.net_kgs), 0);
+  const netHeads    = lines.reduce((s, l) => s + Number(l.heads), 0);
+  const avgWeight   = netHeads > 0 ? netKgs / netHeads : 0;
+  const harvestedHeads = Number(doc?.harvested_heads ?? 0);
+  const availHeads  = harvestedHeads - netHeads;
+
+  const [entryHeads, setEntryHeads] = useState(0);
+  const [entryKgs,   setEntryKgs]   = useState(0);
+  const [entryRef,   setEntryRef]   = useState('');
+  const [editIdx,    setEditIdx]    = useState<number | null>(null);
+
+  function addTallyLine() {
+    if (entryHeads <= 0 && entryKgs <= 0) return;
+    setLines(prev => [...prev, {
+      line_no: prev.length + 1,
+      item_id: doc?.live_item_id ?? (items[0]?.id ?? ''),
+      heads:     entryHeads,
+      gross_kgs: entryKgs,
+      crate_kgs: 0,
+      net_kgs:   entryKgs,
+      remarks:   entryRef,
+    }]);
+    setEntryHeads(0);
+    setEntryKgs(0);
+    setEntryRef('');
+  }
 
   if (loading) return <div className="py-12 text-center text-sm text-slate-500">Loading…</div>;
   if (!doc) return <div className="py-12 text-center text-sm text-red-500">Not found.</div>;
@@ -327,93 +380,156 @@ export default function TallySheetDetailPage() {
 
       {/* Tally Details */}
       <div className="mt-6 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-6 py-3">
+        <div className="border-b border-slate-200 dark:border-slate-700 px-6 py-3">
           <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tally Details</h2>
-          {isEditable && (
-            <button type="button" onClick={() => setLines(l => [...l, { line_no: l.length + 1, item_id: '', heads: 0, gross_kgs: 0, crate_kgs: 0, net_kgs: 0, remarks: '' }])}
-              className="text-xs text-brand-600 hover:underline">+ Add line</button>
-          )}
         </div>
+
+        {/* Entry area: LEFT = tally inputs + totals | RIGHT = available */}
+        <div className="border-b border-slate-100 dark:border-slate-700 grid grid-cols-2 divide-x divide-slate-100 dark:divide-slate-700">
+          {/* LEFT — entry & running totals */}
+          <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4">
+            <div className="mb-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Tally Entry</div>
+            {isEditable && (
+              <div className="flex flex-wrap items-end gap-3 mb-4">
+                <div>
+                  <label className={lbl}>Heads</label>
+                  <input type="number" min={0} value={entryHeads || ''}
+                    onChange={e => setEntryHeads(parseFloat(e.target.value) || 0)}
+                    onKeyDown={e => e.key === 'Enter' && addTallyLine()}
+                    placeholder="0"
+                    className="w-24 rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-right dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
+                </div>
+                <div>
+                  <label className={lbl}>Quantity (KGS)</label>
+                  <input type="number" min={0} step="any" value={entryKgs || ''}
+                    onChange={e => setEntryKgs(parseFloat(e.target.value) || 0)}
+                    onKeyDown={e => e.key === 'Enter' && addTallyLine()}
+                    placeholder="0.000000"
+                    className="w-36 rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-right dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
+                </div>
+                <div className="flex-1 min-w-28">
+                  <label className={lbl}>Reference</label>
+                  <input type="text" value={entryRef}
+                    onChange={e => setEntryRef(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addTallyLine()}
+                    placeholder="reference…"
+                    className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
+                </div>
+                <button type="button" onClick={addTallyLine}
+                  className="rounded bg-brand-600 px-4 py-1.5 text-sm font-bold text-white hover:bg-brand-700">
+                  +
+                </button>
+              </div>
+            )}
+            <div className="grid grid-cols-3 gap-4 text-xs">
+              <div>
+                <div className="text-slate-500 dark:text-slate-400">Total Heads</div>
+                <div className="mt-0.5 text-lg font-bold text-slate-800 dark:text-slate-100">{netHeads.toLocaleString()}</div>
+              </div>
+              <div>
+                <div className="text-slate-500 dark:text-slate-400">Total Quantity (KGS)</div>
+                <div className="mt-0.5 text-lg font-bold text-slate-800 dark:text-slate-100">{netKgs.toFixed(6)}</div>
+              </div>
+              <div>
+                <div className="text-slate-500 dark:text-slate-400">Average Weight (KGS)</div>
+                <div className="mt-0.5 text-lg font-bold text-slate-800 dark:text-slate-100">{avgWeight.toFixed(6)}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT — available for tally */}
+          <div className="px-6 py-4 flex flex-col justify-center">
+            <div className="mb-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Available for Tally</div>
+            {harvestedHeads > 0 ? (
+              <>
+                <div className="mb-4">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Harvested Heads</div>
+                  <div className="text-sm font-medium text-slate-600 dark:text-slate-300">{harvestedHeads.toLocaleString()}</div>
+                </div>
+                <div className={`text-4xl font-bold ${availHeads <= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  {Math.max(0, availHeads).toLocaleString()}
+                </div>
+                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">heads remaining</div>
+                {availHeads <= 0 && (
+                  <div className="mt-2 text-xs font-medium text-emerald-600">✓ All heads tallied</div>
+                )}
+                {harvestedHeads > 0 && (
+                  <div className="mt-3 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-700">
+                    <div
+                      className="h-2 rounded-full bg-emerald-500 transition-all"
+                      style={{ width: `${Math.min(100, (netHeads / harvestedHeads) * 100).toFixed(1)}%` }}
+                    />
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-sm text-slate-400 italic">No harvest target set on this tally</div>
+            )}
+          </div>
+        </div>
+
+        {/* Lines table */}
         <div className="overflow-x-auto">
           <table className="min-w-full text-xs">
             <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500">
               <tr>
-                <th className="px-3 py-2 text-left font-medium">Line #</th>
-                <th className="px-3 py-2 text-left font-medium w-48">Item</th>
-                <th className="px-3 py-2 text-right font-medium w-24">Heads</th>
-                <th className="px-3 py-2 text-right font-medium w-24">Gross KGS</th>
-                <th className="px-3 py-2 text-right font-medium w-24">Crate KGS</th>
-                <th className="px-3 py-2 text-right font-medium w-28">Quantity (KGS)</th>
-                <th className="px-3 py-2 text-left font-medium">Reference</th>
-                {isEditable && <th className="w-6" />}
+                <th className="px-4 py-2 text-left font-medium w-16">Line #</th>
+                <th className="px-4 py-2 text-right font-medium w-32">Heads</th>
+                <th className="px-4 py-2 text-right font-medium w-40">Quantity (KGS)</th>
+                <th className="px-4 py-2 text-left font-medium">Reference</th>
+                <th className="px-4 py-2 text-center font-medium w-20">Action</th>
               </tr>
             </thead>
             <tbody>
               {lines.length === 0 ? (
-                <tr><td colSpan={isEditable ? 8 : 7} className="px-3 py-6 text-center text-slate-400">No data available in table</td></tr>
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-slate-400">No data available in table</td>
+                </tr>
               ) : lines.map((l, i) => (
-                <tr key={i} className="border-b border-slate-50 dark:border-slate-700 last:border-0">
-                  <td className="px-3 py-2 text-slate-400">{i + 1}</td>
-                  <td className="px-3 py-1">
-                    {isEditable ? (
-                      <select value={l.item_id} onChange={e => updateLine(i, 'item_id', e.target.value)} className={tinp}>
-                        <option value="">Select item…</option>
-                        {items.map(it => <option key={it.id} value={it.id}>{it.sku} — {it.name}</option>)}
-                      </select>
-                    ) : (
-                      <span className="text-slate-800 dark:text-slate-200">{l.sku} — {l.item_name}</span>
+                <tr key={i} className="border-b border-slate-50 dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                  <td className="px-4 py-2 text-slate-400">{i + 1}</td>
+                  <td className="px-4 py-2 text-right font-mono font-semibold text-slate-800 dark:text-slate-200">
+                    {editIdx === i && isEditable ? (
+                      <input type="number" min={0} value={l.heads}
+                        onChange={e => updateLine(i, 'heads', parseFloat(e.target.value) || 0)}
+                        className={`${tinp} text-right w-24`} />
+                    ) : Number(l.heads).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-2 text-right font-mono font-semibold text-slate-800 dark:text-slate-200">
+                    {editIdx === i && isEditable ? (
+                      <input type="number" min={0} step="any" value={l.net_kgs}
+                        onChange={e => updateLine(i, 'gross_kgs', parseFloat(e.target.value) || 0)}
+                        className={`${tinp} text-right w-28`} />
+                    ) : Number(l.net_kgs).toFixed(6)}
+                  </td>
+                  <td className="px-4 py-2 text-slate-500 dark:text-slate-400">
+                    {editIdx === i && isEditable ? (
+                      <input type="text" value={l.remarks ?? ''}
+                        onChange={e => updateLine(i, 'remarks', e.target.value)}
+                        className={tinp} />
+                    ) : (l.remarks || '—')}
+                  </td>
+                  <td className="px-4 py-2 text-center">
+                    {isEditable && (
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => setEditIdx(editIdx === i ? null : i)}
+                          className="text-slate-400 hover:text-brand-600"
+                          title="Edit line">
+                          {editIdx === i ? '✓' : '✏'}
+                        </button>
+                        <button
+                          onClick={() => { setLines(prev => prev.filter((_, j) => j !== i)); if (editIdx === i) setEditIdx(null); }}
+                          className="text-red-400 hover:text-red-600"
+                          title="Delete line">
+                          ×
+                        </button>
+                      </div>
                     )}
                   </td>
-                  <td className="px-3 py-1">
-                    {isEditable ? (
-                      <input type="number" min={0} value={l.heads} onChange={e => updateLine(i, 'heads', parseFloat(e.target.value) || 0)} className={`${tinp} text-right`} />
-                    ) : (
-                      <span className="block text-right font-mono">{Number(l.heads).toLocaleString()}</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-1">
-                    {isEditable ? (
-                      <input type="number" min={0} step="any" value={l.gross_kgs} onChange={e => updateLine(i, 'gross_kgs', parseFloat(e.target.value) || 0)} className={`${tinp} text-right`} />
-                    ) : (
-                      <span className="block text-right font-mono">{Number(l.gross_kgs).toFixed(2)}</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-1">
-                    {isEditable ? (
-                      <input type="number" min={0} step="any" value={l.crate_kgs} onChange={e => updateLine(i, 'crate_kgs', parseFloat(e.target.value) || 0)} className={`${tinp} text-right`} />
-                    ) : (
-                      <span className="block text-right font-mono">{Number(l.crate_kgs).toFixed(2)}</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono font-semibold">{Number(l.net_kgs).toFixed(6)}</td>
-                  <td className="px-3 py-1">
-                    {isEditable ? (
-                      <input type="text" value={l.remarks ?? ''} onChange={e => updateLine(i, 'remarks', e.target.value)} className={tinp} />
-                    ) : (
-                      <span className="text-slate-500">{l.remarks ?? '—'}</span>
-                    )}
-                  </td>
-                  {isEditable && (
-                    <td className="px-2 py-1 text-center">
-                      {lines.length > 1 && (
-                        <button onClick={() => setLines(l => l.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600">×</button>
-                      )}
-                    </td>
-                  )}
                 </tr>
               ))}
             </tbody>
-            {lines.length > 0 && (
-              <tfoot>
-                <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-                  <td colSpan={2} className="px-3 py-2 text-right text-xs font-medium text-slate-500">Total</td>
-                  <td className="px-3 py-2 text-right font-mono font-semibold">{netHeads.toLocaleString()}</td>
-                  <td colSpan={2} />
-                  <td className="px-3 py-2 text-right font-mono font-semibold">{netKgs.toFixed(6)}</td>
-                  <td colSpan={isEditable ? 2 : 1} />
-                </tr>
-              </tfoot>
-            )}
           </table>
         </div>
       </div>
@@ -446,25 +562,31 @@ export default function TallySheetDetailPage() {
             </button>
           )}
           {doc.status === 'posted' && (
-            <button type="button"
-              onClick={() => {
-                sessionStorage.setItem('pending_conversion', JSON.stringify({
-                  tally_sheet_id: doc.id,
-                  transaction_date: (doc.transfer_date ?? '').split('T')[0],
-                  branch_id: doc.destination_id ?? doc.branch_id ?? '',
-                  lines: lines.map(l => ({
-                    item_id: l.item_id,
-                    item_name: l.item_name ?? '',
-                    sku: l.sku ?? '',
-                    heads: Number(l.heads),
-                    net_kgs: Number(l.net_kgs),
-                  })),
-                }));
-                router.push('/dashboard/poultry/conversions/new');
-              }}
-              className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
-              Create Conversion
-            </button>
+            <>
+              <button type="button"
+                onClick={() => {
+                  sessionStorage.setItem('pending_conversion', JSON.stringify({
+                    tally_sheet_id: doc.id,
+                    transaction_date: (doc.transfer_date ?? '').split('T')[0],
+                    branch_id: doc.destination_id ?? doc.branch_id ?? '',
+                    lines: lines.map(l => ({
+                      item_id: l.item_id,
+                      item_name: l.item_name ?? '',
+                      sku: l.sku ?? '',
+                      heads: Number(l.heads),
+                      net_kgs: Number(l.net_kgs),
+                    })),
+                  }));
+                  router.push('/dashboard/poultry/conversions/new');
+                }}
+                className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
+                Create Conversion
+              </button>
+              <button type="button" onClick={openDRModal}
+                className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+                Create DR
+              </button>
+            </>
           )}
         </div>
         <div className="flex gap-6 text-xs text-slate-500">
@@ -472,6 +594,41 @@ export default function TallySheetDetailPage() {
           <span>Net KGS: <strong className="text-slate-800 dark:text-slate-200">{netKgs.toFixed(2)}</strong></span>
         </div>
       </div>
+
+      {/* Create DR modal */}
+      {showDRModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-[460px] rounded-lg bg-white dark:bg-slate-900 p-6 shadow-xl">
+            <h2 className="mb-1 text-base font-semibold text-slate-900 dark:text-slate-100">Create Delivery Receipt</h2>
+            <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
+              Select the Sales Order to fulfill with this tally's quantities ({netKgs.toFixed(2)} KGS / {netHeads.toLocaleString()} heads).
+            </p>
+            <div className="mb-4">
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Sales Order *</label>
+              <select value={drSoId} onChange={e => setDrSoId(e.target.value)}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                <option value="">Select sales order…</option>
+                {drOrders.map(o => (
+                  <option key={o.id} value={o.id}>{o.order_no} — {o.customer_name}</option>
+                ))}
+              </select>
+            </div>
+            {drMsg && (
+              <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{drMsg}</div>
+            )}
+            <div className="flex gap-3">
+              <button onClick={createDR} disabled={creatingDR || !drSoId}
+                className="flex-1 rounded bg-emerald-600 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
+                {creatingDR ? 'Creating…' : 'Create DR'}
+              </button>
+              <button onClick={() => setShowDRModal(false)}
+                className="flex-1 rounded border border-slate-300 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

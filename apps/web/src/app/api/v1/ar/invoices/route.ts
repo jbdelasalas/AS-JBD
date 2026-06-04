@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { type NextRequest } from 'next/server';
+import { type PoolClient } from 'pg';
 import { query, getPool } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
@@ -105,13 +106,23 @@ export async function POST(request: NextRequest) {
   const companyId = dto.company_id as string;
   const customerId = dto.customer_id as string;
 
-  const customers = await query<{ id: string; payment_terms_days: number }>(
-    `SELECT id, payment_terms_days FROM customers WHERE id = $1 AND company_id = $2 AND is_active = true`,
-    [customerId, companyId],
-  );
+  let customers: Array<{ id: string; payment_terms_days: number }>;
+  try {
+    customers = await query<{ id: string; payment_terms_days: number }>(
+      `SELECT id, payment_terms_days FROM customers WHERE id = $1 AND company_id = $2 AND is_active = true`,
+      [customerId, companyId],
+    );
+  } catch (e) {
+    return err((e as Error).message ?? 'Database error', 500);
+  }
   if (!customers[0]) return err('Customer not found or inactive', 404);
 
-  const client = await getPool().connect();
+  let client: PoolClient;
+  try {
+    client = await getPool().connect();
+  } catch (e) {
+    return err((e as Error).message ?? 'Database connection failed', 500);
+  }
   try {
     await client.query('BEGIN');
 
@@ -207,7 +218,7 @@ export async function POST(request: NextRequest) {
       lines: invoiceLines.map((l) => mapLine(l as Record<string, unknown>)),
     }, 201);
   } catch (e) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     return err((e as Error).message ?? 'Internal server error', 500);
   } finally {
     client.release();

@@ -31,6 +31,7 @@ interface BillLine {
   ewt_amount: number;
   account_name: string | null;
   account_code: string | null;
+  item_uom: string | null;
 }
 
 interface Bill {
@@ -238,6 +239,7 @@ export default function BillDetailPage() {
                 <th className="px-3 py-2 text-left font-medium">Description</th>
                 <th className="px-3 py-2 text-left font-medium w-36">Account</th>
                 <th className="px-3 py-2 text-right font-medium w-16">Qty</th>
+                <th className="px-3 py-2 text-left font-medium w-14">UOM</th>
                 <th className="px-3 py-2 text-right font-medium w-28">Unit Price</th>
                 <th className="px-3 py-2 text-right font-medium w-12">VAT%</th>
                 <th className="px-3 py-2 text-right font-medium w-12">EWT%</th>
@@ -257,6 +259,7 @@ export default function BillDetailPage() {
                     {l.account_name && <span className="ml-1 text-slate-400">({l.account_name})</span>}
                   </td>
                   <td className="px-3 py-2 text-right font-mono dark:text-slate-300">{l.quantity}</td>
+                  <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.item_uom ?? '—'}</td>
                   <td className="px-3 py-2 text-right font-mono dark:text-slate-300">{formatPHP(l.unit_price)}</td>
                   <td className="px-3 py-2 text-right dark:text-slate-300">{l.vat_rate}%</td>
                   <td className="px-3 py-2 text-right dark:text-slate-300">{l.ewt_rate}%</td>
@@ -269,23 +272,23 @@ export default function BillDetailPage() {
             </tbody>
             <tfoot>
               <tr className="bg-slate-50 dark:bg-slate-800">
-                <td colSpan={7} className="px-3 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">Subtotal</td>
+                <td colSpan={8} className="px-3 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">Subtotal</td>
                 <td className="px-3 py-1.5 text-right font-mono text-xs dark:text-slate-300">{formatPHP(bill.subtotal)}</td>
                 <td colSpan={3} />
               </tr>
               <tr className="bg-slate-50 dark:bg-slate-800">
-                <td colSpan={7} className="px-3 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">VAT</td>
+                <td colSpan={8} className="px-3 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">VAT</td>
                 <td colSpan={2} className="px-3 py-1.5 text-right font-mono text-xs dark:text-slate-300">{formatPHP(bill.vat_amount)}</td>
                 <td colSpan={2} />
               </tr>
               <tr className="bg-slate-50 dark:bg-slate-800">
-                <td colSpan={7} className="px-3 py-1.5 text-right text-xs font-medium text-slate-600 dark:text-slate-300">Gross Total (incl. VAT)</td>
+                <td colSpan={8} className="px-3 py-1.5 text-right text-xs font-medium text-slate-600 dark:text-slate-300">Gross Total (incl. VAT)</td>
                 <td colSpan={2} className="px-3 py-1.5 text-right font-mono text-xs font-medium dark:text-slate-300">{formatPHP(bill.total)}</td>
                 <td colSpan={2} />
               </tr>
               {bill.ewt_amount > 0 && (
                 <tr className="bg-slate-50 dark:bg-slate-800">
-                  <td colSpan={9} className="px-3 py-1.5 text-right text-xs text-amber-700 dark:text-amber-400">
+                  <td colSpan={10} className="px-3 py-1.5 text-right text-xs text-amber-700 dark:text-amber-400">
                     Less: EWT Withheld{bill.ewt_code ? ` (${bill.ewt_code} · ${bill.ewt_code_rate != null ? Number(bill.ewt_code_rate) : ''}%)` : ''}
                   </td>
                   <td className="px-3 py-1.5 text-right font-mono text-xs text-amber-700 dark:text-amber-400">({formatPHP(bill.ewt_amount)})</td>
@@ -293,7 +296,7 @@ export default function BillDetailPage() {
                 </tr>
               )}
               <tr className="border-t border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
-                <td colSpan={9} className="px-3 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">
+                <td colSpan={10} className="px-3 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">
                   {bill.ewt_amount > 0 ? 'Net Payable to Supplier' : 'Total'}
                 </td>
                 <td className="px-3 py-2 text-right font-mono text-sm font-bold text-slate-900 dark:text-slate-100">

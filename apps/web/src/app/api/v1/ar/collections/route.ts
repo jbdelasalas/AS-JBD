@@ -99,31 +99,40 @@ export async function POST(request: NextRequest) {
   if (!companyId || !customerId) return err('company_id and customer_id are required', 400);
   if (amount <= 0) return err('Payment amount must be positive', 400);
 
-  const customers = await query(
-    `SELECT id FROM customers WHERE id = $1 AND company_id = $2 AND is_active = true`,
-    [customerId, companyId],
-  );
-  if (!customers[0]) return err('Customer not found or inactive', 404);
-
-  const applications = (dto.applications as Array<{ invoice_id: string; amount_applied: number }>) ?? [];
-  const appTotal = applications.reduce((s, a) => s + a.amount_applied, 0);
-  if (appTotal > amount + 0.0001) return err('Applied amounts exceed payment amount', 400);
-
   const client = await getPool().connect();
   try {
-    await client.query('BEGIN');
+    const customers = await client.query(
+      `SELECT id FROM customers WHERE id = $1 AND company_id = $2 AND is_active = true`,
+      [customerId, companyId],
+    );
+    if (!customers.rows[0]) throw new Error('Customer not found or inactive');
 
+    const deduction1Amount = Number(dto.deduction1_amount ?? 0);
+    const deduction2Amount = Number(dto.deduction2_amount ?? 0);
+    const totalDeductions  = deduction1Amount + deduction2Amount;
+
+    const applications = (dto.applications as Array<{ invoice_id: string; amount_applied: number }>) ?? [];
+    const appTotal = applications.reduce((s, a) => s + a.amount_applied, 0);
+    const effectiveAmount = amount + totalDeductions;
+    if (appTotal > effectiveAmount + 0.0001) throw new Error('Applied amounts exceed payment amount plus deductions');
+
+    await client.query('BEGIN');
     const seriesRows = await client.query(
       `UPDATE document_series SET current_number = current_number + 1, updated_at = now() WHERE company_id = $1 AND doc_type = $2 AND is_active = true RETURNING prefix, current_number`,
       [companyId, 'official_receipt'],
     );
-    if (!seriesRows.rows[0]) { await client.query('ROLLBACK'); return err('No active document series for official_receipt', 400); }
+    if (!seriesRows.rows[0]) { throw new Error('No active document series for official_receipt'); }
     const receiptNo = `${seriesRows.rows[0].prefix}${String(Number(seriesRows.rows[0].current_number)).padStart(6, '0')}`;
-    const unapplied = amount - appTotal;
+    const unapplied = effectiveAmount - appTotal;
 
     const headerRows = await client.query(
-      `INSERT INTO customer_payments (company_id, branch_id, receipt_no, customer_id, payment_date, payment_method, reference, bank_ref, check_date, amount, unapplied_amount, is_advance, bank_account_id, notes, status, created_by, building_id, cost_center_id, grow_reference_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'draft',$15,$16,$17,$18) RETURNING *`,
+      `INSERT INTO customer_payments
+         (company_id, branch_id, receipt_no, customer_id, payment_date, payment_method,
+          reference, bank_ref, check_date, amount, unapplied_amount, is_advance,
+          bank_account_id, notes, status, created_by, building_id, cost_center_id, grow_reference_id,
+          deduction1_account_id, deduction1_label, deduction1_amount,
+          deduction2_account_id, deduction2_label, deduction2_amount)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'draft',$15,$16,$17,$18,$19,$20,$21,$22,$23,$24) RETURNING *`,
       [
         companyId, dto.branch_id ?? null, receiptNo, customerId,
         dto.payment_date, dto.payment_method,
@@ -132,6 +141,8 @@ export async function POST(request: NextRequest) {
         dto.is_advance ?? (appTotal === 0),
         dto.bank_account_id ?? null, dto.notes ?? null, auth.userId,
         dto.building_id ?? null, dto.cost_center_id ?? null, dto.grow_reference_id ?? null,
+        dto.deduction1_account_id ?? null, dto.deduction1_label ?? null, deduction1Amount.toFixed(2),
+        dto.deduction2_account_id ?? null, dto.deduction2_label ?? null, deduction2Amount.toFixed(2),
       ],
     );
     const header = headerRows.rows[0];
@@ -141,23 +152,17 @@ export async function POST(request: NextRequest) {
         `SELECT id, balance, status, customer_id FROM sales_invoices WHERE id = $1 FOR UPDATE`,
         [app.invoice_id],
       );
-      if (!invRows.rows[0]) { await client.query('ROLLBACK'); return err(`Invoice ${app.invoice_id} not found`, 404); }
+      if (!invRows.rows[0]) throw new Error(`Invoice ${app.invoice_id} not found`);
       const inv = invRows.rows[0] as Record<string, unknown>;
 
-      if (inv.customer_id !== customerId) {
-        await client.query('ROLLBACK');
-        return err(`Invoice ${app.invoice_id} belongs to a different customer`, 400);
-      }
-      if (!['open', 'partially_paid', 'overdue'].includes(inv.status as string)) {
-        await client.query('ROLLBACK');
-        return err(`Invoice ${app.invoice_id} is ${inv.status}`, 400);
-      }
+      if (inv.customer_id !== customerId)
+        throw new Error(`Invoice ${app.invoice_id} belongs to a different customer`);
+      if (!['open', 'partially_paid', 'overdue'].includes(inv.status as string))
+        throw new Error(`Invoice ${app.invoice_id} is ${inv.status}`);
 
       const invBalance = Number(inv.balance);
-      if (app.amount_applied > invBalance + 0.0001) {
-        await client.query('ROLLBACK');
-        return err(`Cannot apply ${app.amount_applied} to invoice with balance ${invBalance.toFixed(2)}`, 400);
-      }
+      if (app.amount_applied > invBalance + 0.0001)
+        throw new Error(`Cannot apply ${app.amount_applied} to invoice with balance ${invBalance.toFixed(2)}`);
 
       await client.query(
         `INSERT INTO payment_applications (payment_id, invoice_id, amount_applied) VALUES ($1,$2,$3)`,
@@ -187,8 +192,8 @@ export async function POST(request: NextRequest) {
       applications: apps.map((a) => ({ ...a, amount_applied: Number((a as Record<string, unknown>).amount_applied) })),
     }, 201);
   } catch (e) {
-    await client.query('ROLLBACK');
-    throw e;
+    await client.query('ROLLBACK').catch(() => {});
+    return err((e as Error).message || 'Failed to save collection', 500);
   } finally {
     client.release();
   }

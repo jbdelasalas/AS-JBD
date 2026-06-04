@@ -11,7 +11,7 @@ export default function NewCustomerPage() {
 
   const [form, setForm] = useState({
     name: '',
-    customer_type: 'wholesale',
+    customer_type: 'HRI',
     tin: '',
     address: '',
     contact_person: '',
@@ -69,8 +69,8 @@ export default function NewCustomerPage() {
               <select value={form.customer_type}
                 onChange={(e) => setForm((f) => ({ ...f, customer_type: e.target.value }))}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
-                {['wholesale','retail','fleet','gov'].map((t) => (
-                  <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+                {['HRI','Wet','Others'].map((t) => (
+                  <option key={t} value={t}>{t}</option>
                 ))}
               </select>
             </div>

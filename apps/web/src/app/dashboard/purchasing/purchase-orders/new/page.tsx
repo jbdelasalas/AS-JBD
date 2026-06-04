@@ -9,7 +9,7 @@ import { SearchableSelect } from '@/components/SearchableSelect';
 import { NumericInput } from '@/components/NumericInput';
 
 interface Supplier { id: string; code: string; name: string; address: string | null; payment_terms_days: number; }
-interface Item     { id: string; sku: string; name: string; selling_price: number; }
+interface Item     { id: string; sku: string; name: string; selling_price: number; uom: string; }
 interface Account  { id: string; code: string; name: string; }
 
 interface Line {
@@ -20,6 +20,7 @@ interface Line {
   quantity: number;
   unit_price: number;
   vat_rate: number;
+  uom: string;
   branch_id: string;
   building_id: string;
   cost_center_id: string;
@@ -28,7 +29,7 @@ interface Line {
 
 const EMPTY_LINE: Line = {
   line_type: 'item', item_id: '', gl_account_id: '', description: '',
-  quantity: 1, unit_price: 0, vat_rate: 12,
+  quantity: 1, unit_price: 0, vat_rate: 12, uom: '',
   branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '',
 };
 
@@ -79,7 +80,7 @@ export default function NewPurchaseOrderPage() {
       } else if (field === 'item_id' && typeof val === 'string') {
         const item = items.find(i => i.id === val);
         line.item_id = val;
-        if (item) { line.description = item.name; line.unit_price = item.selling_price; }
+        if (item) { line.description = item.name; line.unit_price = item.selling_price; line.uom = item.uom; }
       } else {
         (line as Record<string, unknown>)[field] = val;
       }
@@ -191,6 +192,7 @@ export default function NewPurchaseOrderPage() {
                   <th className="px-2 py-1.5 text-left font-medium w-36">Account / Item</th>
                   <th className="px-2 py-1.5 text-left font-medium">Description *</th>
                   <th className="px-2 py-1.5 text-right font-medium w-28">Qty</th>
+                  <th className="px-2 py-1.5 text-left font-medium w-14">UOM</th>
                   <th className="px-2 py-1.5 text-right font-medium w-24">Unit Price</th>
                   <th className="px-2 py-1.5 text-right font-medium w-12">VAT%</th>
                   <th className="px-2 py-1.5 text-right font-medium w-24">Total</th>
@@ -237,6 +239,7 @@ export default function NewPurchaseOrderPage() {
                         min={0} decimals={4}
                         className="w-full rounded border border-slate-300 px-1 py-1 text-right dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
                     </td>
+                    <td className="px-2 py-1 text-xs text-slate-500 dark:text-slate-400">{l.uom || '—'}</td>
                     <td className="px-2 py-1">
                       <NumericInput value={l.unit_price} onChange={v => updateLine(idx, 'unit_price', v)}
                         min={0} decimals={4}

@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
     ...tag('sales_orders'),
     ...tag('sales_order_lines'),
     ...tag('sales_invoices'),
+    ['sales_invoices.dr_id', `ALTER TABLE sales_invoices ADD COLUMN IF NOT EXISTS dr_id uuid REFERENCES delivery_receipts(id)`],
     ...tag('sales_invoice_lines'),
 
     // ── payments ─────────────────────────────────────────────────────────────
@@ -242,6 +243,37 @@ export async function POST(request: NextRequest) {
         remarks             text
       )
     `],
+
+    // ── customer_payments: deduction fields (CWT etc.) ───────────────────────
+    ['customer_payments.deduction1_account_id', `ALTER TABLE customer_payments ADD COLUMN IF NOT EXISTS deduction1_account_id uuid REFERENCES accounts(id)`],
+    ['customer_payments.deduction1_label',      `ALTER TABLE customer_payments ADD COLUMN IF NOT EXISTS deduction1_label      text`],
+    ['customer_payments.deduction1_amount',     `ALTER TABLE customer_payments ADD COLUMN IF NOT EXISTS deduction1_amount     numeric(14,2) NOT NULL DEFAULT 0`],
+    ['customer_payments.deduction2_account_id', `ALTER TABLE customer_payments ADD COLUMN IF NOT EXISTS deduction2_account_id uuid REFERENCES accounts(id)`],
+    ['customer_payments.deduction2_label',      `ALTER TABLE customer_payments ADD COLUMN IF NOT EXISTS deduction2_label      text`],
+    ['customer_payments.deduction2_amount',     `ALTER TABLE customer_payments ADD COLUMN IF NOT EXISTS deduction2_amount     numeric(14,2) NOT NULL DEFAULT 0`],
+
+    // ── sales_tally_lines: ensure all columns exist (table may predate these columns) ─
+    ['sales_tally_lines.actual_qty',        `ALTER TABLE sales_tally_lines ADD COLUMN IF NOT EXISTS actual_qty         numeric(14,4) NOT NULL DEFAULT 0`],
+    ['sales_tally_lines.actual_weight_kgs', `ALTER TABLE sales_tally_lines ADD COLUMN IF NOT EXISTS actual_weight_kgs  numeric(14,4) NOT NULL DEFAULT 0`],
+    ['sales_tally_lines.remarks',           `ALTER TABLE sales_tally_lines ADD COLUMN IF NOT EXISTS remarks             text`],
+    ['sales_tally_lines.unit_price',        `ALTER TABLE sales_tally_lines ADD COLUMN IF NOT EXISTS unit_price          numeric(14,4) NOT NULL DEFAULT 0`],
+    ['sales_tally_lines.allocation_unit',   `ALTER TABLE sales_tally_lines ADD COLUMN IF NOT EXISTS allocation_unit     varchar(20) NOT NULL DEFAULT 'Pcs'`],
+    ['sales_tally_lines.qty_allocated',     `ALTER TABLE sales_tally_lines ADD COLUMN IF NOT EXISTS qty_allocated        numeric(14,4) NOT NULL DEFAULT 0`],
+    ['sales_tally_lines.allocation_line_id',`ALTER TABLE sales_tally_lines ADD COLUMN IF NOT EXISTS allocation_line_id  uuid REFERENCES order_allocation_lines(id)`],
+
+    // ── sales_tally_sheets: ensure status column exists ───────────────────────
+    ['sales_tally_sheets.status',           `ALTER TABLE sales_tally_sheets ADD COLUMN IF NOT EXISTS status varchar(20) NOT NULL DEFAULT 'draft'`],
+
+    // ── sales_tally_sheets: so_id + dr_id for direct SO linkage and DR tracking ─
+    ['sales_tally_sheets.so_id', `ALTER TABLE sales_tally_sheets ADD COLUMN IF NOT EXISTS so_id uuid REFERENCES sales_orders(id)`],
+    ['sales_tally_sheets.dr_id', `ALTER TABLE sales_tally_sheets ADD COLUMN IF NOT EXISTS dr_id uuid REFERENCES delivery_receipts(id)`],
+    ['sales_tally_sheets.poultry_tally_id', `ALTER TABLE sales_tally_sheets ADD COLUMN IF NOT EXISTS poultry_tally_id uuid REFERENCES tally_sheets(id)`],
+
+    // ── delivery_receipts: tally_sheet_id back-link + tagging columns ─────────
+    ['delivery_receipts.tally_sheet_id',    `ALTER TABLE delivery_receipts ADD COLUMN IF NOT EXISTS tally_sheet_id    uuid REFERENCES sales_tally_sheets(id)`],
+    ['delivery_receipts.building_id',       `ALTER TABLE delivery_receipts ADD COLUMN IF NOT EXISTS building_id        uuid REFERENCES farm_buildings(id)`],
+    ['delivery_receipts.cost_center_id',    `ALTER TABLE delivery_receipts ADD COLUMN IF NOT EXISTS cost_center_id     uuid REFERENCES cost_centers(id)`],
+    ['delivery_receipts.grow_reference_id', `ALTER TABLE delivery_receipts ADD COLUMN IF NOT EXISTS grow_reference_id  uuid REFERENCES grow_references(id)`],
   ];
 
   const results: string[] = [];

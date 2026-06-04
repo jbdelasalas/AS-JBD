@@ -69,7 +69,7 @@ export default function MasterDataCustomersPage() {
             ]}
             importColumns={[
               { key: 'name', header: 'Name' },
-              { key: 'customer_type', header: 'Type (wholesale/fleet/gov/retail)' },
+              { key: 'customer_type', header: 'Type (HRI/Wet/Others)' },
               { key: 'email', header: 'Email' },
               { key: 'phone', header: 'Phone' },
               { key: 'tin', header: 'TIN' },
@@ -84,7 +84,7 @@ export default function MasterDataCustomersPage() {
               await api.post('/ar/customers', {
                 company_id: companyId,
                 name: row['Name'],
-                customer_type: row['Type (wholesale/fleet/gov/retail)'] || 'wholesale',
+                customer_type: row['Type (HRI/Wet/Others)'] || 'HRI',
                 email: row['Email'] || undefined,
                 phone: row['Phone'] || undefined,
                 tin: row['TIN'] || undefined,

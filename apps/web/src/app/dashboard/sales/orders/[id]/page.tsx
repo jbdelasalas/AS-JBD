@@ -166,6 +166,7 @@ export default function SalesOrderDetailPage() {
                 <th className="px-3 py-2 text-left font-medium">Item</th>
                 <th className="px-3 py-2 text-left font-medium">Description</th>
                 <th className="px-3 py-2 text-right font-medium w-20">Qty</th>
+                <th className="px-3 py-2 text-left font-medium w-14">UOM</th>
                 <th className="px-3 py-2 text-right font-medium w-20">Delivered</th>
                 <th className="px-3 py-2 text-right font-medium w-20">Disc%</th>
                 <th className="px-3 py-2 text-right font-medium w-12">VAT%</th>
@@ -183,6 +184,7 @@ export default function SalesOrderDetailPage() {
                     {l.item_name && <span className="ml-1 text-slate-400">({l.item_name})</span>}
                   </td>
                   <td className="px-3 py-2 text-right font-mono dark:text-slate-300">{l.quantity}</td>
+                  <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.item_uom ?? '—'}</td>
                   <td className="px-3 py-2 text-right font-mono">
                     <span className={l.qty_delivered >= l.quantity ? 'text-emerald-600' : l.qty_delivered > 0 ? 'text-amber-600' : 'text-slate-400'}>
                       {l.qty_delivered}
@@ -197,15 +199,15 @@ export default function SalesOrderDetailPage() {
             </tbody>
             <tfoot>
               <tr className="bg-slate-50 dark:bg-slate-800">
-                <td colSpan={8} className="px-3 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">Subtotal</td>
+                <td colSpan={9} className="px-3 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">Subtotal</td>
                 <td className="px-3 py-1.5 text-right font-mono text-xs dark:text-slate-300">{formatPHP(order.subtotal)}</td>
               </tr>
               <tr className="bg-slate-50 dark:bg-slate-800">
-                <td colSpan={8} className="px-3 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">VAT</td>
+                <td colSpan={9} className="px-3 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">VAT</td>
                 <td className="px-3 py-1.5 text-right font-mono text-xs dark:text-slate-300">{formatPHP(order.vat_amount)}</td>
               </tr>
               <tr className="border-t border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
-                <td colSpan={8} className="px-3 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">Total</td>
+                <td colSpan={9} className="px-3 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">Total</td>
                 <td className="px-3 py-2 text-right font-mono text-sm font-bold text-slate-900 dark:text-slate-100">{formatPHP(order.total)}</td>
               </tr>
             </tfoot>

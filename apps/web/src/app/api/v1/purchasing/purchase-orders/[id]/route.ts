@@ -55,7 +55,7 @@ export async function GET(
 
   const lines = await query(
     `SELECT pol.*,
-            i.sku  AS item_sku,   i.name  AS item_name,
+            i.sku  AS item_sku,   i.name  AS item_name,   i.uom  AS item_uom,
             a.code AS gl_account_code, a.name AS gl_account_name,
             b.code AS branch_code,
             fb.code AS building_code,
