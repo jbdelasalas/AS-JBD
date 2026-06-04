@@ -102,7 +102,7 @@ export async function POST(
 
     // Apply to invoices
     const apps = await client.query(
-      `SELECT pa.invoice_id, pa.amount_applied FROM payment_applications WHERE payment_id = $1`,
+      `SELECT pa.invoice_id, pa.amount_applied FROM payment_applications pa WHERE pa.payment_id = $1`,
       [id],
     );
     for (const app of apps.rows as Array<{ invoice_id: string; amount_applied: string }>) {
