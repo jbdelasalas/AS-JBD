@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { type NextRequest } from 'next/server';
+import { type PoolClient } from 'pg';
 import { query, getPool } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
@@ -41,8 +42,12 @@ export async function POST(
   }
 
   const id = params.id;
-  const client = await getPool().connect();
-
+  let client: PoolClient;
+  try {
+    client = await getPool().connect();
+  } catch (e) {
+    return err((e as Error).message ?? 'Database connection failed', 500);
+  }
   try {
     await client.query('BEGIN');
 
@@ -177,27 +182,30 @@ export async function POST(
 
     await client.query('COMMIT');
   } catch (e) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     return err((e as Error).message ?? 'Internal server error', 500);
   } finally {
     client.release();
   }
 
-  const fullHeaders = await query(
-    `SELECT si.*, c.name AS customer_name, c.code AS customer_code, so.order_no, dr.dr_no
-       FROM sales_invoices si JOIN customers c ON c.id = si.customer_id
-       LEFT JOIN sales_orders so ON so.id = si.so_id LEFT JOIN delivery_receipts dr ON dr.id = si.dr_id
-      WHERE si.id = $1 LIMIT 1`,
-    [id],
-  );
-  const invoiceLines = await query(
-    `SELECT sil.*, i.sku AS item_sku, i.name AS item_name FROM sales_invoice_lines sil
-       LEFT JOIN items i ON i.id = sil.item_id WHERE sil.invoice_id = $1 ORDER BY sil.line_no`,
-    [id],
-  );
-
-  return ok({
-    ...mapRow(fullHeaders[0] as Record<string, unknown>),
-    lines: invoiceLines.map((l) => mapLine(l as Record<string, unknown>)),
-  });
+  try {
+    const fullHeaders = await query(
+      `SELECT si.*, c.name AS customer_name, c.code AS customer_code, so.order_no, dr.dr_no
+         FROM sales_invoices si JOIN customers c ON c.id = si.customer_id
+         LEFT JOIN sales_orders so ON so.id = si.so_id LEFT JOIN delivery_receipts dr ON dr.id = si.dr_id
+        WHERE si.id = $1 LIMIT 1`,
+      [id],
+    );
+    const invoiceLines = await query(
+      `SELECT sil.*, i.sku AS item_sku, i.name AS item_name FROM sales_invoice_lines sil
+         LEFT JOIN items i ON i.id = sil.item_id WHERE sil.invoice_id = $1 ORDER BY sil.line_no`,
+      [id],
+    );
+    return ok({
+      ...mapRow(fullHeaders[0] as Record<string, unknown>),
+      lines: invoiceLines.map((l) => mapLine(l as Record<string, unknown>)),
+    });
+  } catch (e) {
+    return err((e as Error).message ?? 'Internal server error', 500);
+  }
 }
