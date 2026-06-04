@@ -316,7 +316,7 @@ export default function POPrintPage() {
               const desc = l.description + (l.item_name && l.item_name !== l.description ? ` - ${l.item_name}` : '');
               return (
                 <tr key={l.id}>
-                  <td style={{ border: BK, padding: '4px 5px', textAlign: 'center', fontFamily: 'monospace', fontSize: '11px' }}>
+                  <td style={{ border: BK, padding: '4px 5px', textAlign: 'center', fontFamily: 'monospace', fontSize: '11px', whiteSpace: 'nowrap' }}>
                     {sku}
                   </td>
                   <td style={{ border: BK, padding: '4px 5px' }} />
