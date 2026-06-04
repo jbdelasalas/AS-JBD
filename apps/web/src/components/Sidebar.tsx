@@ -95,11 +95,32 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const router = useRouter();
   const [companyName, setCompanyName] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [isSandbox, setIsSandbox] = useState(false);
+  const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
     const name = localStorage.getItem('company_name');
     if (name) setCompanyName(name);
+    // Detect current mode from the cookie (readable on client only via a dedicated endpoint
+    // is overkill — instead check the banner or a localStorage flag set after toggle).
+    const mode = localStorage.getItem('db-mode');
+    setIsSandbox(mode === 'sandbox');
   }, []);
+
+  async function toggleDbMode() {
+    if (switching) return;
+    setSwitching(true);
+    const next = isSandbox ? 'production' : 'sandbox';
+    await fetch('/api/v1/set-db-mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: next }),
+    });
+    localStorage.setItem('db-mode', next);
+    setIsSandbox(next === 'sandbox');
+    setSwitching(false);
+    router.refresh();
+  }
 
   // Auto-expand the group whose parent or children match the current page
   useEffect(() => {
@@ -147,19 +168,36 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         `}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 dark:border-slate-700">
-          <div>
-            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">ERP System</div>
-            <div className="text-[11px] text-slate-500 dark:text-slate-400">{companyName}</div>
+        <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">ERP System</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">{companyName}</div>
+            </div>
+            <button
+              onClick={onClose}
+              aria-label="Close menu"
+              className="flex h-7 w-7 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 md:hidden"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
+          {/* Environment toggle */}
           <button
-            onClick={onClose}
-            aria-label="Close menu"
-            className="flex h-7 w-7 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 md:hidden"
+            onClick={toggleDbMode}
+            disabled={switching}
+            title={isSandbox ? 'Switch to Production' : 'Switch to Sandbox'}
+            className={`mt-2 flex w-full items-center gap-1.5 rounded px-2 py-1 text-[10px] font-semibold tracking-wide transition-colors ${
+              isSandbox
+                ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-300'
+                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400'
+            } ${switching ? 'opacity-50 cursor-wait' : ''}`}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <span className={`h-1.5 w-1.5 rounded-full ${isSandbox ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+            {isSandbox ? 'SANDBOX' : 'PRODUCTION'}
+            <span className="ml-auto opacity-60">{switching ? '...' : 'switch'}</span>
           </button>
         </div>
 

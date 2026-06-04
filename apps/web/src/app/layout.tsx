@@ -18,6 +18,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://erp.artfreshchicken.ph'),
   title: 'AFCC ERP System',
   description: 'Enterprise Resource Planning System for Art Fresh Creative Corporation',
   manifest: '/manifest.json',
