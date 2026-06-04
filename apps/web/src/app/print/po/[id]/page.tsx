@@ -222,8 +222,7 @@ export default function POPrintPage() {
         {/* ── TITLE ── */}
         <div style={{
           textAlign: 'center', fontSize: '16px', fontWeight: 900,
-          borderTop: BK, borderBottom: BK,
-          padding: '4px 0', marginBottom: '6px', letterSpacing: '1px',
+          padding: '10px 0', marginBottom: '6px', letterSpacing: '1px',
         }}>
           PURCHASE ORDER
         </div>
@@ -297,7 +296,7 @@ export default function POPrintPage() {
         {/* ── LINE ITEMS TABLE ── */}
         <table style={{ width: '100%', borderCollapse: 'collapse', border: BK, marginBottom: '4px', fontSize: '12px' }}>
           <thead>
-            <tr style={{ background: '#f0f0f0' }}>
+            <tr style={{ background: '#e8e8e8' }}>
               <th style={{ border: BK, padding: '4px 5px', textAlign: 'center', fontWeight: 700, width: '10%' }}>Item</th>
               <th style={{ border: BK, padding: '4px 5px', textAlign: 'center', fontWeight: 700, width: '10%' }}>Barcode</th>
               <th style={{ border: BK, padding: '4px 5px', textAlign: 'center', fontWeight: 700, width: '8%' }}>QTY</th>
