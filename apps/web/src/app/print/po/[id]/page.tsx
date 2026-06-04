@@ -374,8 +374,13 @@ export default function POPrintPage() {
           </div>
         )}
 
+        </div>{/* end main content */}
+
+        {/* ── SIGNATURES + CONFORME + CONDITIONS pinned to bottom ── */}
+        <div style={{ marginTop: 'auto' }}>
+
         {/* ── SIGNATURES ── */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '24px', marginBottom: '20px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
           <tbody>
             <tr>
               <td style={{ width: '50%', textAlign: 'center', paddingRight: '20px', verticalAlign: 'bottom' }}>
@@ -395,11 +400,6 @@ export default function POPrintPage() {
             </tr>
           </tbody>
         </table>
-
-        </div>{/* end main content */}
-
-        {/* ── CONFORME + CONDITIONS pinned to bottom ── */}
-        <div style={{ marginTop: 'auto' }}>
 
         {/* ── CONFORME ── */}
         <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>CONFORME:</div>
