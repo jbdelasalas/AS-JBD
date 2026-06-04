@@ -116,9 +116,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       body: JSON.stringify({ mode: next }),
     });
     localStorage.setItem('db-mode', next);
-    setIsSandbox(next === 'sandbox');
-    setSwitching(false);
-    router.refresh();
+    window.location.reload();
   }
 
   // Auto-expand the group whose parent or children match the current page
