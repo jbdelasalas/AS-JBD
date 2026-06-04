@@ -97,18 +97,17 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [isSandbox, setIsSandbox] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     const name = localStorage.getItem('company_name');
     if (name) setCompanyName(name);
-    // Detect current mode from the cookie (readable on client only via a dedicated endpoint
-    // is overkill — instead check the banner or a localStorage flag set after toggle).
     const mode = localStorage.getItem('db-mode');
     setIsSandbox(mode === 'sandbox');
   }, []);
 
-  async function toggleDbMode() {
-    if (switching) return;
+  async function confirmSwitch() {
+    setShowConfirm(false);
     setSwitching(true);
     const next = isSandbox ? 'production' : 'sandbox';
     await fetch('/api/v1/set-db-mode', {
@@ -146,6 +145,58 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
   return (
     <>
+      {/* Environment switch confirmation modal */}
+      {showConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white shadow-xl dark:bg-slate-800">
+            <div className={`rounded-t-xl px-5 py-4 ${isSandbox ? 'bg-emerald-50 dark:bg-emerald-900/30' : 'bg-amber-50 dark:bg-amber-900/30'}`}>
+              <div className="flex items-center gap-3">
+                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg ${isSandbox ? 'bg-emerald-100 dark:bg-emerald-800' : 'bg-amber-100 dark:bg-amber-800'}`}>
+                  {isSandbox ? '✓' : '⚠'}
+                </span>
+                <div>
+                  <p className={`text-sm font-semibold ${isSandbox ? 'text-emerald-800 dark:text-emerald-200' : 'text-amber-800 dark:text-amber-200'}`}>
+                    Switch to {isSandbox ? 'Production' : 'Sandbox'}?
+                  </p>
+                  <p className={`text-xs ${isSandbox ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'}`}>
+                    Currently on <strong>{isSandbox ? 'SANDBOX' : 'PRODUCTION'}</strong>
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="px-5 py-4">
+              {isSandbox ? (
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  You are switching to <strong>Production</strong>. Any changes you make will affect <strong>live data</strong>.
+                </p>
+              ) : (
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  You are switching to <strong>Sandbox</strong>. This is a safe test environment — changes here <strong>will not affect production</strong>.
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2 border-t border-slate-100 px-5 py-3 dark:border-slate-700">
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSwitch}
+                className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors ${
+                  isSandbox
+                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                    : 'bg-amber-500 hover:bg-amber-600'
+                }`}
+              >
+                Switch to {isSandbox ? 'Production' : 'Sandbox'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Backdrop — mobile only */}
       {open && (
         <div
@@ -186,7 +237,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </div>
           {/* Environment toggle */}
           <button
-            onClick={toggleDbMode}
+            onClick={() => setShowConfirm(true)}
             disabled={switching}
             title={isSandbox ? 'Switch to Production' : 'Switch to Sandbox'}
             className={`mt-2 flex w-full items-center gap-1.5 rounded px-2 py-1 text-[10px] font-semibold tracking-wide transition-colors ${
