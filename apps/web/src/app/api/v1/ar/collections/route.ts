@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { type NextRequest } from 'next/server';
+import { type PoolClient } from 'pg';
 import { query, getPool } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
@@ -99,7 +100,12 @@ export async function POST(request: NextRequest) {
   if (!companyId || !customerId) return err('company_id and customer_id are required', 400);
   if (amount <= 0) return err('Payment amount must be positive', 400);
 
-  const client = await getPool().connect();
+  let client: PoolClient;
+  try {
+    client = await getPool().connect();
+  } catch (e) {
+    return err((e as Error).message ?? 'Database connection failed', 500);
+  }
   try {
     const customers = await client.query(
       `SELECT id FROM customers WHERE id = $1 AND company_id = $2 AND is_active = true`,

@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { type NextRequest } from 'next/server';
+import { type PoolClient } from 'pg';
 import { query, getPool } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
@@ -25,8 +26,12 @@ export async function POST(
   if (!reason?.trim()) return err('Void reason required', 400);
 
   const id = params.id;
-  const client = await getPool().connect();
-
+  let client: PoolClient;
+  try {
+    client = await getPool().connect();
+  } catch (e) {
+    return err((e as Error).message ?? 'Database connection failed', 500);
+  }
   try {
     await client.query('BEGIN');
 
@@ -91,8 +96,8 @@ export async function POST(
 
     await client.query('COMMIT');
   } catch (e) {
-    await client.query('ROLLBACK');
-    throw e;
+    await client.query('ROLLBACK').catch(() => {});
+    return err((e as Error).message ?? 'Internal server error', 500);
   } finally {
     client.release();
   }
@@ -100,11 +105,11 @@ export async function POST(
   const fullHeaders = await query(
     `SELECT cp.*, c.name AS customer_name, c.code AS customer_code FROM customer_payments cp JOIN customers c ON c.id = cp.customer_id WHERE cp.id = $1 LIMIT 1`,
     [id],
-  );
+  ).catch(() => [] as Record<string, unknown>[]);
   const applications = await query(
     `SELECT pa.*, si.invoice_no FROM payment_applications pa JOIN sales_invoices si ON si.id = pa.invoice_id WHERE pa.payment_id = $1`,
     [id],
-  );
+  ).catch(() => [] as Record<string, unknown>[]);
 
   const h = fullHeaders[0] as Record<string, unknown>;
   return ok({
