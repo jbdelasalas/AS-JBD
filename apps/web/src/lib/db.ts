@@ -4,7 +4,7 @@ import { headers } from 'next/headers';
 let _prodPool: Pool | undefined;
 let _sandboxPool: Pool | undefined;
 
-function makePool(raw: string): Pool {
+function makePool(raw: string, schema: 'public' | 'sandbox'): Pool {
   const url = raw.replace(/([?&])sslmode=[^&]*/g, '$1').replace(/[?&]$/, '');
   const cfg: PoolConfig = {
     connectionString: url,
@@ -14,11 +14,15 @@ function makePool(raw: string): Pool {
     idleTimeoutMillis: 10_000,
     allowExitOnIdle: true,
   };
-  return new Pool(cfg);
+  const pool = new Pool(cfg);
+  // Route each connection to the correct schema
+  pool.on('connect', (client) => {
+    client.query(`SET search_path TO ${schema}, extensions, public`);
+  });
+  return pool;
 }
 
 export function getPool(isSandbox?: boolean): Pool {
-  // Auto-detect from request header when caller doesn't specify
   if (isSandbox === undefined) {
     try {
       isSandbox = headers().get('x-db-mode') === 'sandbox';
@@ -27,22 +31,21 @@ export function getPool(isSandbox?: boolean): Pool {
     }
   }
 
+  // POSTGRES_URL  = Supabase transaction-mode pooler (port 6543) — best for serverless.
+  // DATABASE_URL  = fallback direct connection.
+  const raw = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+  if (!raw) throw new Error('No database URL configured (set POSTGRES_URL or DATABASE_URL)');
+
   if (isSandbox) {
-    const raw = process.env.SANDBOX_DATABASE_URL || process.env.SANDBOX_POSTGRES_URL;
-    if (!raw) throw new Error('SANDBOX_DATABASE_URL is not configured');
     if (!_sandboxPool) {
-      _sandboxPool = makePool(raw);
+      _sandboxPool = makePool(raw, 'sandbox');
       _sandboxPool.on('error', () => { _sandboxPool = undefined; });
     }
     return _sandboxPool;
   }
 
-  // POSTGRES_URL  = Supabase transaction-mode pooler (port 6543) — best for serverless.
-  // DATABASE_URL  = fallback direct connection.
-  const raw = process.env.POSTGRES_URL || process.env.DATABASE_URL;
-  if (!raw) throw new Error('No database URL configured (set POSTGRES_URL or DATABASE_URL)');
   if (!_prodPool) {
-    _prodPool = makePool(raw);
+    _prodPool = makePool(raw, 'public');
     _prodPool.on('error', () => { _prodPool = undefined; });
   }
   return _prodPool;
