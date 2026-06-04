@@ -161,7 +161,7 @@ export default function POPrintPage() {
       <div id="po-print" style={{
         width: '210mm',
         background: '#fff',
-        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontFamily: 'var(--font-outfit), Arial, sans-serif',
         fontSize: '10px',
         color: '#000',
         padding: '8mm 10mm',
