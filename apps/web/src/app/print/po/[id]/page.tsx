@@ -239,15 +239,15 @@ export default function POPrintPage() {
                       <td style={{ fontWeight: 700, paddingRight: '6px', verticalAlign: 'top', whiteSpace: 'nowrap', paddingBottom: '4px' }}>
                         Supplier:
                       </td>
-                      <td style={{ verticalAlign: 'top', paddingBottom: '4px' }}>
-                        {po.supplier_code} {po.supplier_name}
+                      <td style={{ borderBottom: '1px solid #555', paddingBottom: '2px', paddingLeft: '4px', verticalAlign: 'top' }}>
+                        {po.supplier_name}
                       </td>
                     </tr>
                     <tr>
                       <td style={{ fontWeight: 700, paddingRight: '6px', verticalAlign: 'top', whiteSpace: 'nowrap', paddingBottom: '4px' }}>
                         Address:
                       </td>
-                      <td style={{ verticalAlign: 'top', paddingBottom: '4px' }}>
+                      <td style={{ borderBottom: '1px solid #555', paddingBottom: '2px', paddingLeft: '4px', verticalAlign: 'top' }}>
                         {po.supplier_address ?? ''}
                       </td>
                     </tr>
@@ -255,7 +255,7 @@ export default function POPrintPage() {
                       <td style={{ fontWeight: 700, paddingRight: '6px', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                         TIN:
                       </td>
-                      <td style={{ verticalAlign: 'top' }}>
+                      <td style={{ borderBottom: '1px solid #555', paddingBottom: '2px', paddingLeft: '4px', verticalAlign: 'top' }}>
                         {po.supplier_tin ?? ''}
                       </td>
                     </tr>
@@ -340,23 +340,23 @@ export default function POPrintPage() {
         </table>
 
         {/* ── TOTALS ── */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '8px' }}>
+        <table style={{ borderCollapse: 'collapse', marginBottom: '8px' }}>
           <tbody>
             <tr>
-              <td style={{ textAlign: 'right', paddingRight: '8px', fontSize: '13px' }}>Subtotal</td>
-              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', width: '140px' }}>
+              <td style={{ paddingRight: '16px', fontSize: '13px' }}>Subtotal</td>
+              <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>
                 PHP{fmtNum(po.subtotal)}
               </td>
             </tr>
             <tr>
-              <td style={{ textAlign: 'right', paddingRight: '8px', fontSize: '13px' }}>VAT</td>
-              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: '13px' }}>
+              <td style={{ paddingRight: '16px', fontSize: '13px' }}>VAT</td>
+              <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>
                 PHP{fmtNum(po.vat_amount)}
               </td>
             </tr>
             <tr>
-              <td style={{ textAlign: 'right', paddingRight: '8px', fontSize: '14px', fontWeight: 700 }}>Total</td>
-              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, borderTop: BK }}>
+              <td style={{ paddingRight: '16px', fontSize: '14px', fontWeight: 700 }}>Total</td>
+              <td style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, borderTop: BK }}>
                 PHP{fmtNum(po.total)}
               </td>
             </tr>
