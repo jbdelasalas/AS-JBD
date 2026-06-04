@@ -195,7 +195,6 @@ export default function POPrintPage() {
                         objectFit: 'contain',
                         flexShrink: 0,
                         backgroundColor: '#fff',
-                        mixBlendMode: 'multiply',
                       }}
                     />
                   )}
@@ -344,22 +343,22 @@ export default function POPrintPage() {
         </table>
 
         {/* ── TOTALS ── */}
-        <table style={{ borderCollapse: 'collapse', marginBottom: '8px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '8px' }}>
           <tbody>
             <tr>
-              <td style={{ paddingRight: '16px', fontSize: '13px' }}>Subtotal</td>
-              <td style={{ fontFamily: 'monospace', fontSize: '13px', textAlign: 'right', minWidth: '140px' }}>
+              <td style={{ fontSize: '13px' }}>Subtotal</td>
+              <td style={{ fontFamily: 'monospace', fontSize: '13px', textAlign: 'right', width: '160px' }}>
                 PHP{fmtNum(po.subtotal)}
               </td>
             </tr>
             <tr>
-              <td style={{ paddingRight: '16px', fontSize: '13px' }}>VAT</td>
+              <td style={{ fontSize: '13px' }}>VAT</td>
               <td style={{ fontFamily: 'monospace', fontSize: '13px', textAlign: 'right' }}>
                 PHP{fmtNum(po.vat_amount)}
               </td>
             </tr>
             <tr>
-              <td style={{ paddingRight: '16px', fontSize: '14px', fontWeight: 700 }}>Total</td>
+              <td style={{ fontSize: '14px', fontWeight: 700 }}>Total</td>
               <td style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, borderTop: BK, textAlign: 'right' }}>
                 PHP{fmtNum(po.total)}
               </td>
