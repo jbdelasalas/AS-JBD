@@ -81,6 +81,7 @@ const NAV: NavItem[] = [
   },
   { href: '/dashboard/reports', label: 'Reports' },
   { href: '/dashboard/bir',     label: 'BIR Compliance' },
+  { href: '/dashboard/ai',      label: 'AI Analysis' },
   { href: '/dashboard/admin', label: 'Administration' },
 ];
 

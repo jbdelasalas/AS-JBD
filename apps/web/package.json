@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.100.1",
     "@node-rs/bcrypt": "^1.10.7",
     "@perpet/shared": "*",
     "@types/bcryptjs": "^2.4.6",

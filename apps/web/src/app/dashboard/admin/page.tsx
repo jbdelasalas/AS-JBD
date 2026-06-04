@@ -45,20 +45,25 @@ export default function AdminHomePage() {
       .finally(() => setCompanyLoading(false));
   }, []);
 
-  function compressImage(dataUrl: string, maxPx = 400, quality = 0.85): Promise<string> {
+  function compressImage(dataUrl: string, maxPx = 400): Promise<string> {
     return new Promise((resolve) => {
       const img = new Image();
+      img.onerror = () => resolve(dataUrl);
       img.onload = () => {
-        let { width: w, height: h } = img;
-        if (w > maxPx || h > maxPx) {
+        // If it fits within maxPx, return as-is — PNG transparency is preserved
+        if (img.width <= maxPx && img.height <= maxPx) { resolve(dataUrl); return; }
+        try {
+          let w = img.width, h = img.height;
           if (w >= h) { h = Math.round(h * maxPx / w); w = maxPx; }
           else { w = Math.round(w * maxPx / h); h = maxPx; }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/png')); // PNG preserves transparency
+        } catch {
+          resolve(dataUrl);
         }
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', quality));
       };
       img.src = dataUrl;
     });
@@ -68,11 +73,10 @@ export default function AdminHomePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = async (ev) => {
+    reader.onload = (ev) => {
       const raw = ev.target?.result as string;
-      const compressed = await compressImage(raw);
-      setLogoPreview(compressed);
-      setCompany((c) => ({ ...c, logo: compressed }));
+      setLogoPreview(raw);
+      setCompany((c) => ({ ...c, logo: raw }));
     };
     reader.readAsDataURL(file);
   }
@@ -88,6 +92,8 @@ export default function AdminHomePage() {
       const payload = { ...company };
       if (payload.logo && payload.logo.startsWith('data:')) {
         payload.logo = await compressImage(payload.logo);
+        setLogoPreview(payload.logo);
+        setCompany((c) => ({ ...c, logo: payload.logo! }));
       }
       await api.put(`/companies/${companyId}`, payload);
       const token = localStorage.getItem('access_token');
@@ -176,7 +182,7 @@ export default function AdminHomePage() {
               <div className="flex items-center gap-4">
                 {logoPreview ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={logoPreview} alt="Logo" className="h-16 w-auto max-w-[160px] rounded border border-slate-200 dark:border-slate-700 object-contain p-1 dark:border-slate-600" />
+                  <img src={logoPreview} alt="Logo" className="h-16 w-auto max-w-[160px] rounded border border-slate-200 dark:border-slate-700 object-contain p-1 dark:border-slate-600 bg-white" />
                 ) : (
                   <div className="flex h-16 w-32 items-center justify-center rounded border-2 border-dashed border-slate-200 dark:border-slate-700 text-[11px] text-slate-400 dark:border-slate-600">No logo</div>
                 )}

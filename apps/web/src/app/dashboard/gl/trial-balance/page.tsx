@@ -100,7 +100,7 @@ export default function TrialBalancePage() {
             <span className={`rounded px-2 py-0.5 font-medium ${data.is_balanced ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
               {data.is_balanced ? '✓ Balanced' : '✗ Out of balance'}
             </span>
-            <span className="text-slate-600 dark:text-slate-400">{data.rows.length} accounts with movement</span>
+            <span className="text-slate-600 dark:text-slate-400">{data.rows?.length ?? 0} accounts with movement</span>
           </div>
 
           <DataTable
