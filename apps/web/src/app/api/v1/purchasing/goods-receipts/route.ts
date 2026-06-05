@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
       [header.id],
     );
 
-    // ── Journal Entry: DR Inventory/Asset, CR GRNI ───────────────────────────
+    // ── Journal Entry: DR Inventory/Asset, CR GRNI or Advances to Suppliers ──
     const periodRows = await client.query(
       `SELECT id, status FROM fiscal_periods
         WHERE company_id = $1 AND $2::date BETWEEN start_date AND end_date LIMIT 1`,
@@ -179,7 +179,31 @@ export async function POST(request: NextRequest) {
           ORDER BY code LIMIT 1`,
         [companyId],
       );
-      const grniAccountId = grniRows.rows[0]?.id ?? null;
+      const grniAccountId: string | null = grniRows.rows[0]?.id ?? null;
+
+      // Advances to Suppliers account (used when PO already has a bill)
+      const advRows = await client.query(
+        `SELECT id FROM accounts
+          WHERE company_id = $1
+            AND (name ILIKE '%advances to supplier%'
+                 OR (name ILIKE '%advance%' AND name ILIKE '%supplier%'))
+            AND is_active = true
+          ORDER BY code LIMIT 1`,
+        [companyId],
+      );
+      const advancesAccountId: string | null = advRows.rows[0]?.id ?? null;
+
+      // If PO already has approved/partial bills → credit Advances to Suppliers to close the advance
+      const billCountRows = await client.query(
+        `SELECT COUNT(*)::int AS c FROM bills WHERE po_id = $1 AND status IN ('approved','partial','pending_approval')`,
+        [poId],
+      );
+      const poHasBill = Number((billCountRows.rows[0] as Record<string, unknown>).c) > 0;
+
+      const creditAccountId = (poHasBill && advancesAccountId) ? advancesAccountId : grniAccountId;
+      const creditDescription = (poHasBill && advancesAccountId)
+        ? `Clear Advance to Supplier — ${grnNo}`
+        : `GRNI — ${grnNo}`;
 
       // Default asset/inventory account fallback for lines with no specific account
       const defAssetRows = await client.query(
@@ -204,7 +228,7 @@ export async function POST(request: NextRequest) {
         [companyId],
       );
 
-      if (grniAccountId && seriesRows.rows[0]) {
+      if (creditAccountId && seriesRows.rows[0]) {
         const jeNo = `${seriesRows.rows[0].prefix}${String(Number(seriesRows.rows[0].current_number)).padStart(6, '0')}`;
 
         const grnLineDetails = await client.query(
@@ -257,7 +281,7 @@ export async function POST(request: NextRequest) {
             `INSERT INTO journal_entry_lines
                (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
              VALUES ($1,$2,$3,$4,0,$5,'PHP',1,0,$5)`,
-            [jeId, jeLineNo, grniAccountId, `GRNI — ${grnNo}`, totalAmount],
+            [jeId, jeLineNo, creditAccountId, creditDescription, totalAmount],
           );
 
           await client.query(
