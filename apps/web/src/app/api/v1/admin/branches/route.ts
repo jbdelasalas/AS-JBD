@@ -15,10 +15,9 @@ export async function GET(req: NextRequest) {
 
     const rows = await query<{
       id: string; code: string; name: string; address: string | null;
-      bir_atp_number: string | null;
-      ptu_number: string | null; is_active: boolean; created_at: string;
+      is_active: boolean; created_at: string;
     }>(
-      `SELECT id, code, name, address, bir_atp_number, ptu_number, is_active, created_at
+      `SELECT id, code, name, address, is_active, created_at
          FROM branches
         WHERE company_id = $1
         ORDER BY code`,

@@ -12,12 +12,8 @@ export async function GET(req: NextRequest, { params }: Ctx) {
   try { auth = await requireAuth(req); } catch (e) { return e as Response; }
 
     const [branch] = await query<Record<string, unknown>>(
-      `SELECT b.id, b.company_id, b.code, b.name, b.address,
-              b.bir_atp_number, b.bir_atp_valid_from, b.bir_atp_valid_to,
-              b.ptu_number, b.man_number, b.manager_user_id, b.is_active, b.created_at,
-              bs.signatory_name, bs.signatory_tin, bs.signatory_position
+      `SELECT b.id, b.company_id, b.code, b.name, b.address, b.is_active, b.created_at
          FROM branches b
-         LEFT JOIN bir_setup bs ON bs.branch_id = b.id
         WHERE b.id = $1`,
       [params.id]
     );
@@ -35,11 +31,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   try { auth = await requireAuth(req); } catch (e) { return e as Response; }
 
     const body = await req.json();
-    const allowed = [
-      'name', 'address', 'is_active', 'manager_user_id',
-      'bir_atp_number', 'bir_atp_valid_from', 'bir_atp_valid_to',
-      'ptu_number', 'man_number',
-    ];
+    const allowed = ['name', 'address', 'is_active'];
     const fields: string[] = [];
     const values: unknown[] = [];
     let idx = 1;
@@ -52,8 +44,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     }
     if (fields.length === 0) return err('No fields to update', 400);
 
-    fields.push(`updated_by = $${idx++}`);
-    values.push(auth.userId, params.id);
+    values.push(params.id);
 
     const [updated] = await query<{ id: string }>(
       `UPDATE branches SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id`,
