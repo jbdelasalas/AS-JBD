@@ -71,8 +71,11 @@ export async function POST(request: NextRequest) {
   const branchCols: [string, string][] = [
     ['phone', 'varchar(50)'],
     ['bir_atp_number', 'varchar(50)'],
+    ['bir_atp_valid_from', 'date'],
+    ['bir_atp_valid_to', 'date'],
     ['ptu_number', 'varchar(50)'],
     ['man_number', 'varchar(50)'],
+    ['manager_user_id', 'uuid'],
     ['created_by', 'uuid'],
     ['updated_by', 'uuid'],
   ];

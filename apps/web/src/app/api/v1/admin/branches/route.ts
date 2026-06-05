@@ -15,10 +15,10 @@ export async function GET(req: NextRequest) {
 
     const rows = await query<{
       id: string; code: string; name: string; address: string | null;
-      phone: string | null; bir_atp_number: string | null;
+      bir_atp_number: string | null;
       ptu_number: string | null; is_active: boolean; created_at: string;
     }>(
-      `SELECT id, code, name, address, phone, bir_atp_number, ptu_number, is_active, created_at
+      `SELECT id, code, name, address, bir_atp_number, ptu_number, is_active, created_at
          FROM branches
         WHERE company_id = $1
         ORDER BY code`,
@@ -37,14 +37,14 @@ export async function POST(req: NextRequest) {
   try { auth = await requireAuth(req); } catch (e) { return e as Response; }
 
     const body = await req.json();
-    const { company_id, code, name, address, phone } = body;
+    const { company_id, code, name, address } = body;
     if (!company_id || !code || !name) return err('company_id, code, name required', 400);
 
     const [branch] = await query<{ id: string; code: string; name: string }>(
-      `INSERT INTO branches (company_id, code, name, address, phone, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO branches (company_id, code, name, address, created_by)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING id, code, name`,
-      [company_id, code, name, address ?? null, phone ?? null, auth.userId]
+      [company_id, code, name, address ?? null, auth.userId]
     );
 
     // Auto-create a matching warehouse so Inventory Locations stays in sync
