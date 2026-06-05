@@ -164,6 +164,8 @@ export default function PODetailPage() {
   if (!po) return <div className="py-10 text-center text-sm text-red-600">Purchase order not found</div>;
 
   const isTerminal = ['received', 'closed', 'cancelled'].includes(po.status);
+  const totalBilled = bills.filter(b => b.status !== 'voided').reduce((s, b) => s + b.total, 0);
+  const canBill = ['approved', 'received', 'partial'].includes(po.status) && totalBilled < po.total;
 
   return (
     <div className="space-y-5">
@@ -334,7 +336,7 @@ export default function PODetailPage() {
               </button>
             </>
           )}
-          {['approved', 'received', 'partial'].includes(po.status) && (
+          {canBill && (
             <Link href={`/dashboard/ap/bills/new?po_id=${id}`}
               className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700">
               Process to Bill
