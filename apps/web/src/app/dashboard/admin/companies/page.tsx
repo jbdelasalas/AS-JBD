@@ -21,6 +21,12 @@ export default function CompaniesPage() {
   const [rows, setRows] = useState<CompanyRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [syncLog, setSyncLog] = useState<{ id: string; results: string[] } | null>(null);
+
+  const isSuperadmin = typeof window !== 'undefined'
+    ? (() => { try { return JSON.parse(localStorage.getItem('user') ?? 'null')?.is_superadmin === true; } catch { return false; } })()
+    : false;
 
   useEffect(() => {
     api.get<CompanyRow[]>('/admin/companies')
@@ -28,6 +34,19 @@ export default function CompaniesPage() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  async function syncToSandbox(company: CompanyRow) {
+    setSyncingId(company.id);
+    setSyncLog(null);
+    try {
+      const res = await api.post<{ results: string[] }>('/init-company-sandbox', { company_id: company.id });
+      setSyncLog({ id: company.id, results: res.results });
+    } catch (e: unknown) {
+      setSyncLog({ id: company.id, results: [`ERROR: ${(e as Error).message}`] });
+    } finally {
+      setSyncingId(null);
+    }
+  }
 
   return (
     <div>
@@ -56,11 +75,12 @@ export default function CompaniesPage() {
               <th className="px-3 py-2 text-left font-medium">VAT</th>
               <th className="px-3 py-2 text-left font-medium">Method</th>
               <th className="px-3 py-2 text-left font-medium">Status</th>
+              {isSuperadmin && <th className="px-3 py-2 text-left font-medium">Sandbox</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">Loading…</td></tr>
+              <tr><td colSpan={isSuperadmin ? 7 : 6} className="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">Loading…</td></tr>
             ) : rows.map((c) => (
               <tr key={c.id} className="border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800">
                 <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">{c.code}</td>
@@ -78,11 +98,39 @@ export default function CompaniesPage() {
                     {c.is_active ? 'active' : 'inactive'}
                   </span>
                 </td>
+                {isSuperadmin && (
+                  <td className="px-3 py-2">
+                    <button
+                      onClick={() => syncToSandbox(c)}
+                      disabled={syncingId === c.id}
+                      className="rounded border border-slate-300 dark:border-slate-600 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50"
+                    >
+                      {syncingId === c.id ? 'Syncing…' : 'Sync to Sandbox'}
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Sync result log */}
+      {syncLog && (
+        <div className="mt-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Sandbox sync results</span>
+            <button onClick={() => setSyncLog(null)} className="text-xs text-slate-400 hover:text-slate-600">Dismiss</button>
+          </div>
+          <ul className="space-y-0.5">
+            {syncLog.results.map((r, i) => (
+              <li key={i} className={`font-mono text-[11px] ${r.includes('ERROR') || r.includes('failed') ? 'text-red-600' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                {r}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
