@@ -9,6 +9,8 @@ import { TaggingFields, GrowSelect, type TaggingValues } from '@/components/Tagg
 interface Customer { id: string; code: string; name: string; payment_terms_days: number; }
 interface Item { id: string; sku: string; name: string; selling_price: number; uom: string; }
 interface Account { id: string; code: string; name: string; }
+interface SOLine { item_id: string; description: string; quantity: number; unit_price: number; discount_pct: number; vat_rate: number; item_uom: string | null; grow_reference_id: string | null; }
+interface SO { so_no: string; customer_id: string; payment_terms_days: number | null; customer_terms: number | null; branch_id: string | null; building_id: string | null; cost_center_id: string | null; grow_reference_id: string | null; lines: SOLine[]; }
 
 interface Line {
   line_type: 'item' | 'gl';
@@ -49,6 +51,7 @@ function NewInvoiceForm() {
   ]);
   const [tags, setTags] = useState<TaggingValues>({ branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '' });
   const [drRef, setDrRef] = useState<string | null>(null);
+  const [soRef, setSoRef] = useState<string | null>(null);
 
   useEffect(() => {
     const companyId = localStorage.getItem('company_id');
@@ -61,6 +64,36 @@ function NewInvoiceForm() {
       setCustomers(c.data);
       setItems(i);
       setAccounts(a.data ?? []);
+
+      // Pre-fill from SO if coming from SO detail page
+      if (preSoId) {
+        api.get<SO>(`/sales/orders/${preSoId}`).then(so => {
+          setSoRef(so.so_no);
+          const terms = so.payment_terms_days ?? so.customer_terms ?? 30;
+          setForm(f => ({ ...f, customer_id: so.customer_id, payment_terms_days: terms, reference: so.so_no }));
+          const newTags = {
+            branch_id:         so.branch_id         ?? '',
+            building_id:       so.building_id       ?? '',
+            cost_center_id:    so.cost_center_id    ?? '',
+            grow_reference_id: so.grow_reference_id ?? '',
+          };
+          setTags(newTags);
+          if (so.lines?.length) {
+            setLines(so.lines.map(l => ({
+              line_type: 'item' as const,
+              item_id:        l.item_id ?? '',
+              gl_account_id:  '',
+              description:    l.description,
+              quantity:       l.quantity,
+              unit_price:     l.unit_price,
+              discount_pct:   l.discount_pct,
+              vat_rate:       l.vat_rate,
+              uom:            l.item_uom ?? '',
+              grow_reference_id: l.grow_reference_id ?? newTags.grow_reference_id,
+            })));
+          }
+        }).catch(() => {});
+      }
 
       // Pre-fill from DR if coming from DR detail page
       const raw = sessionStorage.getItem('pending_si_from_dr');
@@ -179,6 +212,11 @@ function NewInvoiceForm() {
       <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">New Sales Invoice</h1>
       <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">Create a draft invoice — post it to generate the GL entry and AR.</p>
 
+      {soRef && (
+        <div className="mb-4 rounded border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-700 dark:border-brand-800 dark:bg-brand-950 dark:text-brand-300">
+          Pre-filled from Sales Order <strong>{soRef}</strong> — review and save.
+        </div>
+      )}
       {drRef && (
         <div className="mb-4 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
           Pre-filled from Delivery Receipt <strong>{drRef}</strong> — review and save.
