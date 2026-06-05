@@ -34,10 +34,18 @@ export async function GET(
 
   const lines = await query(
     `SELECT grl.*, pol.description, pol.quantity AS po_qty, pol.unit_price,
-            i.sku AS item_sku, i.name AS item_name, i.uom AS item_uom
+            i.sku AS item_sku, i.name AS item_name, i.uom AS item_uom,
+            br.code AS branch_code,
+            fb.code AS building_code,
+            cc.code AS cost_center_code,
+            gr.code AS grow_ref_code
        FROM goods_receipt_lines grl
        JOIN purchase_order_lines pol ON pol.id = grl.po_line_id
-       LEFT JOIN items i ON i.id = pol.item_id
+       LEFT JOIN items          i  ON i.id  = pol.item_id
+       LEFT JOIN branches       br ON br.id = grl.branch_id
+       LEFT JOIN farm_buildings fb ON fb.id = grl.building_id
+       LEFT JOIN cost_centers   cc ON cc.id = grl.cost_center_id
+       LEFT JOIN grow_references gr ON gr.id = grl.grow_reference_id
       WHERE grl.grn_id = $1
       ORDER BY grl.line_no`,
     [params.id],

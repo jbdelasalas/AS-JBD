@@ -17,6 +17,10 @@ interface GRNLine {
   item_sku: string | null;
   item_name: string | null;
   item_uom: string | null;
+  branch_code: string | null;
+  building_code: string | null;
+  cost_center_code: string | null;
+  grow_ref_code: string | null;
 }
 
 interface GRN {
@@ -161,6 +165,10 @@ export default function GRNDetailPage() {
               <th className="px-3 py-2 text-left font-medium">UOM</th>
               <th className="px-3 py-2 text-right font-medium">Qty Received</th>
               <th className="px-3 py-2 text-right font-medium">Unit Cost</th>
+              <th className="px-3 py-2 text-left font-medium">Location</th>
+              <th className="px-3 py-2 text-left font-medium">Building</th>
+              <th className="px-3 py-2 text-left font-medium">Cost Center</th>
+              <th className="px-3 py-2 text-left font-medium">Grow</th>
             </tr>
           </thead>
           <tbody>
@@ -177,6 +185,10 @@ export default function GRNDetailPage() {
                 <td className="px-3 py-2 text-right font-mono text-xs dark:text-slate-300">
                   {l.unit_cost.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </td>
+                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.branch_code ?? '—'}</td>
+                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.building_code ?? '—'}</td>
+                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.cost_center_code ?? '—'}</td>
+                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.grow_ref_code ?? '—'}</td>
               </tr>
             ))}
           </tbody>

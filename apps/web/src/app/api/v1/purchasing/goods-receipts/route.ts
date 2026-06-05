@@ -121,9 +121,17 @@ export async function POST(request: NextRequest) {
       if (qtyReceived <= 0) continue;
 
       await client.query(
-        `INSERT INTO goods_receipt_lines (grn_id, po_line_id, line_no, qty_received, unit_cost)
-         VALUES ($1,$2,$3,$4,$5)`,
-        [header.id, l.po_line_id, i + 1, qtyReceived, Number(l.unit_cost ?? 0)],
+        `INSERT INTO goods_receipt_lines
+           (grn_id, po_line_id, line_no, qty_received, unit_cost,
+            branch_id, building_id, cost_center_id, grow_reference_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [
+          header.id, l.po_line_id, i + 1, qtyReceived, Number(l.unit_cost ?? 0),
+          (l.branch_id as string) || null,
+          (l.building_id as string) || null,
+          (l.cost_center_id as string) || null,
+          (l.grow_reference_id as string) || null,
+        ],
       );
 
       await client.query(

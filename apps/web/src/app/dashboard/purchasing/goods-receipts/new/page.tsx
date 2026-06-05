@@ -43,11 +43,14 @@ interface ReceiptLine {
   already_received: number;
   qty_received: number;
   unit_cost: number;
+  branch_id: string;
+  building_id: string;
+  cost_center_id: string;
+  grow_reference_id: string;
   branch_code: string | null;
   building_code: string | null;
   cost_center_code: string | null;
   grow_ref_code: string | null;
-  grow_reference_id: string;
 }
 
 function NewGoodsReceiptForm() {
@@ -99,11 +102,14 @@ function NewGoodsReceiptForm() {
           already_received: l.qty_received,
           qty_received:     Math.max(0, l.quantity - l.qty_received),
           unit_cost:        l.unit_price,
+          branch_id:        l.branch_id ?? '',
+          building_id:      l.building_id ?? '',
+          cost_center_id:   l.cost_center_id ?? '',
+          grow_reference_id: l.grow_reference_id ?? '',
           branch_code:      l.branch_code,
           building_code:    l.building_code,
           cost_center_code: l.cost_center_code,
           grow_ref_code:    l.grow_ref_code,
-          grow_reference_id: l.grow_reference_id ?? '',
         })));
       })
       .catch(() => {})
@@ -148,7 +154,10 @@ function NewGoodsReceiptForm() {
             po_line_id:        l.po_line_id,
             qty_received:      l.qty_received,
             unit_cost:         l.unit_cost,
-            grow_reference_id: l.grow_reference_id || undefined,
+            branch_id:         l.branch_id         || undefined,
+            building_id:       l.building_id        || undefined,
+            cost_center_id:    l.cost_center_id     || undefined,
+            grow_reference_id: l.grow_reference_id  || undefined,
           })),
       });
       router.push(`/dashboard/purchasing/goods-receipts/${grn.id}`);
