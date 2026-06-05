@@ -32,6 +32,13 @@ export async function GET(
   );
   if (!rows[0]) return err(`Goods receipt ${params.id} not found`, 404);
 
+  const grn = rows[0] as Record<string, unknown>;
+  const billCount = await query<{ c: number }>(
+    `SELECT COUNT(*)::int AS c FROM bills WHERE po_id = $1 AND status != 'voided'`,
+    [grn.po_id],
+  );
+  const hasBill = Number(billCount[0].c) > 0;
+
   const lines = await query(
     `SELECT grl.*, pol.description, pol.quantity AS po_qty, pol.unit_price,
             i.sku AS item_sku, i.name AS item_name, i.uom AS item_uom,
@@ -52,7 +59,8 @@ export async function GET(
   );
 
   return ok({
-    ...rows[0],
+    ...grn,
+    has_bill: hasBill,
     lines: lines.map((l) => {
       const row = l as Record<string, unknown>;
       return {

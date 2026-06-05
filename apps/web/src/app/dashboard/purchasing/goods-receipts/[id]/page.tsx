@@ -33,6 +33,7 @@ interface GRN {
   po_no: string;
   po_id: string;
   je_id: string | null;
+  has_bill: boolean;
   supplier_name: string;
   supplier_code: string;
   branch_code: string | null;    branch_name: string | null;
@@ -97,7 +98,7 @@ export default function GRNDetailPage() {
               View Journal Entry
             </Link>
           )}
-          {grn.status === 'posted' && (
+          {grn.status === 'posted' && !grn.has_bill && (
             <Link href={`/dashboard/ap/bills/new?po_id=${grn.po_id}`}
               className="rounded bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700">
               Process to Bill
