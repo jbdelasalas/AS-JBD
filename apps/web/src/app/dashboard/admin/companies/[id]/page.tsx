@@ -77,6 +77,7 @@ export default function CompanyDetailPage() {
 
       <div className="space-y-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
         <div className="grid grid-cols-2 gap-4">
+          {f('Code', 'code')}
           {f('Company name', 'name')}
           {f('Trade name', 'trade_name')}
           {f('TIN', 'tin')}
@@ -102,6 +103,15 @@ export default function CompanyDetailPage() {
               onChange={(e) => setForm((p) => ({ ...p, accounting_method: e.target.value }))}
               className="w-full rounded border border-slate-300 dark:border-slate-600 px-2 py-1.5 text-sm dark:bg-slate-800 dark:text-slate-100">
               {METHOD_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Status</label>
+            <select value={form.is_active ? 'true' : 'false'}
+              onChange={(e) => setForm((p) => ({ ...p, is_active: e.target.value === 'true' }))}
+              className="w-full rounded border border-slate-300 dark:border-slate-600 px-2 py-1.5 text-sm dark:bg-slate-800 dark:text-slate-100">
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
             </select>
           </div>
         </div>
