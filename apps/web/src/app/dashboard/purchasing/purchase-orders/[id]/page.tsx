@@ -57,6 +57,15 @@ interface PO {
   lines: POLine[];
 }
 
+interface GRNRow {
+  id: string;
+  grn_no: string;
+  receipt_date: string;
+  delivery_no: string | null;
+  notes: string | null;
+  status: string;
+}
+
 interface BillRow {
   id: string;
   internal_no: string;
@@ -89,6 +98,12 @@ const BILL_STATUS: Record<string, string> = {
   voided:           'bg-red-100 text-red-700',
 };
 
+const GRN_STATUS: Record<string, string> = {
+  draft:   'bg-slate-100 text-slate-700',
+  posted:  'bg-emerald-100 text-emerald-700',
+  voided:  'bg-red-100 text-red-700',
+};
+
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
@@ -102,6 +117,7 @@ export default function PODetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [po, setPo] = useState<PO | null>(null);
+  const [grns, setGrns] = useState<GRNRow[]>([]);
   const [bills, setBills] = useState<BillRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -118,8 +134,9 @@ export default function PODetailPage() {
     setLoading(true);
     Promise.all([
       api.get<PO>(`/purchasing/purchase-orders/${id}`),
+      api.get<{ data: GRNRow[] }>(`/purchasing/goods-receipts?company_id=${companyId}&po_id=${id}&limit=100`),
       api.get<{ data: BillRow[] }>(`/ap/bills?company_id=${companyId}&po_id=${id}`),
-    ]).then(([p, b]) => { setPo(p); setBills(b.data); })
+    ]).then(([p, g, b]) => { setPo(p); setGrns(g.data); setBills(b.data); })
       .finally(() => setLoading(false));
   }, [id, companyId]);
 
@@ -329,6 +346,45 @@ export default function PODetailPage() {
             className="rounded border border-red-300 bg-red-50 px-4 py-1.5 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-700 dark:bg-red-950 dark:text-red-400">
             Delete
           </button>
+        )}
+      </div>
+
+      {/* Goods Receipts */}
+      <div className="rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+        <div className="border-b border-slate-200 px-5 py-3 text-sm font-medium text-slate-700 dark:border-slate-700 dark:text-slate-300">
+          Goods Receipts
+        </div>
+        {grns.length === 0 ? (
+          <div className="px-5 py-6 text-center text-xs text-slate-400">No goods receipts for this PO.</div>
+        ) : (
+          <table className="min-w-full text-xs">
+            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">GRN No.</th>
+                <th className="px-3 py-2 text-left font-medium">Receipt Date</th>
+                <th className="px-3 py-2 text-left font-medium">Delivery Note</th>
+                <th className="px-3 py-2 text-left font-medium">Notes</th>
+                <th className="px-3 py-2 text-left font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {grns.map((g) => (
+                <tr key={g.id} className="border-t border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                  <td className="px-3 py-2">
+                    <Link href={`/dashboard/purchasing/goods-receipts/${g.id}`} className="font-mono text-brand-700 hover:underline dark:text-brand-400">{g.grn_no}</Link>
+                  </td>
+                  <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{formatDate(g.receipt_date)}</td>
+                  <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{g.delivery_no ?? '—'}</td>
+                  <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{g.notes ?? '—'}</td>
+                  <td className="px-3 py-2">
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${GRN_STATUS[g.status] ?? GRN_STATUS.draft}`}>
+                      {g.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 
