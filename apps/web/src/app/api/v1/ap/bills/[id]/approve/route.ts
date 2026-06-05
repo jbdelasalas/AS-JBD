@@ -91,7 +91,7 @@ export async function POST(
     );
     const defaultExpAcctId = defExpRows.rows[0]?.id ?? null;
 
-    // GRNI account (for PO-linked bills)
+    // GRNI account (for PO-linked bills with GR)
     const grniRows = await client.query(
       `SELECT id FROM accounts
         WHERE company_id = $1
@@ -101,6 +101,18 @@ export async function POST(
       [bill.company_id],
     );
     const grniAccountId = grniRows.rows[0]?.id ?? null;
+
+    // Advances to Supplier account (for PO-linked bills without GR)
+    const advRows = await client.query(
+      `SELECT id FROM accounts
+        WHERE company_id = $1
+          AND (name ILIKE '%advance%supplier%' OR name ILIKE '%supplier%advance%'
+               OR name ILIKE '%advances to supplier%')
+          AND is_active = true
+        ORDER BY code LIMIT 1`,
+      [bill.company_id],
+    );
+    const advancesAccountId = advRows.rows[0]?.id ?? null;
 
     const vatAmount  = Number(bill.vat_amount);
     const subtotal   = Number(bill.subtotal);
@@ -147,15 +159,34 @@ export async function POST(
 
     let lineNo = 1;
 
-    if (bill.po_id && grniAccountId) {
-      // PO-linked bill: DR GRNI (clear the receipt accrual)
-      await client.query(
-        `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
-         VALUES ($1,$2,$3,$4,$5,0,'PHP',1,$5,0)`,
-        [je.id, lineNo++, grniAccountId, `Clear GRNI — ${bill.internal_no}`, subtotal],
+    if (bill.po_id) {
+      // Check whether this PO has any goods receipts
+      const grCountRows = await client.query(
+        `SELECT COUNT(*)::int AS c FROM goods_receipts WHERE po_id = $1`,
+        [bill.po_id],
       );
+      const poHasGR = Number((grCountRows.rows[0] as Record<string, unknown>).c) > 0;
+
+      if (poHasGR && grniAccountId) {
+        // PO has GR: DR GRNI (clear the receipt accrual)
+        await client.query(
+          `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
+           VALUES ($1,$2,$3,$4,$5,0,'PHP',1,$5,0)`,
+          [je.id, lineNo++, grniAccountId, `Clear GRNI — ${bill.internal_no}`, subtotal],
+        );
+      } else {
+        // PO has no GR: DR Advances to Supplier (prepayment / advance billing)
+        const advAcctId = advancesAccountId ?? defaultExpAcctId;
+        if (advAcctId) {
+          await client.query(
+            `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
+             VALUES ($1,$2,$3,$4,$5,0,'PHP',1,$5,0)`,
+            [je.id, lineNo++, advAcctId, `Advance to Supplier — ${bill.internal_no}`, subtotal],
+          );
+        }
+      }
     } else {
-      // Non-PO bill (or no GRNI account): DR Expense per line
+      // Non-PO bill: DR Expense per line
       for (const l of lineRows.rows as Array<Record<string, unknown>>) {
         const acctId = (l.eff_expense_acct as string | null) ?? defaultExpAcctId;
         if (!acctId) continue;
