@@ -40,15 +40,38 @@ export async function GET(
   }
 
   const headers = await query(
-    `SELECT so.*, c.name AS customer_name, c.code AS customer_code, c.credit_limit,
-            c.payment_terms_days AS customer_terms, c.address AS customer_address
-       FROM sales_orders so JOIN customers c ON c.id = so.customer_id WHERE so.id = $1 LIMIT 1`,
+    `SELECT so.*,
+            c.name AS customer_name, c.code AS customer_code, c.credit_limit,
+            c.payment_terms_days AS customer_terms, c.address AS customer_address,
+            br.code AS branch_code, br.name AS branch_name,
+            fb.code AS building_code, fb.name AS building_name,
+            cc.code AS cost_center_code, cc.name AS cost_center_name,
+            gr.code AS grow_ref_code, gr.name AS grow_ref_name
+       FROM sales_orders so
+       JOIN customers c ON c.id = so.customer_id
+       LEFT JOIN branches br ON br.id = so.branch_id
+       LEFT JOIN farm_buildings fb ON fb.id = so.building_id
+       LEFT JOIN cost_centers cc ON cc.id = so.cost_center_id
+       LEFT JOIN grow_references gr ON gr.id = so.grow_reference_id
+      WHERE so.id = $1 LIMIT 1`,
     [params.id],
   );
   if (!headers[0]) return err(`Sales order ${params.id} not found`, 404);
 
   const lines = await query(
-    `SELECT sol.*, i.sku AS item_sku, i.name AS item_name, i.uom AS item_uom FROM sales_order_lines sol LEFT JOIN items i ON i.id = sol.item_id WHERE sol.order_id = $1 ORDER BY sol.line_no`,
+    `SELECT sol.*,
+            i.sku AS item_sku, i.name AS item_name, i.uom AS item_uom,
+            br.code AS branch_code,
+            fb.code AS building_code,
+            cc.code AS cost_center_code,
+            gr.code AS grow_ref_code
+       FROM sales_order_lines sol
+       LEFT JOIN items i ON i.id = sol.item_id
+       LEFT JOIN branches br ON br.id = sol.branch_id
+       LEFT JOIN farm_buildings fb ON fb.id = sol.building_id
+       LEFT JOIN cost_centers cc ON cc.id = sol.cost_center_id
+       LEFT JOIN grow_references gr ON gr.id = sol.grow_reference_id
+      WHERE sol.order_id = $1 ORDER BY sol.line_no`,
     [params.id],
   );
 

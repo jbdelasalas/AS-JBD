@@ -156,13 +156,16 @@ export async function POST(request: NextRequest) {
     for (const l of mappedLines) {
       const itemRow = items.find((i) => i.id === l.item_id);
       await client.query(
-        `INSERT INTO sales_order_lines (order_id, line_no, item_id, description, quantity, qty_delivered, qty_reserved, unit_price, discount_pct, vat_rate, line_subtotal, line_vat, line_total, grow_reference_id)
-         VALUES ($1,$2,$3,$4,$5,0,0,$6,$7,$8,$9,$10,$11,$12)`,
+        `INSERT INTO sales_order_lines (order_id, line_no, item_id, description, quantity, qty_delivered, qty_reserved, unit_price, discount_pct, vat_rate, line_subtotal, line_vat, line_total, branch_id, building_id, cost_center_id, grow_reference_id)
+         VALUES ($1,$2,$3,$4,$5,0,0,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
         [
           header.id, l.line_no, l.item_id,
           l.description ?? itemRow?.name ?? '',
           l.quantity, l.unit_price, l.disc, l.vatRate,
           l.subtotal.toFixed(2), l.vat.toFixed(2), l.total.toFixed(2),
+          (l as Record<string,unknown>).branch_id ?? null,
+          (l as Record<string,unknown>).building_id ?? null,
+          (l as Record<string,unknown>).cost_center_id ?? null,
           (l as Record<string,unknown>).grow_reference_id ?? null,
         ],
       );

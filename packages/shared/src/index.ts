@@ -175,12 +175,23 @@ export interface SalesOrderLine {
   line_subtotal: number;
   line_vat: number;
   line_total: number;
+  branch_id?: string | null;
+  building_id?: string | null;
+  cost_center_id?: string | null;
+  grow_reference_id?: string | null;
+  branch_code?: string | null;
+  building_code?: string | null;
+  cost_center_code?: string | null;
+  grow_ref_code?: string | null;
 }
 
 export interface SalesOrder {
   id: string;
   company_id: string;
   branch_id: string | null;
+  building_id: string | null;
+  cost_center_id: string | null;
+  grow_reference_id: string | null;
   order_no: string;
   customer_id: string;
   customer_name?: string;
@@ -205,6 +216,14 @@ export interface SalesOrder {
   created_by: string;
   created_at: string;
   updated_at: string;
+  branch_code?: string | null;
+  branch_name?: string | null;
+  building_code?: string | null;
+  building_name?: string | null;
+  cost_center_code?: string | null;
+  cost_center_name?: string | null;
+  grow_ref_code?: string | null;
+  grow_ref_name?: string | null;
   lines?: SalesOrderLine[];
 }
 

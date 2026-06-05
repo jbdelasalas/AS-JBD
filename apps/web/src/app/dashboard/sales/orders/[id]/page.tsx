@@ -140,6 +140,14 @@ export default function SalesOrderDetailPage() {
               <Field label="Notes" value={order.notes} />
             </div>
           )}
+          {(order.branch_code || order.building_code || order.cost_center_code || order.grow_ref_code) && (
+            <>
+              {order.branch_code && <Field label="Location" value={`${order.branch_code}${order.branch_name ? ` — ${order.branch_name}` : ''}`} />}
+              {order.building_code && <Field label="Building" value={`${order.building_code}${order.building_name ? ` — ${order.building_name}` : ''}`} />}
+              {order.cost_center_code && <Field label="Cost Center" value={`${order.cost_center_code}${order.cost_center_name ? ` — ${order.cost_center_name}` : ''}`} />}
+              {order.grow_ref_code && <Field label="Grow Reference" value={`${order.grow_ref_code}${order.grow_ref_name ? ` — ${order.grow_ref_name}` : ''}`} />}
+            </>
+          )}
           {order.approval_notes && (
             <div className="col-span-4">
               <Field label="Approval Notes" value={order.approval_notes} />
@@ -172,6 +180,10 @@ export default function SalesOrderDetailPage() {
                 <th className="px-3 py-2 text-right font-medium w-12">VAT%</th>
                 <th className="px-3 py-2 text-right font-medium w-28">Unit Price</th>
                 <th className="px-3 py-2 text-right font-medium w-28">Total</th>
+                <th className="px-3 py-2 text-left font-medium w-20">Location</th>
+                <th className="px-3 py-2 text-left font-medium w-20">Building</th>
+                <th className="px-3 py-2 text-left font-medium w-24">Cost Center</th>
+                <th className="px-3 py-2 text-left font-medium w-20">Grow</th>
               </tr>
             </thead>
             <tbody>
@@ -194,6 +206,10 @@ export default function SalesOrderDetailPage() {
                   <td className="px-3 py-2 text-right dark:text-slate-300">{l.vat_rate}%</td>
                   <td className="px-3 py-2 text-right font-mono dark:text-slate-300">{formatPHP(l.unit_price)}</td>
                   <td className="px-3 py-2 text-right font-mono font-semibold dark:text-slate-300">{formatPHP(l.line_total)}</td>
+                  <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{l.branch_code ?? '—'}</td>
+                  <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{l.building_code ?? '—'}</td>
+                  <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{l.cost_center_code ?? '—'}</td>
+                  <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{l.grow_ref_code ?? '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -201,14 +217,17 @@ export default function SalesOrderDetailPage() {
               <tr className="bg-slate-50 dark:bg-slate-800">
                 <td colSpan={9} className="px-3 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">Subtotal</td>
                 <td className="px-3 py-1.5 text-right font-mono text-xs dark:text-slate-300">{formatPHP(order.subtotal)}</td>
+                <td colSpan={4} />
               </tr>
               <tr className="bg-slate-50 dark:bg-slate-800">
                 <td colSpan={9} className="px-3 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">VAT</td>
                 <td className="px-3 py-1.5 text-right font-mono text-xs dark:text-slate-300">{formatPHP(order.vat_amount)}</td>
+                <td colSpan={4} />
               </tr>
               <tr className="border-t border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
                 <td colSpan={9} className="px-3 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">Total</td>
                 <td className="px-3 py-2 text-right font-mono text-sm font-bold text-slate-900 dark:text-slate-100">{formatPHP(order.total)}</td>
+                <td colSpan={4} />
               </tr>
             </tfoot>
           </table>
