@@ -185,7 +185,8 @@ export async function POST(request: NextRequest) {
       const advRows = await client.query(
         `SELECT id FROM accounts
           WHERE company_id = $1
-            AND (name ILIKE '%advances to supplier%'
+            AND (code = '11021'
+                 OR name ILIKE '%advances to supplier%'
                  OR (name ILIKE '%advance%' AND name ILIKE '%supplier%'))
             AND is_active = true
           ORDER BY code LIMIT 1`,
@@ -193,9 +194,9 @@ export async function POST(request: NextRequest) {
       );
       const advancesAccountId: string | null = advRows.rows[0]?.id ?? null;
 
-      // If PO already has approved/partial bills → credit Advances to Suppliers to close the advance
+      // If PO already has any bill → credit Advances to Suppliers to close the advance
       const billCountRows = await client.query(
-        `SELECT COUNT(*)::int AS c FROM bills WHERE po_id = $1 AND status IN ('approved','partial','pending_approval')`,
+        `SELECT COUNT(*)::int AS c FROM bills WHERE po_id = $1 AND status IN ('draft','approved','partial','pending_approval')`,
         [poId],
       );
       const poHasBill = Number((billCountRows.rows[0] as Record<string, unknown>).c) > 0;
