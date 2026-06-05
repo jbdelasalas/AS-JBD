@@ -95,8 +95,10 @@ export async function POST(request: NextRequest) {
 
     const headerRows = await client.query(
       `INSERT INTO goods_receipts
-         (company_id, grn_no, po_id, warehouse_id, receipt_date, delivery_no, notes, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'posted',$8)
+         (company_id, grn_no, po_id, warehouse_id, receipt_date, delivery_no, notes,
+          branch_id, building_id, cost_center_id, grow_reference_id,
+          status, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'posted',$12)
        RETURNING *`,
       [
         companyId, grnNo, poId,
@@ -104,6 +106,10 @@ export async function POST(request: NextRequest) {
         dto.receipt_date,
         (dto.delivery_no as string) || null,
         (dto.notes as string) || null,
+        (dto.branch_id as string) || null,
+        (dto.building_id as string) || null,
+        (dto.cost_center_id as string) || null,
+        (dto.grow_reference_id as string) || null,
         auth.userId,
       ],
     );
