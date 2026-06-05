@@ -2,7 +2,11 @@ export const dynamic = 'force-dynamic';
 import { type NextRequest } from 'next/server';
 import { compare } from '@node-rs/bcrypt';
 import * as crypto from 'crypto';
-import { query } from '@/lib/db';
+import { getPool } from '@/lib/db';
+
+function query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T[]> {
+  return getPool(false).query(sql, params).then((r) => r.rows as T[]);
+}
 import { signAccess } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
 
@@ -40,7 +44,7 @@ async function getCompanies(userId: string, isSuperadmin: boolean) {
     `SELECT DISTINCT c.id, c.code, c.name
        FROM companies c
        LEFT JOIN user_roles ur ON ur.company_id = c.id
-      WHERE c.is_active
+      WHERE ($1 OR c.is_active)
         AND ($1 OR ur.user_id = $2)
       ORDER BY c.name`,
     [isSuperadmin, userId],
