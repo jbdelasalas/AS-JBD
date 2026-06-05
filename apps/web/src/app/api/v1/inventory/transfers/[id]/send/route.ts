@@ -13,6 +13,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const xfr = rows[0] as Record<string, unknown>;
   if (xfr.status !== 'draft') return err(`Cannot send a ${xfr.status} transfer`, 400);
 
+  const companyRows = await query<{ allow_negative_inventory: boolean }>(
+    `SELECT allow_negative_inventory FROM companies WHERE id = $1`, [xfr.company_id],
+  );
+  const allowNegative = companyRows[0]?.allow_negative_inventory ?? false;
+
   const lines = await query(
     `SELECT stl.*, sb.qty_on_hand FROM stock_transfer_lines stl
      LEFT JOIN stock_balances sb ON sb.item_id = stl.item_id AND sb.warehouse_id = $2
@@ -27,9 +32,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     for (const l of lines) {
       const qty = Number(l.qty);
       const available = Number(l.qty_on_hand ?? 0);
-      if (available < qty - 0.0001) {
+      if (!allowNegative && available < qty - 0.0001) {
         await client.query('ROLLBACK');
-        return err(`Insufficient stock for item ${l.item_id}: available ${available}, requested ${qty}`, 400);
+        return err(`Insufficient stock for item ${l.item_id}: available ${available}, requested ${qty}. Enable "Allow Negative Inventory" in Administration to permit this.`, 400);
       }
 
       const avgCost = await client.query(

@@ -30,10 +30,31 @@ export async function POST(
 
     if (dr.status !== 'draft') { await client.query('ROLLBACK'); return err(`DR is already ${dr.status}`, 409); }
 
-    const lines = await client.query(
-      `SELECT drl.item_id, drl.qty_delivered, drl.unit_cost, drl.so_line_id, i.name AS item_name FROM delivery_receipt_lines drl JOIN items i ON i.id = drl.item_id WHERE drl.dr_id = $1`,
-      [id],
+    const companyRows = await client.query(
+      `SELECT allow_negative_inventory FROM companies WHERE id = $1`, [dr.company_id],
     );
+    const allowNegative = companyRows.rows[0]?.allow_negative_inventory ?? false;
+
+    const lines = await client.query(
+      `SELECT drl.item_id, drl.qty_delivered, drl.unit_cost, drl.so_line_id, i.name AS item_name,
+              COALESCE(sb.qty_on_hand, 0) AS qty_on_hand
+         FROM delivery_receipt_lines drl
+         JOIN items i ON i.id = drl.item_id
+         LEFT JOIN stock_balances sb ON sb.item_id = drl.item_id AND sb.warehouse_id = $2
+        WHERE drl.dr_id = $1`,
+      [id, dr.warehouse_id],
+    );
+
+    if (!allowNegative) {
+      for (const line of lines.rows as Array<Record<string, unknown>>) {
+        const qty = Number(line.qty_delivered);
+        const available = Number(line.qty_on_hand ?? 0);
+        if (available - qty < -0.0001) {
+          await client.query('ROLLBACK');
+          return err(`Insufficient stock for "${line.item_name}": available ${available}, requested ${qty}. Enable "Allow Negative Inventory" in Administration to permit this.`, 400);
+        }
+      }
+    }
 
     for (const line of lines.rows as Array<Record<string, unknown>>) {
       const qty = Number(line.qty_delivered);

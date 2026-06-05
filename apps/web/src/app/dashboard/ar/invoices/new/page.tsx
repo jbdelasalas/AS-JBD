@@ -22,6 +22,9 @@ interface Line {
   discount_pct: number;
   vat_rate: number;
   uom: string;
+  branch_id: string;
+  building_id: string;
+  cost_center_id: string;
   grow_reference_id: string;
 }
 
@@ -46,9 +49,8 @@ function NewInvoiceForm() {
     notes: '',
   });
 
-  const [lines, setLines] = useState<Line[]>([
-    { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12, uom: '', grow_reference_id: '' },
-  ]);
+  const emptyLine = (): Line => ({ line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12, uom: '', branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '' });
+  const [lines, setLines] = useState<Line[]>([emptyLine()]);
   const [tags, setTags] = useState<TaggingValues>({ branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '' });
   const [drRef, setDrRef] = useState<string | null>(null);
   const [soRef, setSoRef] = useState<string | null>(null);
@@ -81,14 +83,17 @@ function NewInvoiceForm() {
           if (so.lines?.length) {
             setLines(so.lines.map(l => ({
               line_type: 'item' as const,
-              item_id:        l.item_id ?? '',
-              gl_account_id:  '',
-              description:    l.description,
-              quantity:       l.quantity,
-              unit_price:     l.unit_price,
-              discount_pct:   l.discount_pct,
-              vat_rate:       l.vat_rate,
-              uom:            l.item_uom ?? '',
+              item_id:           l.item_id ?? '',
+              gl_account_id:     '',
+              description:       l.description,
+              quantity:          l.quantity,
+              unit_price:        l.unit_price,
+              discount_pct:      l.discount_pct,
+              vat_rate:          l.vat_rate,
+              uom:               l.item_uom ?? '',
+              branch_id:         (l as Record<string,unknown>).branch_id as string ?? newTags.branch_id,
+              building_id:       (l as Record<string,unknown>).building_id as string ?? newTags.building_id,
+              cost_center_id:    (l as Record<string,unknown>).cost_center_id as string ?? newTags.cost_center_id,
               grow_reference_id: l.grow_reference_id ?? newTags.grow_reference_id,
             })));
           }
@@ -129,14 +134,17 @@ function NewInvoiceForm() {
           if (d.lines?.length) {
             setLines(d.lines.map(l => ({
               line_type: 'item' as const,
-              item_id: l.item_id,
-              gl_account_id: '',
-              description: l.description,
-              quantity: l.quantity,
-              unit_price: l.unit_price,
-              discount_pct: l.discount_pct,
-              vat_rate: l.vat_rate,
-              uom: l.uom,
+              item_id:           l.item_id,
+              gl_account_id:     '',
+              description:       l.description,
+              quantity:          l.quantity,
+              unit_price:        l.unit_price,
+              discount_pct:      l.discount_pct,
+              vat_rate:          l.vat_rate,
+              uom:               l.uom,
+              branch_id:         newTags.branch_id,
+              building_id:       newTags.building_id,
+              cost_center_id:    newTags.cost_center_id,
               grow_reference_id: l.grow_reference_id || newTags.grow_reference_id,
             })));
           }
@@ -148,11 +156,11 @@ function NewInvoiceForm() {
 
   function handleTagChange(field: keyof TaggingValues, val: string) {
     setTags(t => ({ ...t, [field]: val }));
-    if (field === 'grow_reference_id') setLines(prev => prev.map(l => ({ ...l, grow_reference_id: val })));
+    setLines(prev => prev.map(l => ({ ...l, [field]: val })));
   }
 
   function addLine() {
-    setLines((l) => [...l, { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12, uom: '', grow_reference_id: tags.grow_reference_id }]);
+    setLines(l => [...l, { ...emptyLine(), branch_id: tags.branch_id, building_id: tags.building_id, cost_center_id: tags.cost_center_id, grow_reference_id: tags.grow_reference_id }]);
   }
 
   function updateLine(idx: number, field: keyof Line, val: string | number) {
@@ -292,7 +300,10 @@ function NewInvoiceForm() {
                 <th className="px-2 py-1.5 text-right font-medium w-14">Disc %</th>
                 <th className="px-2 py-1.5 text-right font-medium w-14">VAT %</th>
                 <th className="px-2 py-1.5 text-right font-medium w-24">Total</th>
-                <th className="px-2 py-1.5 text-left font-medium w-28">Grow</th>
+                <th className="px-2 py-1.5 text-left font-medium w-24">Location</th>
+                <th className="px-2 py-1.5 text-left font-medium w-24">Building</th>
+                <th className="px-2 py-1.5 text-left font-medium w-24">Cost Center</th>
+                <th className="px-2 py-1.5 text-left font-medium w-24">Grow</th>
                 <th className="w-6" />
               </tr>
             </thead>
@@ -351,6 +362,24 @@ function NewInvoiceForm() {
                     {lineTotal(l).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                   </td>
                   <td className="px-2 py-1">
+                    <select value={l.branch_id} onChange={e => updateLine(idx, 'branch_id', e.target.value)} className="w-full rounded border border-slate-300 px-1 py-1 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                      <option value="">—</option>
+                      {tagData.branches.map(b => <option key={b.id} value={b.id}>{b.code}</option>)}
+                    </select>
+                  </td>
+                  <td className="px-2 py-1">
+                    <select value={l.building_id} onChange={e => updateLine(idx, 'building_id', e.target.value)} className="w-full rounded border border-slate-300 px-1 py-1 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                      <option value="">—</option>
+                      {tagData.buildings.map(b => <option key={b.id} value={b.id}>{b.code}</option>)}
+                    </select>
+                  </td>
+                  <td className="px-2 py-1">
+                    <select value={l.cost_center_id} onChange={e => updateLine(idx, 'cost_center_id', e.target.value)} className="w-full rounded border border-slate-300 px-1 py-1 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                      <option value="">—</option>
+                      {tagData.costCenters.map(c => <option key={c.id} value={c.id}>{c.code}</option>)}
+                    </select>
+                  </td>
+                  <td className="px-2 py-1">
                     <GrowSelect value={l.grow_reference_id} data={tagData} onChange={v => updateLine(idx, 'grow_reference_id', v)} />
                   </td>
                   <td className="px-1 py-1 text-center">
@@ -368,7 +397,7 @@ function NewInvoiceForm() {
                 <td className="px-2 py-2 text-right font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">
                   ₱{grandTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </td>
-                <td />
+                <td colSpan={4} />
               </tr>
             </tfoot>
           </table>

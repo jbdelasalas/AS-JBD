@@ -45,5 +45,19 @@ export async function POST(request: NextRequest) {
     results.push('ok: 036b advances_to_suppliers account');
   } catch (e) { results.push(`err: 036b advances_to_suppliers — ${(e as Error).message}`); }
 
+  // 037 — branch/building/cost_center on sales_order_lines and sales_invoice_lines
+  const lineTags037: [string, string][] = [
+    ['sales_order_lines.branch_id',       `ALTER TABLE sales_order_lines    ADD COLUMN IF NOT EXISTS branch_id       uuid REFERENCES branches(id)`],
+    ['sales_order_lines.building_id',     `ALTER TABLE sales_order_lines    ADD COLUMN IF NOT EXISTS building_id     uuid REFERENCES farm_buildings(id)`],
+    ['sales_order_lines.cost_center_id',  `ALTER TABLE sales_order_lines    ADD COLUMN IF NOT EXISTS cost_center_id  uuid REFERENCES cost_centers(id)`],
+    ['sales_invoice_lines.branch_id',     `ALTER TABLE sales_invoice_lines  ADD COLUMN IF NOT EXISTS branch_id       uuid REFERENCES branches(id)`],
+    ['sales_invoice_lines.building_id',   `ALTER TABLE sales_invoice_lines  ADD COLUMN IF NOT EXISTS building_id     uuid REFERENCES farm_buildings(id)`],
+    ['sales_invoice_lines.cost_center_id',`ALTER TABLE sales_invoice_lines  ADD COLUMN IF NOT EXISTS cost_center_id  uuid REFERENCES cost_centers(id)`],
+  ];
+  for (const [label, sql] of lineTags037) {
+    try { await query(sql); results.push(`ok: 037 ${label}`); }
+    catch (e) { results.push(`err: 037 ${label} — ${(e as Error).message}`); }
+  }
+
   return ok({ results });
 }

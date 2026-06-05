@@ -45,11 +45,19 @@ export async function GET(
     headers = await query(
       `SELECT si.*, c.name AS customer_name, c.code AS customer_code,
               c.address AS customer_address, c.payment_terms_days AS customer_terms,
-              so.order_no, dr.dr_no
+              so.order_no, dr.dr_no,
+              br.code AS branch_code, br.name AS branch_name,
+              fb.code AS building_code, fb.name AS building_name,
+              cc.code AS cost_center_code, cc.name AS cost_center_name,
+              gr.code AS grow_ref_code, gr.name AS grow_ref_name
          FROM sales_invoices si
          JOIN customers c ON c.id = si.customer_id
          LEFT JOIN sales_orders so ON so.id = si.so_id
          LEFT JOIN delivery_receipts dr ON dr.id = si.dr_id
+         LEFT JOIN branches br ON br.id = si.branch_id
+         LEFT JOIN farm_buildings fb ON fb.id = si.building_id
+         LEFT JOIN cost_centers cc ON cc.id = si.cost_center_id
+         LEFT JOIN grow_references gr ON gr.id = si.grow_reference_id
         WHERE si.id = $1 LIMIT 1`,
       [params.id],
     ) as Record<string, unknown>[];
@@ -70,9 +78,15 @@ export async function GET(
 
   try {
     lines = await query(
-      `SELECT sil.*, i.sku AS item_sku, i.name AS item_name, i.uom AS item_uom
+      `SELECT sil.*, i.sku AS item_sku, i.name AS item_name, i.uom AS item_uom,
+              br.code AS branch_code, fb.code AS building_code,
+              cc.code AS cost_center_code, gr.code AS grow_ref_code
          FROM sales_invoice_lines sil
          LEFT JOIN items i ON i.id = sil.item_id
+         LEFT JOIN branches br ON br.id = sil.branch_id
+         LEFT JOIN farm_buildings fb ON fb.id = sil.building_id
+         LEFT JOIN cost_centers cc ON cc.id = sil.cost_center_id
+         LEFT JOIN grow_references gr ON gr.id = sil.grow_reference_id
         WHERE sil.invoice_id = $1
         ORDER BY sil.line_no`,
       [params.id],
@@ -150,12 +164,16 @@ export async function PATCH(
       await client.query(
         `INSERT INTO sales_invoice_lines
            (invoice_id, line_no, item_id, description, quantity, unit_price,
-            discount_pct, vat_rate, line_subtotal, line_vat, line_total, grow_reference_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+            discount_pct, vat_rate, line_subtotal, line_vat, line_total,
+            branch_id, building_id, cost_center_id, grow_reference_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
         [
           params.id, l.line_no, l.item_id ?? null, l.description,
           l.quantity, l.unit_price, l.disc, l.vatRate,
           l.subtotal.toFixed(2), l.vat.toFixed(2), l.total.toFixed(2),
+          (l as Record<string, unknown>).branch_id ?? null,
+          (l as Record<string, unknown>).building_id ?? null,
+          (l as Record<string, unknown>).cost_center_id ?? null,
           (l as Record<string, unknown>).grow_reference_id ?? null,
         ],
       );

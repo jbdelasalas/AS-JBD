@@ -36,6 +36,9 @@ interface EditLine {
   discount_pct: number;
   vat_rate: number;
   uom: string;
+  branch_id: string;
+  building_id: string;
+  cost_center_id: string;
   grow_reference_id: string;
 }
 
@@ -71,18 +74,24 @@ function DraftEditForm({ inv, onSaved, onPost }: { inv: SalesInvoice; onSaved: (
     grow_reference_id: (invAny.grow_reference_id as string) ?? '',
   });
   const [lines, setLines] = useState<EditLine[]>(
-    (inv.lines ?? []).map(l => ({
-      line_type: 'item' as const,
-      item_id:        (l as unknown as Record<string,unknown>).item_id as string ?? '',
-      gl_account_id:  '',
-      description:    l.description,
-      quantity:       l.quantity,
-      unit_price:     l.unit_price,
-      discount_pct:   l.discount_pct ?? 0,
-      vat_rate:       l.vat_rate,
-      uom:            (l as unknown as Record<string,unknown>).item_uom as string ?? '',
-      grow_reference_id: (l as unknown as Record<string,unknown>).grow_reference_id as string ?? '',
-    }))
+    (inv.lines ?? []).map(l => {
+      const la = l as unknown as Record<string,unknown>;
+      return {
+        line_type: 'item' as const,
+        item_id:          la.item_id as string ?? '',
+        gl_account_id:    '',
+        description:      l.description,
+        quantity:         l.quantity,
+        unit_price:       l.unit_price,
+        discount_pct:     l.discount_pct ?? 0,
+        vat_rate:         l.vat_rate,
+        uom:              la.item_uom as string ?? '',
+        branch_id:        la.branch_id as string ?? '',
+        building_id:      la.building_id as string ?? '',
+        cost_center_id:   la.cost_center_id as string ?? '',
+        grow_reference_id:la.grow_reference_id as string ?? '',
+      };
+    })
   );
 
   useEffect(() => {
@@ -95,7 +104,7 @@ function DraftEditForm({ inv, onSaved, onPost }: { inv: SalesInvoice; onSaved: (
 
   function handleTagChange(field: keyof TaggingValues, val: string) {
     setTags(t => ({ ...t, [field]: val }));
-    if (field === 'grow_reference_id') setLines(prev => prev.map(l => ({ ...l, grow_reference_id: val })));
+    setLines(prev => prev.map(l => ({ ...l, [field]: val })));
   }
 
   function updateLine(idx: number, field: keyof EditLine, val: string | number) {
@@ -199,7 +208,7 @@ function DraftEditForm({ inv, onSaved, onPost }: { inv: SalesInvoice; onSaved: (
           <div className="mb-3 flex items-center justify-between">
             <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Line Items</div>
             <button type="button"
-              onClick={() => setLines(l => [...l, { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12, uom: '', grow_reference_id: tags.grow_reference_id }])}
+              onClick={() => setLines(l => [...l, { line_type: 'item', item_id: '', gl_account_id: '', description: '', quantity: 1, unit_price: 0, discount_pct: 0, vat_rate: 12, uom: '', branch_id: tags.branch_id, building_id: tags.building_id, cost_center_id: tags.cost_center_id, grow_reference_id: tags.grow_reference_id }])}
               className="text-xs text-brand-600 hover:underline">+ Add line</button>
           </div>
           <table className="min-w-full text-xs">
@@ -213,6 +222,9 @@ function DraftEditForm({ inv, onSaved, onPost }: { inv: SalesInvoice; onSaved: (
                 <th className="w-14 px-2 py-1.5 text-right font-medium">Disc %</th>
                 <th className="w-14 px-2 py-1.5 text-right font-medium">VAT %</th>
                 <th className="w-24 px-2 py-1.5 text-right font-medium">Total</th>
+                <th className="w-24 px-2 py-1.5 text-left font-medium">Location</th>
+                <th className="w-24 px-2 py-1.5 text-left font-medium">Building</th>
+                <th className="w-24 px-2 py-1.5 text-left font-medium">Cost Ctr</th>
                 <th className="w-28 px-2 py-1.5 text-left font-medium">Grow</th>
                 <th className="w-6" />
               </tr>
@@ -252,6 +264,27 @@ function DraftEditForm({ inv, onSaved, onPost }: { inv: SalesInvoice; onSaved: (
                     {lineTotal(l).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                   </td>
                   <td className="px-2 py-1">
+                    <select value={l.branch_id} onChange={e => updateLine(idx, 'branch_id', e.target.value)}
+                      className="w-full rounded border border-slate-300 px-1 py-1 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                      <option value="">—</option>
+                      {tagData.branches.map(b => <option key={b.id} value={b.id}>{b.code}</option>)}
+                    </select>
+                  </td>
+                  <td className="px-2 py-1">
+                    <select value={l.building_id} onChange={e => updateLine(idx, 'building_id', e.target.value)}
+                      className="w-full rounded border border-slate-300 px-1 py-1 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                      <option value="">—</option>
+                      {tagData.buildings.map(b => <option key={b.id} value={b.id}>{b.code}</option>)}
+                    </select>
+                  </td>
+                  <td className="px-2 py-1">
+                    <select value={l.cost_center_id} onChange={e => updateLine(idx, 'cost_center_id', e.target.value)}
+                      className="w-full rounded border border-slate-300 px-1 py-1 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                      <option value="">—</option>
+                      {tagData.costCenters.map(c => <option key={c.id} value={c.id}>{c.code}</option>)}
+                    </select>
+                  </td>
+                  <td className="px-2 py-1">
                     <GrowSelect value={l.grow_reference_id} data={tagData} onChange={v => updateLine(idx, 'grow_reference_id', v)} />
                   </td>
                   <td className="px-1 py-1 text-center">
@@ -265,7 +298,7 @@ function DraftEditForm({ inv, onSaved, onPost }: { inv: SalesInvoice; onSaved: (
             </tbody>
             <tfoot>
               <tr className="border-t border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
-                <td colSpan={8} className="px-2 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Grand Total (incl. VAT)</td>
+                <td colSpan={11} className="px-2 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Grand Total (incl. VAT)</td>
                 <td className="px-2 py-2 text-right font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">
                   ₱{grandTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </td>
@@ -344,6 +377,7 @@ export default function SalesInvoiceDetailPage() {
   }
 
   const paidPct = inv.total > 0 ? Math.min((inv.amount_paid / inv.total) * 100, 100) : 0;
+  const invAny = inv as unknown as Record<string, unknown>;
 
   return (
     <div>
@@ -410,6 +444,15 @@ export default function SalesInvoiceDetailPage() {
         ))}
       </div>
 
+      {(invAny.branch_code || invAny.building_code || invAny.cost_center_code || invAny.grow_ref_code) && (
+        <div className="mb-3 flex flex-wrap gap-2 text-xs">
+          {invAny.branch_code && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Location: {invAny.branch_code as string}</span>}
+          {invAny.building_code && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Building: {invAny.building_code as string}</span>}
+          {invAny.cost_center_code && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Cost Center: {invAny.cost_center_code as string}</span>}
+          {invAny.grow_ref_code && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Grow: {invAny.grow_ref_code as string}</span>}
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white">
         <div className="border-b border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300">Invoice Lines</div>
         <table className="min-w-full text-sm">
@@ -425,33 +468,44 @@ export default function SalesInvoiceDetailPage() {
               <th className="px-3 py-2 text-right font-medium">Subtotal</th>
               <th className="px-3 py-2 text-right font-medium">VAT</th>
               <th className="px-3 py-2 text-right font-medium">Total</th>
+              <th className="px-3 py-2 text-left font-medium">Location</th>
+              <th className="px-3 py-2 text-left font-medium">Building</th>
+              <th className="px-3 py-2 text-left font-medium">Cost Ctr</th>
+              <th className="px-3 py-2 text-left font-medium">Grow</th>
             </tr>
           </thead>
           <tbody>
-            {inv.lines?.map(l => (
-              <tr key={l.id} className="border-t border-slate-100 dark:border-slate-700">
-                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.line_no}</td>
-                <td className="px-3 py-2">{l.description}</td>
-                <td className="px-3 py-2 text-right font-mono text-xs">{l.quantity}</td>
-                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.item_uom ?? '—'}</td>
-                <td className="px-3 py-2 text-right font-mono text-xs">{formatPHP(l.unit_price)}</td>
-                <td className="px-3 py-2 text-right text-xs">{l.discount_pct}%</td>
-                <td className="px-3 py-2 text-right text-xs">{l.vat_rate}%</td>
-                <td className="px-3 py-2 text-right font-mono text-xs">{formatPHP(l.line_subtotal)}</td>
-                <td className="px-3 py-2 text-right font-mono text-xs">{formatPHP(l.line_vat)}</td>
-                <td className="px-3 py-2 text-right font-mono text-xs font-semibold">{formatPHP(l.line_total)}</td>
-              </tr>
-            ))}
+            {inv.lines?.map(l => {
+              const la = l as unknown as Record<string, unknown>;
+              return (
+                <tr key={l.id} className="border-t border-slate-100 dark:border-slate-700">
+                  <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.line_no}</td>
+                  <td className="px-3 py-2">{l.description}</td>
+                  <td className="px-3 py-2 text-right font-mono text-xs">{l.quantity}</td>
+                  <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.item_uom ?? '—'}</td>
+                  <td className="px-3 py-2 text-right font-mono text-xs">{formatPHP(l.unit_price)}</td>
+                  <td className="px-3 py-2 text-right text-xs">{l.discount_pct}%</td>
+                  <td className="px-3 py-2 text-right text-xs">{l.vat_rate}%</td>
+                  <td className="px-3 py-2 text-right font-mono text-xs">{formatPHP(l.line_subtotal)}</td>
+                  <td className="px-3 py-2 text-right font-mono text-xs">{formatPHP(l.line_vat)}</td>
+                  <td className="px-3 py-2 text-right font-mono text-xs font-semibold">{formatPHP(l.line_total)}</td>
+                  <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{(la.branch_code as string) ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{(la.building_code as string) ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{(la.cost_center_code as string) ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{(la.grow_ref_code as string) ?? '—'}</td>
+                </tr>
+              );
+            })}
           </tbody>
           <tfoot>
             {[{ label: 'Subtotal', value: inv.subtotal }, { label: 'VAT (12%)', value: inv.vat_amount }].map(row => (
               <tr key={row.label} className="bg-slate-50 dark:bg-slate-800">
-                <td colSpan={9} className="px-3 py-1.5 text-right text-xs text-slate-600 dark:text-slate-400">{row.label}</td>
+                <td colSpan={13} className="px-3 py-1.5 text-right text-xs text-slate-600 dark:text-slate-400">{row.label}</td>
                 <td className="px-3 py-1.5 text-right font-mono text-xs">{formatPHP(row.value)}</td>
               </tr>
             ))}
             <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-              <td colSpan={9} className="px-3 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">Total</td>
+              <td colSpan={13} className="px-3 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">Total</td>
               <td className="px-3 py-2 text-right font-mono text-sm font-bold text-slate-900 dark:text-slate-100">{formatPHP(inv.total)}</td>
             </tr>
           </tfoot>

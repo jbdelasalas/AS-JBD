@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
     ['books_start_date', 'date'],
     ['business_style', 'text'],
     ['registration_date', 'date'],
+    ['allow_negative_inventory', 'boolean NOT NULL DEFAULT false'],
   ];
   for (const [col, type] of companyCols010) {
     try {
@@ -2634,6 +2635,20 @@ export async function POST(request: NextRequest) {
     );
     results.push('036 advances_to_suppliers account: ok');
   } catch (e) { results.push(`036 advances_to_suppliers account FAILED: ${(e as Error).message}`); }
+
+  // 037 — branch/building/cost_center on sales_order_lines and sales_invoice_lines
+  const lineTags037: [string, string][] = [
+    ['sales_order_lines.branch_id',       `ALTER TABLE sales_order_lines    ADD COLUMN IF NOT EXISTS branch_id       uuid REFERENCES branches(id)`],
+    ['sales_order_lines.building_id',     `ALTER TABLE sales_order_lines    ADD COLUMN IF NOT EXISTS building_id     uuid REFERENCES farm_buildings(id)`],
+    ['sales_order_lines.cost_center_id',  `ALTER TABLE sales_order_lines    ADD COLUMN IF NOT EXISTS cost_center_id  uuid REFERENCES cost_centers(id)`],
+    ['sales_invoice_lines.branch_id',     `ALTER TABLE sales_invoice_lines  ADD COLUMN IF NOT EXISTS branch_id       uuid REFERENCES branches(id)`],
+    ['sales_invoice_lines.building_id',   `ALTER TABLE sales_invoice_lines  ADD COLUMN IF NOT EXISTS building_id     uuid REFERENCES farm_buildings(id)`],
+    ['sales_invoice_lines.cost_center_id',`ALTER TABLE sales_invoice_lines  ADD COLUMN IF NOT EXISTS cost_center_id  uuid REFERENCES cost_centers(id)`],
+  ];
+  for (const [label, sql] of lineTags037) {
+    try { await query(sql); results.push(`037 ${label}: ok`); }
+    catch (e) { results.push(`037 ${label}: ${(e as Error).message}`); }
+  }
 
   return ok({ results });
 }

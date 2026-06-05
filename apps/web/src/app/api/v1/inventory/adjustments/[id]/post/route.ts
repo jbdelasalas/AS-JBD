@@ -15,6 +15,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const adj = adjRows[0] as Record<string, unknown>;
   if (adj.status !== 'draft') return err(`Cannot post a ${adj.status} adjustment`, 400);
 
+  const companyRows = await query<{ allow_negative_inventory: boolean }>(
+    `SELECT allow_negative_inventory FROM companies WHERE id = $1`, [adj.company_id],
+  );
+  const allowNegative = companyRows[0]?.allow_negative_inventory ?? false;
+
   const lines = await query(
     `SELECT sal.*, sb.qty_on_hand, sb.avg_cost
        FROM stock_adjustment_lines sal
@@ -33,9 +38,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       const unitCost = Number(l.unit_cost);
       const currentQty = Number(l.qty_on_hand ?? 0);
       const newQty = currentQty + qtyChange;
-      if (newQty < -0.0001) {
+      if (!allowNegative && newQty < -0.0001) {
         await client.query('ROLLBACK');
-        return err(`Item ${l.item_id}: stock would go negative (current: ${currentQty}, change: ${qtyChange})`, 400);
+        return err(`Item ${l.item_id}: stock would go negative (current: ${currentQty}, change: ${qtyChange}). Enable "Allow Negative Inventory" in Administration to permit this.`, 400);
       }
 
       // Upsert stock_balances
