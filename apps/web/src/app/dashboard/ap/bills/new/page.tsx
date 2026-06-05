@@ -30,12 +30,16 @@ interface Line {
   ewt_code_id: string;
   ewt_rate: number;
   expense_account_id: string;
+  branch_id: string;
+  building_id: string;
+  cost_center_id: string;
   grow_reference_id: string;
 }
 
 const EMPTY_LINE: Line = {
   line_type: 'gl', item_id: '', description: '', quantity: 1, unit_price: 0,
-  vat_rate: 12, ewt_code_id: '', ewt_rate: 0, expense_account_id: '', grow_reference_id: '',
+  vat_rate: 12, ewt_code_id: '', ewt_rate: 0, expense_account_id: '',
+  branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '',
 };
 
 function NewBillForm() {
@@ -93,6 +97,9 @@ function NewBillForm() {
             quantity: l.quantity, unit_price: l.unit_price, vat_rate: l.vat_rate,
             ewt_code_id: '', ewt_rate: 0,
             expense_account_id: l.gl_account_id ?? '',
+            branch_id: poData.branch_id ?? '',
+            building_id: poData.building_id ?? '',
+            cost_center_id: poData.cost_center_id ?? '',
             grow_reference_id: poData.grow_reference_id ?? '',
           })));
         }
@@ -102,7 +109,7 @@ function NewBillForm() {
 
   function handleTagChange(field: keyof TaggingValues, val: string) {
     setTags(t => ({ ...t, [field]: val }));
-    if (field === 'grow_reference_id') setLines(prev => prev.map(l => ({ ...l, grow_reference_id: val })));
+    setLines(prev => prev.map(l => ({ ...l, [field]: val })));
   }
 
   // Header default EWT code → apply to ALL lines
@@ -128,7 +135,15 @@ function NewBillForm() {
 
   function addLine() {
     const ref = lines[0];
-    setLines(l => [...l, { ...EMPTY_LINE, ewt_code_id: ref?.ewt_code_id ?? '', ewt_rate: ref?.ewt_rate ?? 0, grow_reference_id: tags.grow_reference_id }]);
+    setLines(l => [...l, {
+      ...EMPTY_LINE,
+      ewt_code_id: ref?.ewt_code_id ?? '',
+      ewt_rate: ref?.ewt_rate ?? 0,
+      branch_id: tags.branch_id,
+      building_id: tags.building_id,
+      cost_center_id: tags.cost_center_id,
+      grow_reference_id: tags.grow_reference_id,
+    }]);
   }
 
   function updateLine(idx: number, field: keyof Line, val: string | number) {
@@ -271,6 +286,9 @@ function NewBillForm() {
                   <th className="px-2 py-1.5 text-right font-medium w-14 text-amber-700 dark:text-amber-400">EWT %</th>
                   <th className="px-2 py-1.5 text-right font-medium w-24 text-amber-700 dark:text-amber-400">EWT Amt</th>
                   <th className="px-2 py-1.5 text-right font-medium w-24">Total</th>
+                  <th className="px-2 py-1.5 text-left font-medium w-20">Location</th>
+                  <th className="px-2 py-1.5 text-left font-medium w-20">Building</th>
+                  <th className="px-2 py-1.5 text-left font-medium w-24">Cost Center</th>
                   <th className="px-2 py-1.5 text-left font-medium w-28">Grow</th>
                   <th className="w-6" />
                 </tr>
@@ -337,6 +355,24 @@ function NewBillForm() {
                         {lineTotal(l).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="px-2 py-1">
+                        <select value={l.branch_id} onChange={e => updateLine(idx, 'branch_id', e.target.value)} className={cellSel}>
+                          <option value="">—</option>
+                          {tagData.branches.map(b => <option key={b.id} value={b.id}>{b.code}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-2 py-1">
+                        <select value={l.building_id} onChange={e => updateLine(idx, 'building_id', e.target.value)} className={cellSel}>
+                          <option value="">—</option>
+                          {tagData.buildings.map(b => <option key={b.id} value={b.id}>{b.code}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-2 py-1">
+                        <select value={l.cost_center_id} onChange={e => updateLine(idx, 'cost_center_id', e.target.value)} className={cellSel}>
+                          <option value="">—</option>
+                          {tagData.costCenters.map(c => <option key={c.id} value={c.id}>{c.code}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-2 py-1">
                         <GrowSelect value={l.grow_reference_id} data={tagData} onChange={v => updateLine(idx, 'grow_reference_id', v)} />
                       </td>
                       <td className="px-1 py-1 text-center">
@@ -353,17 +389,17 @@ function NewBillForm() {
                 <tr className="bg-slate-50 dark:bg-slate-800">
                   <td colSpan={9} className="px-2 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">Subtotal</td>
                   <td className="px-2 py-1.5 text-right font-mono text-xs text-slate-700 dark:text-slate-300">{totalSubtotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
-                  <td colSpan={2} />
+                  <td colSpan={5} />
                 </tr>
                 <tr className="bg-slate-50 dark:bg-slate-800">
                   <td colSpan={9} className="px-2 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">VAT</td>
                   <td className="px-2 py-1.5 text-right font-mono text-xs text-slate-700 dark:text-slate-300">{totalVat.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
-                  <td colSpan={2} />
+                  <td colSpan={5} />
                 </tr>
                 <tr className="bg-slate-50 dark:bg-slate-800">
                   <td colSpan={9} className="px-2 py-1.5 text-right text-xs font-medium text-slate-600 dark:text-slate-300">Gross Total (incl. VAT)</td>
                   <td className="px-2 py-1.5 text-right font-mono text-xs font-medium text-slate-700 dark:text-slate-300">{grandTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
-                  <td colSpan={2} />
+                  <td colSpan={5} />
                 </tr>
                 {totalEwt > 0 && (
                   <tr className="bg-slate-50 dark:bg-slate-800">
@@ -373,7 +409,7 @@ function NewBillForm() {
                     <td className="px-2 py-1.5 text-right font-mono text-xs text-amber-700 dark:text-amber-400">
                       ({totalEwt.toLocaleString('en-PH', { minimumFractionDigits: 2 })})
                     </td>
-                    <td colSpan={2} />
+                    <td colSpan={5} />
                   </tr>
                 )}
                 <tr className="border-t border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
@@ -381,7 +417,7 @@ function NewBillForm() {
                   <td className="px-2 py-2 text-right font-mono text-sm font-bold text-slate-900 dark:text-slate-100">
                     ₱{netPayable.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                   </td>
-                  <td colSpan={2} />
+                  <td colSpan={5} />
                 </tr>
               </tfoot>
             </table>

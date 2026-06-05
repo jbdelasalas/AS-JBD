@@ -140,6 +140,14 @@ export async function POST(request: NextRequest) {
   const hasLineEwtRate = existingCols.has('ewt_rate');
   const hasGrowRef     = existingCols.has('grow_reference_id');
 
+  // Check tagging columns specifically on bill_lines (added by migrate-031)
+  const blTagResult = await query(`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='bill_lines'
+      AND column_name IN ('branch_id','building_id','cost_center_id')
+  `);
+  const blTagCols = new Set((blTagResult as Array<Record<string,unknown>>).map(r => String(r.column_name)));
+
   const client = await getPool().connect();
   try {
     await client.query('BEGIN');
@@ -233,6 +241,9 @@ export async function POST(request: NextRequest) {
         lineCols.push('ewt_rate', 'ewt_amount');
         lineVals.push(l.ewtRate, l.ewtAmount.toFixed(2));
       }
+      if (blTagCols.has('branch_id')) { lineCols.push('branch_id'); lineVals.push((l as Record<string,unknown>).branch_id ?? null); }
+      if (blTagCols.has('building_id')) { lineCols.push('building_id'); lineVals.push((l as Record<string,unknown>).building_id ?? null); }
+      if (blTagCols.has('cost_center_id')) { lineCols.push('cost_center_id'); lineVals.push((l as Record<string,unknown>).cost_center_id ?? null); }
       if (hasGrowRef) { lineCols.push('grow_reference_id'); lineVals.push((l as Record<string,unknown>).grow_reference_id ?? null); }
       if (hasEwtCodeId) { lineCols.push('ewt_code_id'); lineVals.push(l.resolvedEwtCodeId); }
 

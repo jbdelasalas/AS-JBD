@@ -89,16 +89,38 @@ export async function GET(
   }
   if (!rows[0]) return err(`Bill ${params.id} not found`, 404);
 
-  const lines = await query(
-    `SELECT bl.*, a.name AS account_name, a.code AS account_code,
-            i.uom AS item_uom
-       FROM bill_lines bl
-       LEFT JOIN accounts a ON a.id = bl.expense_account_id
-       LEFT JOIN items i ON i.id = bl.item_id
-      WHERE bl.bill_id = $1
-      ORDER BY bl.line_no`,
-    [params.id],
-  );
+  let lines: unknown[];
+  try {
+    lines = await query(
+      `SELECT bl.*, a.name AS account_name, a.code AS account_code,
+              i.uom AS item_uom,
+              br.code AS branch_code,
+              fb.code AS building_code,
+              cc.code AS cost_center_code,
+              gr.code AS grow_ref_code
+         FROM bill_lines bl
+         LEFT JOIN accounts a ON a.id = bl.expense_account_id
+         LEFT JOIN items i ON i.id = bl.item_id
+         LEFT JOIN branches       br ON br.id = bl.branch_id
+         LEFT JOIN farm_buildings fb ON fb.id = bl.building_id
+         LEFT JOIN cost_centers   cc ON cc.id = bl.cost_center_id
+         LEFT JOIN grow_references gr ON gr.id = bl.grow_reference_id
+        WHERE bl.bill_id = $1
+        ORDER BY bl.line_no`,
+      [params.id],
+    );
+  } catch {
+    lines = await query(
+      `SELECT bl.*, a.name AS account_name, a.code AS account_code,
+              i.uom AS item_uom
+         FROM bill_lines bl
+         LEFT JOIN accounts a ON a.id = bl.expense_account_id
+         LEFT JOIN items i ON i.id = bl.item_id
+        WHERE bl.bill_id = $1
+        ORDER BY bl.line_no`,
+      [params.id],
+    );
+  }
 
   return ok({
     ...mapRow(rows[0] as Record<string, unknown>),

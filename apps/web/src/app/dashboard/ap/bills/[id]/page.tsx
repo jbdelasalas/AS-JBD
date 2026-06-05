@@ -32,6 +32,10 @@ interface BillLine {
   account_name: string | null;
   account_code: string | null;
   item_uom: string | null;
+  branch_code: string | null;
+  building_code: string | null;
+  cost_center_code: string | null;
+  grow_ref_code: string | null;
 }
 
 interface Bill {
@@ -247,6 +251,10 @@ export default function BillDetailPage() {
                 <th className="px-3 py-2 text-right font-medium w-24">VAT</th>
                 <th className="px-3 py-2 text-right font-medium w-24">EWT</th>
                 <th className="px-3 py-2 text-right font-medium w-28">Total</th>
+                <th className="px-3 py-2 text-left font-medium w-16">Location</th>
+                <th className="px-3 py-2 text-left font-medium w-16">Building</th>
+                <th className="px-3 py-2 text-left font-medium w-20">Cost Center</th>
+                <th className="px-3 py-2 text-left font-medium w-16">Grow</th>
               </tr>
             </thead>
             <tbody>
@@ -267,6 +275,10 @@ export default function BillDetailPage() {
                   <td className="px-3 py-2 text-right font-mono dark:text-slate-300">{formatPHP(l.line_vat)}</td>
                   <td className="px-3 py-2 text-right font-mono text-amber-700 dark:text-amber-400">{l.ewt_amount > 0 ? formatPHP(l.ewt_amount) : '—'}</td>
                   <td className="px-3 py-2 text-right font-mono font-semibold dark:text-slate-300">{formatPHP(l.line_total)}</td>
+                  <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.branch_code ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.building_code ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.cost_center_code ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.grow_ref_code ?? '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -274,17 +286,17 @@ export default function BillDetailPage() {
               <tr className="bg-slate-50 dark:bg-slate-800">
                 <td colSpan={8} className="px-3 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">Subtotal</td>
                 <td className="px-3 py-1.5 text-right font-mono text-xs dark:text-slate-300">{formatPHP(bill.subtotal)}</td>
-                <td colSpan={3} />
+                <td colSpan={7} />
               </tr>
               <tr className="bg-slate-50 dark:bg-slate-800">
                 <td colSpan={8} className="px-3 py-1.5 text-right text-xs text-slate-500 dark:text-slate-400">VAT</td>
                 <td colSpan={2} className="px-3 py-1.5 text-right font-mono text-xs dark:text-slate-300">{formatPHP(bill.vat_amount)}</td>
-                <td colSpan={2} />
+                <td colSpan={6} />
               </tr>
               <tr className="bg-slate-50 dark:bg-slate-800">
                 <td colSpan={8} className="px-3 py-1.5 text-right text-xs font-medium text-slate-600 dark:text-slate-300">Gross Total (incl. VAT)</td>
                 <td colSpan={2} className="px-3 py-1.5 text-right font-mono text-xs font-medium dark:text-slate-300">{formatPHP(bill.total)}</td>
-                <td colSpan={2} />
+                <td colSpan={6} />
               </tr>
               {bill.ewt_amount > 0 && (
                 <tr className="bg-slate-50 dark:bg-slate-800">
@@ -292,7 +304,7 @@ export default function BillDetailPage() {
                     Less: EWT Withheld{bill.ewt_code ? ` (${bill.ewt_code} · ${bill.ewt_code_rate != null ? Number(bill.ewt_code_rate) : ''}%)` : ''}
                   </td>
                   <td className="px-3 py-1.5 text-right font-mono text-xs text-amber-700 dark:text-amber-400">({formatPHP(bill.ewt_amount)})</td>
-                  <td />
+                  <td colSpan={5} />
                 </tr>
               )}
               <tr className="border-t border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
@@ -302,7 +314,7 @@ export default function BillDetailPage() {
                 <td className="px-3 py-2 text-right font-mono text-sm font-bold text-slate-900 dark:text-slate-100">
                   {formatPHP(bill.total - bill.ewt_amount)}
                 </td>
-                <td />
+                <td colSpan={5} />
               </tr>
             </tfoot>
           </table>
