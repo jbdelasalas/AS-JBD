@@ -40,10 +40,10 @@ export async function POST(req: NextRequest) {
     if (!company_id || !code || !name) return err('company_id, code, name required', 400);
 
     const [branch] = await query<{ id: string; code: string; name: string }>(
-      `INSERT INTO branches (company_id, code, name, address, created_by)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO branches (company_id, code, name, address)
+       VALUES ($1, $2, $3, $4)
        RETURNING id, code, name`,
-      [company_id, code, name, address ?? null, auth.userId]
+      [company_id, code, name, address ?? null]
     );
 
     // Auto-create a matching warehouse so Inventory Locations stays in sync

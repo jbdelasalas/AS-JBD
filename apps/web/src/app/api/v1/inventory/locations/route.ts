@@ -47,10 +47,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const [branch] = await query<{ id: string; code: string; name: string }>(
-      `INSERT INTO branches (company_id, code, name, address, created_by)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO branches (company_id, code, name, address)
+       VALUES ($1, $2, $3, $4)
        RETURNING id, code, name`,
-      [companyId, String(dto.code).toUpperCase(), dto.name, dto.address ?? null, auth.userId],
+      [companyId, String(dto.code).toUpperCase(), dto.name, dto.address ?? null],
     );
 
     // Auto-create matching warehouse
