@@ -2601,5 +2601,16 @@ export async function POST(request: NextRequest) {
     results.push('034 suppliers.bir_atc_code: ok');
   } catch (e) { results.push(`034 suppliers.bir_atc_code FAILED: ${(e as Error).message}`); }
 
+  // 035 — item document series (format: ITEM000001)
+  try {
+    await query(
+      `INSERT INTO document_series (company_id, doc_type, prefix, start_number, current_number)
+       SELECT c.id, 'item', 'ITEM', 1, 0
+       FROM companies c
+       WHERE NOT EXISTS (SELECT 1 FROM document_series ds WHERE ds.company_id = c.id AND ds.doc_type = 'item')`,
+    );
+    results.push('035 document_series item: ok');
+  } catch (e) { results.push(`035 document_series item FAILED: ${(e as Error).message}`); }
+
   return ok({ results });
 }

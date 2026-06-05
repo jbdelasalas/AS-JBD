@@ -41,6 +41,9 @@ export default function NewItemPage() {
     api.get<UomRow[]>(`/admin/uoms?company_id=${companyId}`).then(setUoms).catch(() => {});
     api.get<Account[]>(`/gl/accounts?company_id=${companyId}&active_only=true`).then(setAccounts).catch(() => {});
     api.get<Location[]>(`/inventory/locations?company_id=${companyId}`).then(setLocations).catch(() => {});
+    api.get<{ next_sku: string | null }>(`/inventory/items?company_id=${companyId}&next_sku=true`)
+      .then((r) => { if (r.next_sku) setForm((f) => ({ ...f, sku: r.next_sku! })); })
+      .catch(() => {});
   }, []);
 
   function set(field: string, val: unknown) {
@@ -98,9 +101,9 @@ export default function NewItemPage() {
           <div className="mb-4 text-sm font-medium text-slate-700 dark:text-slate-300">Item Details</div>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className={lbl}>SKU *</label>
-              <input required value={form.sku} onChange={(e) => set('sku', e.target.value.toUpperCase())}
-                placeholder="ITEM-001" className={inp} />
+              <label className={lbl}>SKU <span className="font-normal text-slate-400">(auto if blank)</span></label>
+              <input value={form.sku} onChange={(e) => set('sku', e.target.value.toUpperCase())}
+                placeholder="ITEM000001" className={inp} />
             </div>
             <div className="col-span-2">
               <label className={lbl}>Name *</label>

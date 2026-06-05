@@ -11,6 +11,16 @@ export async function GET(request: NextRequest) {
   const companyId = searchParams.get('company_id');
   if (!companyId) return err('company_id is required', 400);
 
+  if (searchParams.get('next_sku') === 'true') {
+    const series = await query<{ prefix: string; current_number: number }>(
+      `SELECT prefix, current_number FROM document_series WHERE company_id = $1 AND doc_type = 'item' AND is_active = true LIMIT 1`,
+      [companyId],
+    );
+    if (!series.length) return ok({ next_sku: null });
+    const { prefix, current_number } = series[0];
+    return ok({ next_sku: `${prefix}${String(current_number + 1).padStart(6, '0')}` });
+  }
+
   const limit = Math.min(parseInt(searchParams.get('limit') ?? '500'), 500);
   const search = searchParams.get('search') ?? '';
   const activeOnly = searchParams.get('active_only') !== 'false';
@@ -76,10 +86,22 @@ export async function POST(request: NextRequest) {
   try { dto = await request.json(); } catch { return err('Invalid request body', 400); }
 
   const companyId = dto.company_id as string;
-  if (!companyId || !dto.sku || !dto.name) return err('company_id, sku, and name are required', 400);
+  if (!companyId || !dto.name) return err('company_id and name are required', 400);
 
-  const dup = await query(`SELECT id FROM items WHERE company_id = $1 AND sku = $2 LIMIT 1`, [companyId, dto.sku]);
-  if (dup.length) return err(`SKU ${dto.sku} already exists`, 409);
+  let sku = (dto.sku as string | undefined)?.trim() || '';
+  if (!sku) {
+    const series = await query<{ prefix: string; current_number: number }>(
+      `UPDATE document_series SET current_number = current_number + 1, updated_at = now()
+        WHERE company_id = $1 AND doc_type = 'item' AND is_active = true
+        RETURNING prefix, current_number`,
+      [companyId],
+    );
+    if (!series.length) return err('No active item document series found. Run migrations first.', 400);
+    sku = `${series[0].prefix}${String(series[0].current_number).padStart(6, '0')}`;
+  } else {
+    const dup = await query(`SELECT id FROM items WHERE company_id = $1 AND sku = $2 LIMIT 1`, [companyId, sku]);
+    if (dup.length) return err(`SKU ${sku} already exists`, 409);
+  }
 
   const rows = await query(
     `INSERT INTO items
@@ -92,7 +114,7 @@ export async function POST(request: NextRequest) {
                inventory_account_id, cogs_account_id, revenue_account_id, purchase_variance_account_id,
                default_warehouse_id`,
     [
-      companyId, dto.sku, dto.name,
+      companyId, sku, dto.name,
       dto.uom ?? 'PCS',
       dto.item_type ?? 'stock',
       dto.costing_method ?? 'weighted_avg',

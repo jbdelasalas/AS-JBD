@@ -1,7 +1,11 @@
 export const dynamic = 'force-dynamic';
 import { type NextRequest } from 'next/server';
 import * as crypto from 'crypto';
-import { query } from '@/lib/db';
+import { getPool } from '@/lib/db';
+
+function query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T[]> {
+  return getPool(false).query(sql, params).then((r) => r.rows as T[]);
+}
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok } from '@/lib/api-response';
 

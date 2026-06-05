@@ -45,13 +45,13 @@ export async function POST(req: NextRequest) {
       `INSERT INTO companies (
          code, name, trade_name, tin, vat_status, rdo_code, business_style,
          registered_address, registration_date, books_start_date,
-         accounting_method, fiscal_year_start_month, created_by
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         accounting_method, fiscal_year_start_month
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING id, code, name`,
       [code, name, trade_name ?? null, tin ?? null, vat_status ?? null,
        rdo_code ?? null, business_style ?? null, registered_address ?? null,
        registration_date ?? null, books_start_date ?? null,
-       accounting_method, fiscal_year_start_month, auth.userId]
+       accounting_method, fiscal_year_start_month]
     );
 
     return ok(company, 201);

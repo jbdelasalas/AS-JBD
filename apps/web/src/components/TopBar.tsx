@@ -1,11 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/lib/theme';
+
+type Company = { id: string; code: string; name: string };
 
 export function TopBar({ onMenuToggle }: { onMenuToggle: () => void }) {
   const [userName, setUserName] = useState('');
-  const [companyName, setCompanyName] = useState('');
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [currentCompanyId, setCurrentCompanyId] = useState('');
+  const [currentCompanyName, setCurrentCompanyName] = useState('');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
@@ -13,11 +19,34 @@ export function TopBar({ onMenuToggle }: { onMenuToggle: () => void }) {
       const user = JSON.parse(localStorage.getItem('user') ?? 'null');
       if (user?.full_name) setUserName(user.full_name);
       const co = localStorage.getItem('company_name');
-      if (co) setCompanyName(co);
+      if (co) setCurrentCompanyName(co);
+      const coId = localStorage.getItem('company_id');
+      if (coId) setCurrentCompanyId(coId);
+      const list = JSON.parse(localStorage.getItem('companies') ?? '[]') as Company[];
+      setCompanies(list);
     } catch {
       /* ignore */
     }
   }, []);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [dropdownOpen]);
+
+  function switchCompany(co: Company) {
+    if (co.id === currentCompanyId) { setDropdownOpen(false); return; }
+    localStorage.setItem('company_id', co.id);
+    localStorage.setItem('company_name', co.name);
+    window.location.reload();
+  }
+
+  const canSwitch = companies.length > 1;
 
   return (
     <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-500 dark:bg-slate-600">
@@ -31,8 +60,46 @@ export function TopBar({ onMenuToggle }: { onMenuToggle: () => void }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <div className="text-sm text-slate-500 dark:text-slate-200">{companyName}</div>
+
+        {canSwitch ? (
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setDropdownOpen((o) => !o)}
+              className="flex items-center gap-1 rounded px-2 py-1 text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
+            >
+              {currentCompanyName}
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute left-0 top-full z-50 mt-1 min-w-[200px] rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-600 dark:bg-slate-700">
+                {companies.map((co) => (
+                  <button
+                    key={co.id}
+                    onClick={() => switchCompany(co)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-600"
+                  >
+                    <span className="flex-1">
+                      <span className="block text-slate-800 dark:text-slate-100">{co.name}</span>
+                      <span className="block text-xs text-slate-400 dark:text-slate-400">{co.code}</span>
+                    </span>
+                    {co.id === currentCompanyId && (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-sm text-slate-500 dark:text-slate-200">{currentCompanyName}</div>
+        )}
       </div>
+
       <div className="flex items-center gap-3">
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
