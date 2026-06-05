@@ -39,7 +39,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
     const body = await req.json();
     const allowed = [
-      'name', 'trade_name', 'tin', 'vat_status', 'rdo_code', 'business_style',
+      'code', 'name', 'trade_name', 'tin', 'vat_status', 'rdo_code', 'business_style',
       'registered_address', 'registration_date', 'books_start_date',
       'accounting_method', 'fiscal_year_start_month', 'is_active',
     ];
@@ -55,8 +55,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     }
     if (fields.length === 0) return err('No fields to update', 400);
 
-    fields.push(`updated_by = $${idx++}`, `updated_at = now()`);
-    values.push(auth.userId, params.id);
+    values.push(params.id);
 
     const [updated] = await query<{ id: string }>(
       `UPDATE companies SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id`,
