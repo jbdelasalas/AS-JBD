@@ -27,18 +27,10 @@ export async function GET(request: NextRequest) {
 
   const rows = await query(
     `SELECT gr.id, gr.grn_no, gr.receipt_date, gr.delivery_no, gr.notes, gr.status,
-            po.po_no, s.name AS supplier_name,
-            br.code AS branch_code,    br.name AS branch_name,
-            fb.code AS building_code,  fb.name AS building_name,
-            cc.code AS cost_center_code,
-            gref.code AS grow_ref_code
+            po.po_no, s.name AS supplier_name
        FROM goods_receipts gr
        JOIN purchase_orders po ON po.id = gr.po_id
        JOIN suppliers s        ON s.id  = po.supplier_id
-       LEFT JOIN branches br          ON br.id   = gr.branch_id
-       LEFT JOIN farm_buildings fb    ON fb.id   = gr.building_id
-       LEFT JOIN cost_centers cc      ON cc.id   = gr.cost_center_id
-       LEFT JOIN grow_references gref ON gref.id = gr.grow_reference_id
       WHERE ${where}
       ORDER BY gr.receipt_date DESC, gr.grn_no DESC
       LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -103,9 +95,8 @@ export async function POST(request: NextRequest) {
 
     const headerRows = await client.query(
       `INSERT INTO goods_receipts
-         (company_id, grn_no, po_id, warehouse_id, receipt_date, delivery_no, notes, status, created_by,
-          branch_id, building_id, cost_center_id, grow_reference_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'posted',$8,$9,$10,$11,$12)
+         (company_id, grn_no, po_id, warehouse_id, receipt_date, delivery_no, notes, status, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'posted',$8)
        RETURNING *`,
       [
         companyId, grnNo, poId,
@@ -114,10 +105,6 @@ export async function POST(request: NextRequest) {
         (dto.delivery_no as string) || null,
         (dto.notes as string) || null,
         auth.userId,
-        (dto.branch_id as string) || null,
-        (dto.building_id as string) || null,
-        (dto.cost_center_id as string) || null,
-        (dto.grow_reference_id as string) || null,
       ],
     );
     const header = headerRows.rows[0];
@@ -128,9 +115,9 @@ export async function POST(request: NextRequest) {
       if (qtyReceived <= 0) continue;
 
       await client.query(
-        `INSERT INTO goods_receipt_lines (grn_id, po_line_id, line_no, qty_received, unit_cost, grow_reference_id)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
-        [header.id, l.po_line_id, i + 1, qtyReceived, Number(l.unit_cost ?? 0), l.grow_reference_id ?? null],
+        `INSERT INTO goods_receipt_lines (grn_id, po_line_id, line_no, qty_received, unit_cost)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [header.id, l.po_line_id, i + 1, qtyReceived, Number(l.unit_cost ?? 0)],
       );
 
       await client.query(
@@ -156,8 +143,8 @@ export async function POST(request: NextRequest) {
     );
 
     await client.query(
-      `UPDATE goods_receipts SET posted_at = now(), posted_by = $2 WHERE id = $1`,
-      [header.id, auth.userId],
+      `UPDATE goods_receipts SET posted_at = now() WHERE id = $1`,
+      [header.id],
     );
 
     // ── Journal Entry: DR Inventory/Asset, CR GRNI ───────────────────────────
@@ -208,7 +195,7 @@ export async function POST(request: NextRequest) {
 
         const grnLineDetails = await client.query(
           `SELECT grl.qty_received, grl.unit_cost, grl.line_no,
-                  COALESCE(i.inventory_account_id, pol.gl_account_id) AS asset_account_id,
+                  i.inventory_account_id AS asset_account_id,
                   pol.description
              FROM goods_receipt_lines grl
              JOIN purchase_order_lines pol ON pol.id = grl.po_line_id
@@ -274,10 +261,7 @@ export async function POST(request: NextRequest) {
             [jeId, auth.userId],
           );
 
-          await client.query(
-            `UPDATE goods_receipts SET je_id = $2 WHERE id = $1`,
-            [header.id, jeId],
-          );
+          // je_id column not yet in DB — skip linking for now
         } else {
           // No postable lines — remove the empty JE header
           await client.query(`DELETE FROM journal_entries WHERE id = $1`, [jeId]);

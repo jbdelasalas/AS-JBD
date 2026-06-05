@@ -40,17 +40,11 @@ export async function GET(
             s.address AS supplier_address, s.payment_terms_days AS supplier_terms,
             s.tin   AS supplier_tin,
             b.code  AS branch_code,    b.name AS branch_name,
-            fb.code AS building_code,  fb.name AS building_name,
-            cc.code AS cost_center_code, cc.name AS cost_center_name,
-            gr.code AS grow_ref_code,  gr.name AS grow_ref_name,
             cu.full_name AS created_by_name,
             au.full_name AS approved_by_name
        FROM purchase_orders po
        JOIN suppliers s   ON s.id  = po.supplier_id
        LEFT JOIN branches b        ON b.id  = po.branch_id
-       LEFT JOIN farm_buildings fb ON fb.id = po.building_id
-       LEFT JOIN cost_centers cc   ON cc.id = po.cost_center_id
-       LEFT JOIN grow_references gr ON gr.id = po.grow_reference_id
        LEFT JOIN users cu          ON cu.id = po.created_by
        LEFT JOIN users au          ON au.id = po.approved_by
       WHERE po.id = $1 LIMIT 1`,
@@ -60,19 +54,9 @@ export async function GET(
 
   const lines = await query(
     `SELECT pol.*,
-            i.sku  AS item_sku,   i.name  AS item_name,   i.uom  AS item_uom,
-            a.code AS gl_account_code, a.name AS gl_account_name,
-            b.code AS branch_code,
-            fb.code AS building_code,
-            cc.code AS cost_center_code,
-            gr.code AS grow_ref_code
+            i.sku  AS item_sku,   i.name  AS item_name,   i.uom  AS item_uom
        FROM purchase_order_lines pol
-       LEFT JOIN items i           ON i.id  = pol.item_id
-       LEFT JOIN accounts a        ON a.id  = pol.gl_account_id
-       LEFT JOIN branches b        ON b.id  = pol.branch_id
-       LEFT JOIN farm_buildings fb ON fb.id = pol.building_id
-       LEFT JOIN cost_centers cc   ON cc.id = pol.cost_center_id
-       LEFT JOIN grow_references gr ON gr.id = pol.grow_reference_id
+       LEFT JOIN items i ON i.id = pol.item_id
       WHERE pol.po_id = $1
       ORDER BY pol.line_no`,
     [params.id],

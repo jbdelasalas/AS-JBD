@@ -119,17 +119,15 @@ export async function POST(request: NextRequest) {
 
     const headerRows = await client.query(
       `INSERT INTO purchase_orders
-         (company_id, branch_id, po_no, supplier_id, po_date, expected_date, remarks,
-          subtotal, vat_amount, total, status, created_by,
-          building_id, cost_center_id, grow_reference_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'draft',$11,$12,$13,$14)
+         (company_id, branch_id, po_no, supplier_id, po_date, expected_date,
+          subtotal, vat_amount, total, status, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'draft',$10)
        RETURNING *`,
       [
         companyId, orNull(dto.branch_id), poNo, supplierId,
-        dto.po_date, orNull(dto.expected_date), orNull(dto.remarks),
+        dto.po_date, orNull(dto.expected_date),
         totSubtotal.toFixed(2), totVat.toFixed(2), totTotal.toFixed(2),
         auth.userId,
-        orNull(dto.building_id), orNull(dto.cost_center_id), orNull(dto.grow_reference_id),
       ],
     );
     const header = headerRows.rows[0];
@@ -137,18 +135,12 @@ export async function POST(request: NextRequest) {
     for (const l of mappedLines) {
       await client.query(
         `INSERT INTO purchase_order_lines
-           (po_id, line_no, item_id, gl_account_id, description, quantity, qty_received, unit_price, vat_rate, line_total,
-            grow_reference_id, branch_id, building_id, cost_center_id)
-         VALUES ($1,$2,$3,$4,$5,$6,0,$7,$8,$9,$10,$11,$12,$13)`,
+           (po_id, line_no, item_id, description, quantity, qty_received, unit_price, vat_rate, line_total)
+         VALUES ($1,$2,$3,$4,$5,0,$6,$7,$8)`,
         [
           header.id, l.line_no, orNull(l.item_id),
-          orNull((l as Record<string,unknown>).gl_account_id),
           l.description,
           l.qty, l.price, l.vatRate, l.lineTotal.toFixed(2),
-          orNull((l as Record<string,unknown>).grow_reference_id),
-          orNull((l as Record<string,unknown>).branch_id),
-          orNull((l as Record<string,unknown>).building_id),
-          orNull((l as Record<string,unknown>).cost_center_id),
         ],
       );
     }
