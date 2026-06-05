@@ -6,6 +6,8 @@ import { api, ApiError } from '@/lib/api';
 import type { LoginResponse } from '@perpet/shared';
 import { loadBranding, getBrandingBg } from '@/lib/branding';
 
+type Company = { id: string; code: string; name: string };
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('admin@afcc.ph');
@@ -14,6 +16,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loginBg, setLoginBg] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState('');
+  const [pendingCompanies, setPendingCompanies] = useState<Company[] | null>(null);
 
   useEffect(() => {
     loadBranding();
@@ -34,16 +37,30 @@ export default function LoginPage() {
       localStorage.setItem('refresh_token', res.refresh_token);
       localStorage.setItem('user', JSON.stringify(res.user));
       localStorage.setItem('permissions', JSON.stringify(res.permissions));
-      if (res.companies.length > 0) {
+      localStorage.setItem('companies', JSON.stringify(res.companies));
+
+      if (res.companies.length === 0) {
+        setError('No companies are assigned to your account.');
+        return;
+      }
+      if (res.companies.length === 1) {
         localStorage.setItem('company_id', res.companies[0].id);
         localStorage.setItem('company_name', res.companies[0].name);
+        router.replace('/dashboard');
+      } else {
+        setPendingCompanies(res.companies);
       }
-      router.replace('/dashboard');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Login failed');
     } finally {
       setLoading(false);
     }
+  }
+
+  function selectCompany(company: Company) {
+    localStorage.setItem('company_id', company.id);
+    localStorage.setItem('company_name', company.name);
+    router.replace('/dashboard');
   }
 
   return (
@@ -56,7 +73,6 @@ export default function LoginPage() {
         backgroundRepeat: 'no-repeat',
       }}
     >
-      {/* dark overlay so the form stays readable over the photo */}
       <div className="absolute inset-0 bg-black/55" />
 
       <div className="relative z-10 w-full max-w-sm rounded-lg border border-white/10 bg-white/10 p-8 shadow-xl backdrop-blur-md">
@@ -65,46 +81,72 @@ export default function LoginPage() {
           {companyName && <p className="mt-1 text-xs text-white/60">{companyName}</p>}
         </div>
 
-        <form onSubmit={onSubmit} className="space-y-4">
+        {pendingCompanies ? (
           <div>
-            <label className="mb-1 block text-xs font-medium text-white/80">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-white/80">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
-            />
-          </div>
-
-          {error && (
-            <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              {error}
+            <p className="mb-4 text-center text-sm text-white/80">Select a company to continue</p>
+            <div className="space-y-2">
+              {pendingCompanies.map((co) => (
+                <button
+                  key={co.id}
+                  onClick={() => selectCompany(co)}
+                  className="w-full rounded border border-white/20 bg-white/10 px-4 py-3 text-left text-sm text-white hover:bg-white/20 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                >
+                  <div className="font-medium">{co.name}</div>
+                  <div className="text-xs text-white/50">{co.code}</div>
+                </button>
+              ))}
             </div>
-          )}
+            <button
+              onClick={() => setPendingCompanies(null)}
+              className="mt-4 w-full text-center text-xs text-white/50 hover:text-white/80"
+            >
+              Back to login
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={onSubmit} className="space-y-4">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-white/80">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-white/80">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+              />
+            </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded bg-brand-600 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-          >
-            {loading ? 'Signing in...' : 'Sign in'}
-          </button>
-        </form>
+            {error && (
+              <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                {error}
+              </div>
+            )}
 
-        <p className="mt-6 text-center text-xs text-white/40">
-          Default: admin@afcc.ph / artfresh2026
-        </p>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded bg-brand-600 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+            >
+              {loading ? 'Signing in...' : 'Sign in'}
+            </button>
+          </form>
+        )}
+
+        {!pendingCompanies && (
+          <p className="mt-6 text-center text-xs text-white/40">
+            Default: admin@afcc.ph / artfresh2026
+          </p>
+        )}
       </div>
     </div>
   );
