@@ -13,9 +13,9 @@ interface PurchasingSummary {
 }
 
 const MODULES = [
-  { href: '/dashboard/admin/master-data/suppliers', label: 'Suppliers',       desc: 'Manage vendor master records, TIN, EWT rates, and payment terms.',  color: 'border-brand-200 bg-brand-50 text-brand-800' },
-  { href: '/dashboard/purchasing/purchase-orders', label: 'Purchase Orders', desc: 'Create, submit, and track POs through approval and receipt.',        color: 'border-brand-200 bg-brand-50 text-brand-800' },
-  { href: '/dashboard/purchasing/goods-receipts',  label: 'Goods Receipts',  desc: 'Record goods received against approved purchase orders.',           color: 'border-brand-200 bg-brand-50 text-brand-800' },
+  { href: '/dashboard/admin/master-data/suppliers', label: 'Suppliers',       desc: 'Manage vendor master records, TIN, EWT rates, and payment terms.',  color: 'border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-700 dark:bg-brand-900/20 dark:text-brand-300' },
+  { href: '/dashboard/purchasing/purchase-orders', label: 'Purchase Orders', desc: 'Create, submit, and track POs through approval and receipt.',        color: 'border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-700 dark:bg-brand-900/20 dark:text-brand-300' },
+  { href: '/dashboard/purchasing/goods-receipts',  label: 'Goods Receipts',  desc: 'Record goods received against approved purchase orders.',           color: 'border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-700 dark:bg-brand-900/20 dark:text-brand-300' },
 ];
 
 export default function PurchasingHomePage() {

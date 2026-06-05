@@ -7,10 +7,10 @@ import { formatPHP } from '@/lib/format';
 import type { ARSummary } from '@perpet/shared';
 
 const MODULES = [
-  { href: '/dashboard/ar/invoices',    label: 'Sales Invoices',   desc: 'Issue, post, and track customer invoices.',    color: 'border-brand-200 bg-brand-50 text-brand-800' },
-  { href: '/dashboard/ar/collections', label: 'Collections',      desc: 'Record payments and issue official receipts.',  color: 'border-brand-200 bg-brand-50 text-brand-800' },
-  { href: '/dashboard/ar/credit-memos',label: 'Credit Memos',     desc: 'Issue and apply AR credit adjustments.',        color: 'border-brand-200 bg-brand-50 text-brand-800' },
-  { href: '/dashboard/admin/master-data/customers', label: 'Customers', desc: 'Manage customer accounts and credit limits.', color: 'border-brand-200 bg-brand-50 text-brand-800' },
+  { href: '/dashboard/ar/invoices',    label: 'Sales Invoices',   desc: 'Issue, post, and track customer invoices.',    color: 'border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-700 dark:bg-brand-900/20 dark:text-brand-300' },
+  { href: '/dashboard/ar/collections', label: 'Collections',      desc: 'Record payments and issue official receipts.',  color: 'border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-700 dark:bg-brand-900/20 dark:text-brand-300' },
+  { href: '/dashboard/ar/credit-memos',label: 'Credit Memos',     desc: 'Issue and apply AR credit adjustments.',        color: 'border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-700 dark:bg-brand-900/20 dark:text-brand-300' },
+  { href: '/dashboard/admin/master-data/customers', label: 'Customers', desc: 'Manage customer accounts and credit limits.', color: 'border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-700 dark:bg-brand-900/20 dark:text-brand-300' },
 ];
 
 export default function ARPage() {
