@@ -23,7 +23,8 @@ export async function GET(
 
     const bills = await query(
       `SELECT b.id, b.internal_no, b.bill_no, b.bill_date, b.due_date,
-              b.total, b.amount_paid, b.balance, b.status
+              b.total, b.amount_paid, b.balance, b.status,
+              b.branch_id, b.building_id, b.cost_center_id, b.grow_reference_id
          FROM bills b
         WHERE b.supplier_id = $1
           AND b.status IN ('approved','partial','pending_approval')

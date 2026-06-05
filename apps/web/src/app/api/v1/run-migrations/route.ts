@@ -2612,5 +2612,28 @@ export async function POST(request: NextRequest) {
     results.push('035 document_series item: ok');
   } catch (e) { results.push(`035 document_series item FAILED: ${(e as Error).message}`); }
 
+  // 036 — je_id column on goods_receipts
+  try {
+    await query(`ALTER TABLE goods_receipts ADD COLUMN IF NOT EXISTS je_id uuid REFERENCES journal_entries(id)`);
+    results.push('036 goods_receipts.je_id: ok');
+  } catch (e) { results.push(`036 goods_receipts.je_id FAILED: ${(e as Error).message}`); }
+
+  // 036b — seed "Advances to Suppliers" account for all companies (used when billing a PO with no GR)
+  try {
+    await query(
+      `INSERT INTO accounts (company_id, code, name, account_type, is_control, is_active)
+       SELECT c.id, '11021', 'Advances to Suppliers', 'ASSET', false, true
+       FROM companies c
+       WHERE NOT EXISTS (
+         SELECT 1 FROM accounts a
+          WHERE a.company_id = c.id
+            AND (a.code = '11021'
+                 OR a.name ILIKE '%advances to supplier%'
+                 OR (a.name ILIKE '%advance%' AND a.name ILIKE '%supplier%'))
+       )`,
+    );
+    results.push('036 advances_to_suppliers account: ok');
+  } catch (e) { results.push(`036 advances_to_suppliers account FAILED: ${(e as Error).message}`); }
+
   return ok({ results });
 }

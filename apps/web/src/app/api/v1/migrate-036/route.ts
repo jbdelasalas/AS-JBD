@@ -1,0 +1,49 @@
+export const dynamic = 'force-dynamic';
+import { type NextRequest } from 'next/server';
+import { query } from '@/lib/db';
+import { ok, err } from '@/lib/api-response';
+
+const SECRET = 'migrate-as-jbd-2026';
+
+export async function POST(request: NextRequest) {
+  const { secret } = await request.json().catch(() => ({ secret: '' }));
+  if (secret !== SECRET) return err('Forbidden', 403);
+
+  const results: string[] = [];
+
+  // 035 — item document series
+  try {
+    await query(
+      `INSERT INTO document_series (company_id, doc_type, prefix, start_number, current_number)
+       SELECT c.id, 'item', 'ITEM', 1, 0
+       FROM companies c
+       WHERE NOT EXISTS (SELECT 1 FROM document_series ds WHERE ds.company_id = c.id AND ds.doc_type = 'item')`,
+    );
+    results.push('ok: 035 document_series item');
+  } catch (e) { results.push(`err: 035 document_series item — ${(e as Error).message}`); }
+
+  // 036 — je_id on goods_receipts
+  try {
+    await query(`ALTER TABLE goods_receipts ADD COLUMN IF NOT EXISTS je_id uuid REFERENCES journal_entries(id)`);
+    results.push('ok: 036 goods_receipts.je_id');
+  } catch (e) { results.push(`err: 036 goods_receipts.je_id — ${(e as Error).message}`); }
+
+  // 036b — Advances to Suppliers account for all companies
+  try {
+    await query(
+      `INSERT INTO accounts (company_id, code, name, account_type, is_control, is_active)
+       SELECT c.id, '11021', 'Advances to Suppliers', 'ASSET', false, true
+       FROM companies c
+       WHERE NOT EXISTS (
+         SELECT 1 FROM accounts a
+          WHERE a.company_id = c.id
+            AND (a.code = '11021'
+                 OR a.name ILIKE '%advances to supplier%'
+                 OR (a.name ILIKE '%advance%' AND a.name ILIKE '%supplier%'))
+       )`,
+    );
+    results.push('ok: 036b advances_to_suppliers account');
+  } catch (e) { results.push(`err: 036b advances_to_suppliers — ${(e as Error).message}`); }
+
+  return ok({ results });
+}

@@ -275,7 +275,10 @@ export async function POST(request: NextRequest) {
             [jeId, auth.userId],
           );
 
-          // je_id column not yet in DB — skip linking for now
+          await client.query(
+            `UPDATE goods_receipts SET je_id = $2 WHERE id = $1`,
+            [header.id, jeId],
+          ).catch(() => {}); // no-op if column not yet migrated
         } else {
           // No postable lines — remove the empty JE header
           await client.query(`DELETE FROM journal_entries WHERE id = $1`, [jeId]);

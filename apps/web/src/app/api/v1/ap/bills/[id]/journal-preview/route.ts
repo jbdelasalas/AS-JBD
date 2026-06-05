@@ -83,7 +83,14 @@ export async function GET(
     }
 
     if (bill.po_id) {
-      // PO-linked bill: DR GRNI to clear the receipt accrual, then CR AP
+      // Check whether this PO has any goods receipts
+      const grCountRows = await query(
+        `SELECT COUNT(*)::int AS c FROM goods_receipts WHERE po_id = $1`,
+        [bill.po_id as string],
+      );
+      const poHasGR = Number((grCountRows[0] as Record<string, unknown>).c) > 0;
+
+      // GRNI account (used when PO has at least one GR)
       const grniRows = await query(
         `SELECT id FROM accounts
           WHERE company_id = $1
@@ -94,63 +101,61 @@ export async function GET(
       );
       const grniAccountId = (grniRows[0] as Record<string, unknown>)?.id as string ?? null;
 
-      // Helper: look up account names in bulk
-      async function buildLines(expenseLineRows: Array<Record<string, unknown>>, defaultExpAcctId: string | null, useGrni: string | null) {
-        const allIds = [apAccountId, vatAccountId, ewtPayableAccountId, defaultExpAcctId, useGrni,
-          ...expenseLineRows.map(l => l.eff_expense_acct as string | null)].filter(Boolean) as string[];
-        const acctRows = await query(`SELECT id, code, name FROM accounts WHERE id = ANY($1::uuid[])`, [allIds]);
-        const acctMap = new Map((acctRows as Array<Record<string, unknown>>).map(a => [String(a.id), a]));
-        const getAcct = (id: string | null) => {
-          if (!id) return { code: '????', name: 'Unknown Account' };
-          const a = acctMap.get(id) as Record<string, unknown> | undefined;
-          return { code: String(a?.code ?? '????'), name: String(a?.name ?? 'Unknown') };
-        };
+      // Advances to Suppliers account (used when PO has no GR)
+      const advRows = await query(
+        `SELECT id FROM accounts
+          WHERE company_id = $1
+            AND (name ILIKE '%advance%supplier%' OR name ILIKE '%supplier%advance%'
+                 OR name ILIKE '%advances to supplier%')
+            AND is_active = true
+          ORDER BY code LIMIT 1`,
+        [bill.company_id],
+      );
+      const advancesAccountId = (advRows[0] as Record<string, unknown>)?.id as string ?? null;
 
-        if (useGrni) {
-          const grni = getAcct(useGrni);
-          lines.push({ account_code: grni.code, account_name: grni.name, description: `Clear GRNI — ${bill.internal_no}`, debit: subtotal, credit: 0 });
-        } else {
-          for (const l of expenseLineRows) {
-            const acctId = (l.eff_expense_acct as string | null) ?? defaultExpAcctId;
-            if (!acctId) { warnings.push(`Line ${l.line_no}: no expense account — line will not be in JE.`); continue; }
-            const acc = getAcct(acctId);
-            lines.push({ account_code: acc.code, account_name: acc.name, description: String(l.description), debit: Number(l.line_subtotal), credit: 0 });
-          }
-        }
+      // Resolve which debit account to use
+      const debitAccountId = poHasGR ? grniAccountId : advancesAccountId;
+      const debitDescription = poHasGR
+        ? `Clear GRNI — ${bill.internal_no}`
+        : `Advance to Supplier — ${bill.internal_no}`;
 
-        if (vatAmount > 0 && vatAccountId) {
-          const vat = getAcct(vatAccountId);
-          lines.push({ account_code: vat.code, account_name: vat.name, description: `Input VAT — ${bill.internal_no}`, debit: vatAmount, credit: 0 });
-        } else if (vatAmount > 0) {
-          warnings.push('Input VAT account not found — VAT amount will not be captured.');
-        }
-
-        if (ewtAmount > 0 && ewtPayableAccountId) {
-          const ewt = getAcct(ewtPayableAccountId);
-          lines.push({ account_code: ewt.code, account_name: ewt.name,
-            description: `EWT Payable${bill.ewt_code ? ` (${bill.ewt_code})` : ''} — ${bill.internal_no}`,
-            debit: 0, credit: ewtAmount });
-        }
-
-        const ap = getAcct(apAccountId);
-        lines.push({ account_code: ap.code, account_name: ap.name, description: `AP — ${bill.internal_no}`, debit: 0, credit: netPayable });
+      if (!debitAccountId) {
+        warnings.push(poHasGR
+          ? 'No GRNI account found. Create a "Goods Received Not Yet Invoiced" account.'
+          : 'No "Advances to Suppliers" account found. Run migrations or add the account to your Chart of Accounts.');
       }
 
-      if (!grniAccountId) {
-        warnings.push('No GRNI account found — expense lines used instead. Create a "Goods Received Not Yet Invoiced" account to enable GRNI clearing.');
-        const lineRows = await query(
-          `SELECT bl.*, bl.expense_account_id AS eff_expense_acct FROM bill_lines bl WHERE bl.bill_id = $1 ORDER BY bl.line_no`,
-          [params.id],
-        );
-        const defExpRows = await query(
-          `SELECT id FROM accounts WHERE company_id = $1 AND account_type = 'EXPENSE' AND is_active = true ORDER BY code LIMIT 1`,
-          [bill.company_id],
-        );
-        const defaultExpAcctId = (defExpRows[0] as Record<string, unknown>)?.id as string ?? null;
-        await buildLines(lineRows as Array<Record<string, unknown>>, defaultExpAcctId, null);
-      } else {
-        await buildLines([], null, grniAccountId);
+      // Look up all account names needed
+      const allIds = [apAccountId, vatAccountId, ewtPayableAccountId, debitAccountId].filter(Boolean) as string[];
+      const acctRows = await query(`SELECT id, code, name FROM accounts WHERE id = ANY($1::uuid[])`, [allIds]);
+      const acctMap = new Map((acctRows as Array<Record<string, unknown>>).map(a => [String(a.id), a]));
+      const getAcct = (id: string | null) => {
+        if (!id) return { code: '????', name: 'Unknown Account' };
+        const a = acctMap.get(id) as Record<string, unknown> | undefined;
+        return { code: String(a?.code ?? '????'), name: String(a?.name ?? 'Unknown') };
+      };
+
+      if (debitAccountId) {
+        const debitAcct = getAcct(debitAccountId);
+        lines.push({ account_code: debitAcct.code, account_name: debitAcct.name, description: debitDescription, debit: subtotal, credit: 0 });
       }
+
+      if (vatAmount > 0 && vatAccountId) {
+        const vat = getAcct(vatAccountId);
+        lines.push({ account_code: vat.code, account_name: vat.name, description: `Input VAT — ${bill.internal_no}`, debit: vatAmount, credit: 0 });
+      } else if (vatAmount > 0) {
+        warnings.push('Input VAT account not found — VAT amount will not be captured.');
+      }
+
+      if (ewtAmount > 0 && ewtPayableAccountId) {
+        const ewt = getAcct(ewtPayableAccountId);
+        lines.push({ account_code: ewt.code, account_name: ewt.name,
+          description: `EWT Payable${(bill.ewt_code as string | null) ? ` (${bill.ewt_code})` : ''} — ${bill.internal_no}`,
+          debit: 0, credit: ewtAmount });
+      }
+
+      const ap = getAcct(apAccountId);
+      lines.push({ account_code: ap.code, account_name: ap.name, description: `AP — ${bill.internal_no}`, debit: 0, credit: netPayable });
     } else {
       // Non-PO bill: DR expense per line, DR VAT, CR EWT Payable, CR AP (net)
       const lineRows = await query(

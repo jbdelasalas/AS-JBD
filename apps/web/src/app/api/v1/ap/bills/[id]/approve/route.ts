@@ -91,7 +91,7 @@ export async function POST(
     );
     const defaultExpAcctId = defExpRows.rows[0]?.id ?? null;
 
-    // GRNI account (for PO-linked bills with GR)
+    // GRNI account (for PO-linked bills with at least one GR)
     const grniRows = await client.query(
       `SELECT id FROM accounts
         WHERE company_id = $1
@@ -175,15 +175,16 @@ export async function POST(
           [je.id, lineNo++, grniAccountId, `Clear GRNI — ${bill.internal_no}`, subtotal],
         );
       } else {
-        // PO has no GR: DR Advances to Supplier (prepayment / advance billing)
-        const advAcctId = advancesAccountId ?? defaultExpAcctId;
-        if (advAcctId) {
-          await client.query(
-            `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
-             VALUES ($1,$2,$3,$4,$5,0,'PHP',1,$5,0)`,
-            [je.id, lineNo++, advAcctId, `Advance to Supplier — ${bill.internal_no}`, subtotal],
-          );
+        // PO has no GR: DR Advances to Suppliers
+        if (!advancesAccountId) {
+          await client.query('ROLLBACK');
+          return err('No "Advances to Suppliers" account found. Please run migrations or add the account to your Chart of Accounts.', 400);
         }
+        await client.query(
+          `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
+           VALUES ($1,$2,$3,$4,$5,0,'PHP',1,$5,0)`,
+          [je.id, lineNo++, advancesAccountId, `Advance to Supplier — ${bill.internal_no}`, subtotal],
+        );
       }
     } else {
       // Non-PO bill: DR Expense per line

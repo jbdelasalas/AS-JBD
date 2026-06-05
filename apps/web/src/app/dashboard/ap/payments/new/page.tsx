@@ -9,7 +9,7 @@ import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
 
 interface Supplier { id: string; code: string; name: string; }
 interface BankAccount { id: string; account_name: string; bank_name: string | null; account_number: string | null; gl_account_id: string | null; }
-interface OpenBill { id: string; internal_no: string; bill_no: string; bill_date: string; due_date: string; total: number; balance: number; }
+interface OpenBill { id: string; internal_no: string; bill_no: string; bill_date: string; due_date: string; total: number; balance: number; branch_id: string | null; building_id: string | null; cost_center_id: string | null; grow_reference_id: string | null; }
 interface Application { bill_id: string; internal_no: string; amount_applied: number; balance: number; }
 
 function NewPaymentForm() {
@@ -64,6 +64,14 @@ function NewPaymentForm() {
     setApps(prev => {
       if (prev.find(a => a.bill_id === bill.id))
         return prev.filter(a => a.bill_id !== bill.id);
+      if (prev.length === 0) {
+        setTags({
+          branch_id:         bill.branch_id         ?? '',
+          building_id:       bill.building_id       ?? '',
+          cost_center_id:    bill.cost_center_id    ?? '',
+          grow_reference_id: bill.grow_reference_id ?? '',
+        });
+      }
       return [...prev, { bill_id: bill.id, internal_no: bill.internal_no, amount_applied: bill.balance, balance: bill.balance }];
     });
   }
@@ -74,6 +82,10 @@ function NewPaymentForm() {
 
   const totalApplied = apps.reduce((s, a) => s + a.amount_applied, 0);
   const unapplied    = (form.amount || 0) - totalApplied;
+
+  useEffect(() => {
+    if (apps.length > 0) setForm(f => ({ ...f, amount: totalApplied }));
+  }, [totalApplied]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
