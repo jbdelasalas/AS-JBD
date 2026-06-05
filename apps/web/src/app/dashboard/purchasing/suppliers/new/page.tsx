@@ -1,13 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+
+interface Account { id: string; code: string; name: string; }
 
 export default function NewSupplierPage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
 
   const [form, setForm] = useState({
     name: '',
@@ -20,7 +23,15 @@ export default function NewSupplierPage() {
     payment_terms_days: 30,
     is_vat_registered: true,
     ewt_rate: 0,
+    ap_account_id: '',
   });
+
+  useEffect(() => {
+    const cid = localStorage.getItem('company_id');
+    if (!cid) return;
+    api.get<Account[]>(`/gl/accounts?company_id=${cid}&limit=500`)
+      .then(r => setAccounts(Array.isArray(r) ? r : [])).catch(() => {});
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,6 +47,7 @@ export default function NewSupplierPage() {
         contact_person: form.contact_person || undefined,
         email: form.email || undefined,
         phone: form.phone || undefined,
+        ap_account_id: form.ap_account_id || undefined,
       });
       router.push(`/dashboard/purchasing/suppliers/${supplier.id}`);
     } catch (e: unknown) {
@@ -116,6 +128,18 @@ export default function NewSupplierPage() {
               <input type="number" min={0} max={100} step="0.01" value={form.ewt_rate}
                 onChange={(e) => setForm((f) => ({ ...f, ewt_rate: parseFloat(e.target.value) || 0 }))}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
+
+            <div className="col-span-3">
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                AP Control Account <span className="font-normal text-slate-400">(required for journal entries — e.g. Accounts Payable)</span>
+              </label>
+              <select value={form.ap_account_id}
+                onChange={(e) => setForm((f) => ({ ...f, ap_account_id: e.target.value }))}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                <option value="">— select account —</option>
+                {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+              </select>
             </div>
 
             <div className="col-span-3">

@@ -15,6 +15,8 @@ interface Payment {
   status: string;
 }
 
+interface Account { id: string; code: string; name: string; }
+
 interface Supplier {
   id: string;
   code: string;
@@ -29,6 +31,9 @@ interface Supplier {
   is_vat_registered: boolean;
   ewt_rate: number;
   is_active: boolean;
+  ap_account_id: string | null;
+  ap_account_code: string | null;
+  ap_account_name: string | null;
 }
 
 interface OpenBill {
@@ -59,6 +64,7 @@ const SUPPLIER_TYPES = ['trade', 'refinery', 'service', 'contractor'];
 export default function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [supplier, setSupplier] = useState<Supplier | null>(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [outstanding, setOutstanding] = useState<Outstanding | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,7 +84,9 @@ export default function SupplierDetailPage() {
         .catch(() => ({ total_balance: 0, bills: [] as Outstanding['bills'] })),
       api.get<{ data: Payment[] }>(`/ap/payments?company_id=${companyId}&supplier_id=${id}&limit=20`)
         .catch(() => ({ data: [] as Payment[] })),
-    ]).then(([s, o, pay]) => { setSupplier(s); setOutstanding(o); setPayments(pay.data); setForm(s); })
+      api.get<Account[]>(`/gl/accounts?company_id=${companyId}&limit=500`)
+        .catch(() => [] as Account[]),
+    ]).then(([s, o, pay, accts]) => { setSupplier(s); setOutstanding(o); setPayments(pay.data); setForm(s); setAccounts(Array.isArray(accts) ? accts : []); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [id, companyId]);
@@ -106,6 +114,7 @@ export default function SupplierDetailPage() {
         is_vat_registered: form.is_vat_registered,
         ewt_rate: Number(form.ewt_rate),
         is_active: form.is_active,
+        ap_account_id: form.ap_account_id || null,
       });
       setSaved(true);
       setEditing(false);
@@ -198,6 +207,13 @@ export default function SupplierDetailPage() {
                 onChange={(e) => set('ewt_rate', parseFloat(e.target.value))} className={inp} />
             </div>
             <div className="col-span-3">
+              <label className={lbl}>AP Control Account <span className="font-normal text-slate-400">(required for journal entries — e.g. Accounts Payable)</span></label>
+              <select value={form.ap_account_id ?? ''} onChange={e => set('ap_account_id', e.target.value || null)} className={inp}>
+                <option value="">— select account —</option>
+                {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+              </select>
+            </div>
+            <div className="col-span-3">
               <label className={lbl}>Address</label>
               <input value={form.address ?? ''} onChange={(e) => set('address', e.target.value)} className={inp} />
             </div>
@@ -237,6 +253,15 @@ export default function SupplierDetailPage() {
                 <div className="mt-0.5 font-medium text-slate-900 dark:text-slate-100">{f.value}</div>
               </div>
             ))}
+          </div>
+          <div className="mb-5">
+            <div className={`rounded-lg border p-3 ${supplier.ap_account_id ? 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900' : 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950'}`}>
+              <div className="text-xs font-medium text-slate-500 dark:text-slate-400">AP Control Account</div>
+              {supplier.ap_account_id
+                ? <div className="mt-0.5 font-medium text-slate-900 dark:text-slate-100">{supplier.ap_account_code} — {supplier.ap_account_name}</div>
+                : <div className="mt-0.5 text-sm text-amber-700 dark:text-amber-400">⚠ Not set — journal entries will use the default AP control account. Click Edit to assign one.</div>
+              }
+            </div>
           </div>
 
           <div className="mb-5 grid grid-cols-2 gap-3">

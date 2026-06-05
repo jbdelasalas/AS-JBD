@@ -16,7 +16,10 @@ export async function GET(
 
   try {
     const rows = await query(
-      `SELECT * FROM suppliers WHERE id = $1 LIMIT 1`,
+      `SELECT s.*, a.code AS ap_account_code, a.name AS ap_account_name
+         FROM suppliers s
+         LEFT JOIN accounts a ON a.id = s.ap_account_id
+        WHERE s.id = $1 LIMIT 1`,
       [params.id],
     );
     if (!rows[0]) return err(`Supplier ${params.id} not found`, 404);
