@@ -32,7 +32,15 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get('status');
   const supplierId = searchParams.get('supplier_id');
 
-  if (status) { params.push(status); where += ` AND po.status = $${params.length}`; }
+  if (status) {
+    const statuses = status.split(',').map(s => s.trim()).filter(Boolean);
+    if (statuses.length === 1) {
+      params.push(statuses[0]); where += ` AND po.status = $${params.length}`;
+    } else if (statuses.length > 1) {
+      const placeholders = statuses.map((s, i) => { params.push(s); return `$${params.length}`; }).join(',');
+      where += ` AND po.status IN (${placeholders})`;
+    }
+  }
   if (supplierId) { params.push(supplierId); where += ` AND po.supplier_id = $${params.length}`; }
 
   params.push(limit, offset);

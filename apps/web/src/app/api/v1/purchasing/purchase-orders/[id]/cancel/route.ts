@@ -26,6 +26,14 @@ export async function POST(
     return err(`PO is ${po.status} — cannot cancel`, 400);
   }
 
+  const [{ grn_count }] = await query<{ grn_count: number }>(
+    `SELECT count(*)::int AS grn_count FROM goods_receipts WHERE po_id = $1`,
+    [params.id],
+  );
+  if (Number(grn_count) > 0) {
+    return err('Cannot cancel: goods have already been received against this PO. Delete the GRN(s) first.', 409);
+  }
+
   const updated = await query(
     `UPDATE purchase_orders SET status = 'cancelled', updated_at = now() WHERE id = $1 RETURNING *`,
     [params.id],

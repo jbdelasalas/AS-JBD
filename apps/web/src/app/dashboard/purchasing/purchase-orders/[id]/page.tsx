@@ -305,10 +305,10 @@ export default function PODetailPage() {
                   {busy ? 'Approving…' : 'Approve'}
                 </button>
               )}
-              {po.status === 'approved' && (
+              {['approved', 'partial'].includes(po.status) && (
                 <Link href={`/dashboard/purchasing/goods-receipts/new?po_id=${id}`}
                   className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
-                  Receive Goods
+                  {po.status === 'partial' ? 'Receive Remaining Goods' : 'Receive Goods'}
                 </Link>
               )}
               <button onClick={() => doAction('cancel')} disabled={busy}

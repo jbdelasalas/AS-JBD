@@ -7,7 +7,7 @@ import { useTaggingData } from '@/hooks/useTaggingData';
 import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
 import { SearchableSelect } from '@/components/SearchableSelect';
 
-interface POOption { id: string; po_no: string; supplier_name: string; }
+interface POOption { id: string; po_no: string; supplier_name: string; status: string; }
 
 interface POLine {
   id: string;
@@ -78,7 +78,7 @@ function NewGoodsReceiptForm() {
   useEffect(() => {
     const cid = localStorage.getItem('company_id');
     if (!cid) return;
-    api.get<{ data: POOption[] }>(`/purchasing/purchase-orders?company_id=${cid}&status=approved&limit=500`)
+    api.get<{ data: POOption[] }>(`/purchasing/purchase-orders?company_id=${cid}&status=approved,partial&limit=500`)
       .then(r => setPos(r.data)).catch(() => {});
   }, []);
 
@@ -196,7 +196,7 @@ function NewGoodsReceiptForm() {
                 value={selectedPoId}
                 onChange={setSelectedPoId}
                 placeholder="Select approved PO…"
-                options={pos.map(p => ({ value: p.id, label: `${p.po_no} — ${p.supplier_name}` }))}
+                options={pos.map(p => ({ value: p.id, label: `${p.po_no} — ${p.supplier_name}${p.status === 'partial' ? ' [partial]' : ''}` }))}
               />
             </div>
             <div>
