@@ -4,11 +4,11 @@ import Link from 'next/link';
 
 const MODULES = [
   { href: '/dashboard/admin/master-data/items', label: 'Items',             desc: 'Manage SKUs, categories, costing method, and reorder levels.',       color: 'border-brand-200 bg-brand-50 text-brand-800' },
-  { href: '/dashboard/admin/master-data/locations', label: 'Locations',    desc: 'Set up warehouses and storage locations for inventory tracking.',    color: 'border-teal-200 bg-teal-50 text-teal-800' },
-  { href: '/dashboard/inventory/stock-on-hand', label: 'Stock On Hand',    desc: 'View current balances and stock values by item and location.',       color: 'border-slate-200 bg-slate-50 text-slate-800' },
-  { href: '/dashboard/inventory/adjustments',  label: 'Adjustments',       desc: 'Post stock gains and losses — damage, spoilage, count corrections.', color: 'border-amber-200 bg-amber-50 text-amber-800' },
-  { href: '/dashboard/inventory/transfers',    label: 'Transfers',         desc: 'Move stock between locations with full in-transit tracking.',        color: 'border-violet-200 bg-violet-50 text-violet-800' },
-  { href: '/dashboard/inventory/counts',       label: 'Stock Counts',      desc: 'Run full, cycle, or spot counts and post count corrections.',        color: 'border-emerald-200 bg-emerald-50 text-emerald-800' },
+  { href: '/dashboard/admin/master-data/locations', label: 'Locations',    desc: 'Set up warehouses and storage locations for inventory tracking.',    color: 'border-brand-200 bg-brand-50 text-brand-800' },
+  { href: '/dashboard/inventory/stock-on-hand', label: 'Stock On Hand',    desc: 'View current balances and stock values by item and location.',       color: 'border-brand-200 bg-brand-50 text-brand-800' },
+  { href: '/dashboard/inventory/adjustments',  label: 'Adjustments',       desc: 'Post stock gains and losses — damage, spoilage, count corrections.', color: 'border-brand-200 bg-brand-50 text-brand-800' },
+  { href: '/dashboard/inventory/transfers',    label: 'Transfers',         desc: 'Move stock between locations with full in-transit tracking.',        color: 'border-brand-200 bg-brand-50 text-brand-800' },
+  { href: '/dashboard/inventory/counts',       label: 'Stock Counts',      desc: 'Run full, cycle, or spot counts and post count corrections.',        color: 'border-brand-200 bg-brand-50 text-brand-800' },
 ];
 
 export default function InventoryHomePage() {

@@ -5,7 +5,7 @@ import Link from 'next/link';
 const REPORT_GROUPS = [
   {
     label: 'Financial Statements',
-    color: 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20',
+    color: 'border-brand-200 bg-brand-50 dark:border-brand-800 dark:bg-brand-900/20',
     reports: [
       { href: '/dashboard/reports/trial-balance',    label: 'Trial Balance',    desc: 'Debit/credit by account as of any date' },
       { href: '/dashboard/reports/income-statement', label: 'Income Statement', desc: 'Profit & loss for a period' },
@@ -13,21 +13,21 @@ const REPORT_GROUPS = [
   },
   {
     label: 'Receivables',
-    color: 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20',
+    color: 'border-brand-200 bg-brand-50 dark:border-brand-800 dark:bg-brand-900/20',
     reports: [
       { href: '/dashboard/reports/ar-aging', label: 'AR Aging', desc: 'Outstanding invoices by age bucket' },
     ],
   },
   {
     label: 'Payables',
-    color: 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20',
+    color: 'border-brand-200 bg-brand-50 dark:border-brand-800 dark:bg-brand-900/20',
     reports: [
       { href: '/dashboard/reports/ap-aging', label: 'AP Aging', desc: 'Outstanding bills by age bucket' },
     ],
   },
   {
     label: 'Sales & VAT',
-    color: 'border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-900/20',
+    color: 'border-brand-200 bg-brand-50 dark:border-brand-800 dark:bg-brand-900/20',
     reports: [
       { href: '/dashboard/reports/sales', label: 'Sales Register', desc: 'Daily / monthly sales with VAT breakdown' },
     ],

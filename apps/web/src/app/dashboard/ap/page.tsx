@@ -14,8 +14,8 @@ interface APSummary {
 
 const MODULES = [
   { href: '/dashboard/admin/master-data/suppliers', label: 'Suppliers',  desc: 'Manage vendor master records, TIN, payment terms, and EWT rates.',   color: 'border-brand-200 bg-brand-50 text-brand-800' },
-  { href: '/dashboard/ap/bills',             label: 'Bills',      desc: 'Enter vendor invoices, match to POs, and track AP balances.',         color: 'border-amber-200 bg-amber-50 text-amber-800' },
-  { href: '/dashboard/ap/payments',          label: 'Payments',   desc: 'Record supplier payments, generate vouchers, and post to GL.',        color: 'border-emerald-200 bg-emerald-50 text-emerald-800' },
+  { href: '/dashboard/ap/bills',             label: 'Bills',      desc: 'Enter vendor invoices, match to POs, and track AP balances.',         color: 'border-brand-200 bg-brand-50 text-brand-800' },
+  { href: '/dashboard/ap/payments',          label: 'Payments',   desc: 'Record supplier payments, generate vouchers, and post to GL.',        color: 'border-brand-200 bg-brand-50 text-brand-800' },
 ];
 
 export default function ApHomePage() {
