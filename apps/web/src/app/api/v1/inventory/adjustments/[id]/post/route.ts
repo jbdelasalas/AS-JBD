@@ -95,12 +95,17 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       const adjAcctId: string | null = adjAcctRows.rows[0]?.id ?? null;
 
       if (invId && adjAcctId) {
-        // Fetch item names for line descriptions
+        // Fetch item names + per-item account overrides
         const itemIds = lines.map((l) => (l as Record<string, unknown>).item_id);
         const itemRows = await client.query(
-          `SELECT id, name FROM items WHERE id = ANY($1::uuid[])`, [itemIds],
+          `SELECT id, name, inventory_account_id FROM items WHERE id = ANY($1::uuid[])`, [itemIds],
         );
-        const itemMap = new Map((itemRows.rows as Array<Record<string, unknown>>).map((i) => [String(i.id), String(i.name)]));
+        const itemMap = new Map(
+          (itemRows.rows as Array<Record<string, unknown>>).map((i) => [
+            String(i.id),
+            { name: String(i.name), inventory_account_id: (i.inventory_account_id as string | null) ?? null },
+          ]),
+        );
 
         const jeLines: Array<{ account_id: string; description: string; debit: number; credit: number }> = [];
         for (const l of lines) {
@@ -109,16 +114,18 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           const unitCost = Number(la.unit_cost);
           const totalCost = parseFloat((Math.abs(qtyChange) * unitCost).toFixed(2));
           if (totalCost <= 0) continue;
-          const itemName = itemMap.get(String(la.item_id)) ?? String(la.item_id);
+          const itemInfo = itemMap.get(String(la.item_id));
+          const itemName = itemInfo?.name ?? String(la.item_id);
+          const itemInvId = itemInfo?.inventory_account_id ?? invId;
           const desc = `${adj.reason_code} — ${itemName} (${adj.adj_no})`;
           if (qtyChange > 0) {
             // Stock increase: DR Inventory, CR Inventory Adjustment (gain)
-            jeLines.push({ account_id: invId,     description: desc, debit: totalCost, credit: 0 });
+            jeLines.push({ account_id: itemInvId, description: desc, debit: totalCost, credit: 0 });
             jeLines.push({ account_id: adjAcctId, description: desc, debit: 0, credit: totalCost });
           } else {
             // Stock decrease: DR Inventory Adjustment (loss), CR Inventory
             jeLines.push({ account_id: adjAcctId, description: desc, debit: totalCost, credit: 0 });
-            jeLines.push({ account_id: invId,     description: desc, debit: 0, credit: totalCost });
+            jeLines.push({ account_id: itemInvId, description: desc, debit: 0, credit: totalCost });
           }
         }
 
