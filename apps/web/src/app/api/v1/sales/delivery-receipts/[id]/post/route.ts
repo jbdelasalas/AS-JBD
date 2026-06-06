@@ -30,10 +30,10 @@ export async function POST(
 
     if (dr.status !== 'draft') { await client.query('ROLLBACK'); return err(`DR is already ${dr.status}`, 409); }
 
-    const companyRows = await client.query(
-      `SELECT allow_negative_inventory FROM companies WHERE id = $1`, [dr.company_id],
+    const flagRows = await client.query(
+      `SELECT enabled FROM feature_flags WHERE name = 'allow_negative_inventory' LIMIT 1`,
     );
-    const allowNegative = companyRows.rows[0]?.allow_negative_inventory ?? false;
+    const allowNegative = flagRows.rows[0]?.enabled ?? false;
 
     const lines = await client.query(
       `SELECT drl.item_id, drl.qty_delivered, drl.unit_cost, drl.so_line_id, i.name AS item_name,

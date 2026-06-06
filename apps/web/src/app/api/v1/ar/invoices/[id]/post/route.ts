@@ -67,10 +67,10 @@ export async function POST(
 
     // Inventory check (only for direct SIs not linked to a DR — DR post already decremented stock)
     if (!inv.dr_id) {
-      const companyRows = await client.query(
-        `SELECT allow_negative_inventory FROM companies WHERE id = $1`, [inv.company_id],
+      const flagRows = await client.query(
+        `SELECT enabled FROM feature_flags WHERE name = 'allow_negative_inventory' LIMIT 1`,
       );
-      const allowNegative = companyRows.rows[0]?.allow_negative_inventory ?? false;
+      const allowNegative = flagRows.rows[0]?.enabled ?? false;
 
       if (!allowNegative) {
         const itemLines = await client.query(

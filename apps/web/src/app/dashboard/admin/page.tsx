@@ -10,10 +10,9 @@ import { api } from "@/lib/api";
 interface CompanyForm {
   name: string; legal_name: string; tin: string; rdo_code: string;
   address: string; phone: string; email: string; website: string; logo: string | null;
-  allow_negative_inventory: boolean;
 }
 
-const EMPTY: CompanyForm = { name: '', legal_name: '', tin: '', rdo_code: '', address: '', phone: '', email: '', website: '', logo: null, allow_negative_inventory: false };
+const EMPTY: CompanyForm = { name: '', legal_name: '', tin: '', rdo_code: '', address: '', phone: '', email: '', website: '', logo: null };
 
 export default function AdminHomePage() {
   const [theme, setTheme] = useState<ThemeKey>("blue");
@@ -39,7 +38,7 @@ export default function AdminHomePage() {
     setCompanyId(id);
     api.get<CompanyForm & { id: string }>(`/companies/${id}`)
       .then((d) => {
-        setCompany({ name: d.name, legal_name: d.legal_name ?? '', tin: d.tin ?? '', rdo_code: d.rdo_code ?? '', address: d.address ?? '', phone: d.phone ?? '', email: d.email ?? '', website: d.website ?? '', logo: d.logo ?? null, allow_negative_inventory: (d as unknown as { allow_negative_inventory?: boolean }).allow_negative_inventory ?? false });
+        setCompany({ name: d.name, legal_name: d.legal_name ?? '', tin: d.tin ?? '', rdo_code: d.rdo_code ?? '', address: d.address ?? '', phone: d.phone ?? '', email: d.email ?? '', website: d.website ?? '', logo: d.logo ?? null });
         setLogoPreview(d.logo ?? null);
       })
       .catch((e) => setCompanyError((e as Error).message))
@@ -220,23 +219,6 @@ export default function AdminHomePage() {
                 placeholder="Complete business address"
                 className="w-full rounded border border-slate-300 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
               />
-            </div>
-
-            {/* Inventory Settings */}
-            <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4">
-              <div className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">Inventory Settings</div>
-              <label className="flex cursor-pointer items-center justify-between">
-                <div>
-                  <div className="text-sm font-medium text-slate-800 dark:text-slate-200">Allow Negative Inventory</div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">When enabled, posting transactions that reduce stock below zero is permitted.</div>
-                </div>
-                <div
-                  onClick={() => setCompany(c => ({ ...c, allow_negative_inventory: !c.allow_negative_inventory }))}
-                  className={`relative ml-6 h-6 w-11 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${company.allow_negative_inventory ? 'bg-brand-600' : 'bg-slate-300 dark:bg-slate-600'}`}
-                >
-                  <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${company.allow_negative_inventory ? 'translate-x-5' : 'translate-x-0'}`} />
-                </div>
-              </label>
             </div>
 
             {companyError && (
