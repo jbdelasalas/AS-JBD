@@ -311,7 +311,7 @@ function DraftEditForm({ inv, onSaved, onPost }: { inv: SalesInvoice; onSaved: (
         <div className="flex gap-3">
           <button type="submit" disabled={saving}
             className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
-            {saving ? 'Saving…' : 'Save Draft'}
+            {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
       </form>
