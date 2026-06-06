@@ -45,6 +45,25 @@ export async function POST(request: NextRequest) {
     results.push('ok: 036b advances_to_suppliers account');
   } catch (e) { results.push(`err: 036b advances_to_suppliers — ${(e as Error).message}`); }
 
+  // 039 — je_id on stock_adjustments + seed Inventory Adjustment account
+  try {
+    await query(`ALTER TABLE stock_adjustments ADD COLUMN IF NOT EXISTS je_id uuid REFERENCES journal_entries(id)`);
+    results.push('ok: 039 stock_adjustments.je_id');
+  } catch (e) { results.push(`err: 039 stock_adjustments.je_id — ${(e as Error).message}`); }
+
+  try {
+    await query(
+      `INSERT INTO accounts (company_id, code, name, account_type, is_control, is_active)
+       SELECT c.id, '5020', 'Inventory Adjustment', 'EXPENSE', false, true
+       FROM companies c
+       WHERE NOT EXISTS (
+         SELECT 1 FROM accounts a WHERE a.company_id = c.id
+           AND (a.code = '5020' OR a.name ILIKE '%inventory adjustment%')
+       )`,
+    );
+    results.push('ok: 039 Inventory Adjustment account seeded');
+  } catch (e) { results.push(`err: 039 Inventory Adjustment account — ${(e as Error).message}`); }
+
   // 038 — mark inventory GL accounts as control accounts (prevents manual JE posting)
   try {
     await query(
