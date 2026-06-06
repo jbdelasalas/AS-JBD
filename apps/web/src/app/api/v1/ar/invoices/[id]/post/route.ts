@@ -65,6 +65,39 @@ export async function POST(
     if (inv.status === 'cancelled') { await client.query('ROLLBACK'); return err('Invoice is cancelled', 400); }
     if (inv.status !== 'draft') { await client.query('ROLLBACK'); return err(`Invoice is ${inv.status}`, 400); }
 
+    // Inventory check (only for direct SIs not linked to a DR — DR post already decremented stock)
+    if (!inv.dr_id) {
+      const companyRows = await client.query(
+        `SELECT allow_negative_inventory FROM companies WHERE id = $1`, [inv.company_id],
+      );
+      const allowNegative = companyRows.rows[0]?.allow_negative_inventory ?? false;
+
+      if (!allowNegative) {
+        const itemLines = await client.query(
+          `SELECT sil.item_id, sil.quantity, i.name AS item_name,
+                  COALESCE(SUM(sb.qty_on_hand), 0) AS qty_on_hand
+             FROM sales_invoice_lines sil
+             JOIN items i ON i.id = sil.item_id
+             LEFT JOIN stock_balances sb ON sb.item_id = sil.item_id
+            WHERE sil.invoice_id = $1 AND sil.item_id IS NOT NULL
+            GROUP BY sil.item_id, sil.quantity, i.name`,
+          [id],
+        );
+        for (const line of itemLines.rows as Array<Record<string, unknown>>) {
+          const qty = Number(line.quantity);
+          const available = Number(line.qty_on_hand ?? 0);
+          if (available - qty < -0.0001) {
+            await client.query('ROLLBACK');
+            return err(
+              `Insufficient stock for "${line.item_name}": available ${available}, needed ${qty}. ` +
+              `Enable "Allow Negative Inventory" in Administration to permit selling without stock.`,
+              400,
+            );
+          }
+        }
+      }
+    }
+
     // Fiscal period
     const periodRows = await client.query(
       `SELECT id, status FROM fiscal_periods WHERE company_id = $1 AND $2::date BETWEEN start_date AND end_date LIMIT 1`,
