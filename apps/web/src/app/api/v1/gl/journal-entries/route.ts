@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
 
   const accountIds = [...new Set(normalizedLines.map((l) => l.account_id as string))];
   const accountRows = await query(
-    `SELECT id, code, name, is_active FROM accounts WHERE id = ANY($1) AND company_id = $2`,
+    `SELECT id, code, name, is_active, is_control FROM accounts WHERE id = ANY($1) AND company_id = $2`,
     [accountIds, companyId],
   );
   if (accountRows.length !== accountIds.length) {
@@ -120,6 +120,13 @@ export async function POST(request: NextRequest) {
   if (inactive.length) {
     return err(
       `Inactive accounts cannot be used: ${inactive.map((a) => (a as Record<string, unknown>).code).join(', ')}`,
+      400,
+    );
+  }
+  const controlled = accountRows.filter((a) => (a as Record<string, unknown>).is_control);
+  if (controlled.length) {
+    return err(
+      `Control accounts cannot be used in manual journal entries: ${controlled.map((a) => `${(a as Record<string, unknown>).code} – ${(a as Record<string, unknown>).name}`).join('; ')}. These accounts are maintained automatically through inventory and AR transactions.`,
       400,
     );
   }

@@ -43,6 +43,23 @@ export async function POST(
     }
     if (d === 0) { await client.query('ROLLBACK'); return err('Cannot post entry with zero amount', 400); }
 
+    // Block control accounts on manual entries
+    if (entry.source_module === 'manual') {
+      const ctrlCheck = await client.query(
+        `SELECT a.code, a.name FROM journal_entry_lines jel
+           JOIN accounts a ON a.id = jel.account_id
+          WHERE jel.entry_id = $1 AND a.is_control = true`,
+        [id],
+      );
+      if (ctrlCheck.rows.length > 0) {
+        await client.query('ROLLBACK');
+        return err(
+          `Cannot post to control accounts: ${ctrlCheck.rows.map((r: Record<string, unknown>) => `${r.code} – ${r.name}`).join('; ')}. These are system-managed accounts.`,
+          400,
+        );
+      }
+    }
+
     const periods = await client.query(
       `SELECT status FROM fiscal_periods WHERE id = $1 LIMIT 1`,
       [entry.fiscal_period_id],

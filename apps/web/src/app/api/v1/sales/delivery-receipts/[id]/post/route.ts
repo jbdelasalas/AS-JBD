@@ -98,7 +98,90 @@ export async function POST(
     const newSoStatus = deliveredQty >= totalQty - 0.0001 ? 'fully_delivered' : deliveredQty > 0 ? 'partially_delivered' : 'approved';
 
     await client.query(`UPDATE sales_orders SET status = $2 WHERE id = $1`, [dr.so_id, newSoStatus]);
-    await client.query(`UPDATE delivery_receipts SET status = 'posted', posted_at = now(), posted_by = $2 WHERE id = $1`, [id, auth.userId]);
+
+    // --- COGS / Inventory GL entry ---
+    let drJeId: string | null = null;
+    const periodRows = await client.query(
+      `SELECT id, status FROM fiscal_periods WHERE company_id = $1 AND $2::date BETWEEN start_date AND end_date LIMIT 1`,
+      [dr.company_id, dr.delivery_date],
+    );
+    const period = periodRows.rows[0];
+    if (period && period.status !== 'closed') {
+      const [cogsAcctRows, invAcctRows] = await Promise.all([
+        client.query(
+          `SELECT id FROM accounts WHERE company_id = $1 AND account_type = 'EXPENSE' AND (code = '5010' OR name ILIKE '%cost of goods%') AND is_active = true ORDER BY code ASC LIMIT 1`,
+          [dr.company_id],
+        ),
+        client.query(
+          `SELECT id FROM accounts WHERE company_id = $1 AND is_control = true AND account_type = 'ASSET' AND (code = '1200' OR name ILIKE '%inventory%') AND is_active = true ORDER BY code ASC LIMIT 1`,
+          [dr.company_id],
+        ),
+      ]);
+      const defaultCogsId: string | null = cogsAcctRows.rows[0]?.id ?? null;
+      const defaultInvId: string | null = invAcctRows.rows[0]?.id ?? null;
+
+      if (defaultCogsId && defaultInvId) {
+        const itemAcctRows = await client.query(
+          `SELECT drl.item_id, drl.qty_delivered, drl.unit_cost, i.name AS item_name,
+                  i.cogs_account_id, i.inventory_account_id
+             FROM delivery_receipt_lines drl
+             JOIN items i ON i.id = drl.item_id
+            WHERE drl.dr_id = $1 AND drl.unit_cost > 0`,
+          [id],
+        );
+
+        const jeLines: Array<{ account_id: string; description: string; debit: number; credit: number }> = [];
+        for (const ln of itemAcctRows.rows as Array<Record<string, unknown>>) {
+          const totalCost = parseFloat((Number(ln.qty_delivered) * Number(ln.unit_cost)).toFixed(2));
+          if (totalCost <= 0) continue;
+          const cogsAcct = (ln.cogs_account_id as string | null) ?? defaultCogsId;
+          const invAcct  = (ln.inventory_account_id as string | null) ?? defaultInvId;
+          jeLines.push({ account_id: cogsAcct, description: `COGS — ${ln.item_name} (${dr.dr_no})`, debit: totalCost, credit: 0 });
+          jeLines.push({ account_id: invAcct,  description: `Inventory — ${ln.item_name} (${dr.dr_no})`, debit: 0, credit: totalCost });
+        }
+
+        if (jeLines.length > 0) {
+          const seriesRows = await client.query(
+            `UPDATE document_series SET current_number = current_number + 1, updated_at = now()
+              WHERE company_id = $1 AND doc_type = 'journal_voucher' AND is_active = true RETURNING prefix, current_number`,
+            [dr.company_id],
+          );
+          if (seriesRows.rows[0]) {
+            const jeNo = `${seriesRows.rows[0].prefix}${String(Number(seriesRows.rows[0].current_number)).padStart(6, '0')}`;
+            const jeInsert = await client.query(
+              `INSERT INTO journal_entries (company_id, branch_id, entry_no, entry_date, fiscal_period_id,
+                 reference, memo, source_module, source_doc_type, source_doc_id, status, created_by)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,'inventory','delivery_receipt',$8,'posted',$9) RETURNING id`,
+              [dr.company_id, dr.branch_id ?? null, jeNo, dr.delivery_date, period.id,
+               dr.dr_no, `DR ${dr.dr_no} — Cost of Goods Sold`, id, auth.userId],
+            );
+            drJeId = jeInsert.rows[0].id;
+            for (let i = 0; i < jeLines.length; i++) {
+              const l = jeLines[i];
+              await client.query(
+                `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
+                 VALUES ($1,$2,$3,$4,$5,$6,'PHP',1,$5,$6)`,
+                [drJeId, i + 1, l.account_id, l.description, l.debit, l.credit],
+              );
+            }
+            await client.query(
+              `INSERT INTO account_balances (account_id, fiscal_period_id, debit_total, credit_total)
+               SELECT jel.account_id, $2, SUM(jel.debit), SUM(jel.credit) FROM journal_entry_lines jel WHERE jel.entry_id = $1 GROUP BY jel.account_id
+               ON CONFLICT (account_id, fiscal_period_id) DO UPDATE SET
+                 debit_total  = account_balances.debit_total  + EXCLUDED.debit_total,
+                 credit_total = account_balances.credit_total + EXCLUDED.credit_total`,
+              [drJeId, period.id],
+            );
+            await client.query(`UPDATE journal_entries SET posted_at = now(), posted_by = $2 WHERE id = $1`, [drJeId, auth.userId]);
+          }
+        }
+      }
+    }
+
+    await client.query(
+      `UPDATE delivery_receipts SET status = 'posted', posted_at = now(), posted_by = $2, je_id = $3 WHERE id = $1`,
+      [id, auth.userId, drJeId],
+    );
 
     await client.query(
       `INSERT INTO audit_log (user_id, company_id, action, entity_type, entity_id) VALUES ($1, $2, $3, $4, $5)`,

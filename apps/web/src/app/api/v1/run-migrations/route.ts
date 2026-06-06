@@ -2636,6 +2636,18 @@ export async function POST(request: NextRequest) {
     results.push('036 advances_to_suppliers account: ok');
   } catch (e) { results.push(`036 advances_to_suppliers account FAILED: ${(e as Error).message}`); }
 
+  // 038 — mark inventory GL accounts as control accounts (prevents manual JE posting)
+  try {
+    await query(
+      `UPDATE accounts SET is_control = true
+        WHERE is_active = true
+          AND account_type = 'ASSET'
+          AND (code = '1200' OR name ILIKE '%merchandise inventory%' OR name ILIKE '%finished goods inventory%' OR name ILIKE '%raw materials inventory%')
+          AND is_control = false`,
+    );
+    results.push('038 inventory control accounts: ok');
+  } catch (e) { results.push(`038 inventory control accounts: ${(e as Error).message}`); }
+
   // 037 — branch/building/cost_center on sales_order_lines and sales_invoice_lines
   const lineTags037: [string, string][] = [
     ['sales_order_lines.branch_id',       `ALTER TABLE sales_order_lines    ADD COLUMN IF NOT EXISTS branch_id       uuid REFERENCES branches(id)`],
