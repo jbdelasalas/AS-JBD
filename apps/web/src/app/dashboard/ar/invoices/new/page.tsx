@@ -91,9 +91,9 @@ function NewInvoiceForm() {
               discount_pct:      l.discount_pct,
               vat_rate:          l.vat_rate,
               uom:               l.item_uom ?? '',
-              branch_id:         (l as Record<string,unknown>).branch_id as string ?? newTags.branch_id,
-              building_id:       (l as Record<string,unknown>).building_id as string ?? newTags.building_id,
-              cost_center_id:    (l as Record<string,unknown>).cost_center_id as string ?? newTags.cost_center_id,
+              branch_id:         (l as unknown as Record<string,unknown>).branch_id as string ?? newTags.branch_id,
+              building_id:       (l as unknown as Record<string,unknown>).building_id as string ?? newTags.building_id,
+              cost_center_id:    (l as unknown as Record<string,unknown>).cost_center_id as string ?? newTags.cost_center_id,
               grow_reference_id: l.grow_reference_id ?? newTags.grow_reference_id,
             })));
           }

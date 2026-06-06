@@ -444,12 +444,12 @@ export default function SalesInvoiceDetailPage() {
         ))}
       </div>
 
-      {(invAny.branch_code || invAny.building_code || invAny.cost_center_code || invAny.grow_ref_code) && (
+      {(Boolean(invAny.branch_code) || Boolean(invAny.building_code) || Boolean(invAny.cost_center_code) || Boolean(invAny.grow_ref_code)) && (
         <div className="mb-3 flex flex-wrap gap-2 text-xs">
-          {invAny.branch_code && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Location: {invAny.branch_code as string}</span>}
-          {invAny.building_code && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Building: {invAny.building_code as string}</span>}
-          {invAny.cost_center_code && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Cost Center: {invAny.cost_center_code as string}</span>}
-          {invAny.grow_ref_code && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Grow: {invAny.grow_ref_code as string}</span>}
+          {Boolean(invAny.branch_code) && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Location: {invAny.branch_code as string}</span>}
+          {Boolean(invAny.building_code) && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Building: {invAny.building_code as string}</span>}
+          {Boolean(invAny.cost_center_code) && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Cost Center: {invAny.cost_center_code as string}</span>}
+          {Boolean(invAny.grow_ref_code) && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Grow: {invAny.grow_ref_code as string}</span>}
         </div>
       )}
 
