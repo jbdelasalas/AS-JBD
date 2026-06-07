@@ -118,6 +118,7 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < lines.length; i++) {
       const l = lines[i] as Record<string, unknown>;
       const qtyReceived = Number(l.qty_received);
+      const unitCost = Number(l.unit_cost ?? 0);
       if (qtyReceived <= 0) continue;
 
       await client.query(
@@ -126,7 +127,7 @@ export async function POST(request: NextRequest) {
             branch_id, building_id, cost_center_id, grow_reference_id)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
         [
-          header.id, l.po_line_id, i + 1, qtyReceived, Number(l.unit_cost ?? 0),
+          header.id, l.po_line_id, i + 1, qtyReceived, unitCost,
           (l.branch_id as string) || null,
           (l.building_id as string) || null,
           (l.cost_center_id as string) || null,
@@ -140,6 +141,44 @@ export async function POST(request: NextRequest) {
           WHERE id = $2`,
         [qtyReceived, l.po_line_id],
       );
+
+      // Resolve item_id from PO line for stock updates
+      const polItemRows = await client.query<{ item_id: string }>(
+        `SELECT item_id FROM purchase_order_lines WHERE id = $1 LIMIT 1`,
+        [l.po_line_id],
+      );
+      const itemId = polItemRows.rows[0]?.item_id ?? null;
+      const warehouseId = (dto.warehouse_id as string) || null;
+
+      if (itemId && warehouseId) {
+        // Weighted-average cost update
+        await client.query(
+          `INSERT INTO stock_balances (item_id, warehouse_id, qty_on_hand, avg_cost, last_movement_at)
+           VALUES ($1, $2, $3, $4, now())
+           ON CONFLICT (item_id, warehouse_id) DO UPDATE
+             SET avg_cost = CASE
+                   WHEN stock_balances.qty_on_hand + $3 > 0
+                   THEN (stock_balances.qty_on_hand * stock_balances.avg_cost + $3 * $4)
+                          / (stock_balances.qty_on_hand + $3)
+                   ELSE $4
+                 END,
+                 qty_on_hand = stock_balances.qty_on_hand + $3,
+                 last_movement_at = now()`,
+          [itemId, warehouseId, qtyReceived, unitCost],
+        );
+
+        await client.query(
+          `INSERT INTO stock_movements
+             (company_id, item_id, warehouse_id, movement_type, quantity, unit_cost, total_cost,
+              reference_type, reference_id, reference_no, created_by)
+           VALUES ($1,$2,$3,'receipt',$4,$5,$6,'goods_receipt',$7,$8,$9)`,
+          [
+            companyId, itemId, warehouseId,
+            qtyReceived, unitCost, qtyReceived * unitCost,
+            header.id, grnNo, auth.userId,
+          ],
+        );
+      }
     }
 
     // Update PO status based on receipt totals
