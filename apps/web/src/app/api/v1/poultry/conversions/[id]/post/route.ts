@@ -133,9 +133,10 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     }
 
     // --- GL: DR output inventory accounts, CR source inventory account ---
+    const jeDate = rec.transaction_date ?? new Date().toISOString().split('T')[0];
     const periodRows = await client.query(
       `SELECT id, status FROM fiscal_periods WHERE company_id = $1 AND $2::date BETWEEN start_date AND end_date LIMIT 1`,
-      [rec.company_id, rec.transaction_date],
+      [rec.company_id, jeDate],
     );
     const period = periodRows.rows[0];
     if (period && period.status !== 'closed' && outputCostMap.length > 0) {
@@ -167,7 +168,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
               `INSERT INTO journal_entries (company_id, entry_no, entry_date, fiscal_period_id,
                  reference, memo, source_module, source_doc_type, source_doc_id, status, created_by)
                VALUES ($1,$2,$3::date,$4,$5,$6,'inventory','conversion',$7,'posted',$8) RETURNING id`,
-              [rec.company_id, jeNo, rec.transaction_date, period.id,
+              [rec.company_id, jeNo, jeDate, period.id,
                rec.doc_no, `Conversion ${rec.doc_no}`, params.id, auth.userId],
             );
             const jeId = jeInsert.rows[0].id;

@@ -129,9 +129,10 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
     // --- GL: DR Inventory per item, CR Inventory Adjustment (production recognition) ---
     let tsJeId: string | null = null;
+    const jeDate = rec.transfer_date ?? new Date().toISOString().split('T')[0];
     const periodRows = await client.query(
       `SELECT id, status FROM fiscal_periods WHERE company_id = $1 AND $2::date BETWEEN start_date AND end_date LIMIT 1`,
-      [rec.company_id, rec.transfer_date],
+      [rec.company_id, jeDate],
     );
     const period = periodRows.rows[0];
     if (period && period.status !== 'closed' && tsWarehouseId) {
@@ -189,7 +190,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
               `INSERT INTO journal_entries (company_id, entry_no, entry_date, fiscal_period_id,
                  reference, memo, source_module, source_doc_type, source_doc_id, status, created_by)
                VALUES ($1,$2,$3::date,$4,$5,$6,'inventory','tally_sheet',$7,'posted',$8) RETURNING id`,
-              [rec.company_id, jeNo, rec.transfer_date, period.id,
+              [rec.company_id, jeNo, jeDate, period.id,
                rec.doc_no, `Tally Sheet ${rec.doc_no}`, params.id, auth.userId],
             );
             const jeId = jeInsert.rows[0].id;
