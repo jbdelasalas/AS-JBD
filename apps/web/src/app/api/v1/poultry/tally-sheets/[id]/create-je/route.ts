@@ -4,6 +4,16 @@ import { query, getPool } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
 
+// node-postgres returns DATE columns as JS Date objects; convert safely to YYYY-MM-DD
+function toISODate(v: unknown): string {
+  if (!v) return '';
+  if (v instanceof Date) return v.toISOString().split('T')[0];
+  const s = String(v);
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10);
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
+}
+
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   let auth: Awaited<ReturnType<typeof requireAuth>>;
   try { auth = await requireAuth(_req); } catch (e) { return e as Response; }
@@ -17,8 +27,9 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     const lines = await query<Record<string, unknown>>(
       `SELECT * FROM tally_sheet_lines WHERE tally_sheet_id = $1`, [params.id]);
 
-    const jeDate = rec.transfer_date ? String(rec.transfer_date).substring(0, 10)
-      : (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
+    const _n = new Date();
+    const jeDate = toISODate(rec.transfer_date)
+      || `${_n.getFullYear()}-${String(_n.getMonth()+1).padStart(2,'0')}-${String(_n.getDate()).padStart(2,'0')}`;
 
     // Check fiscal period
     const periodRows = await query<Record<string, unknown>>(

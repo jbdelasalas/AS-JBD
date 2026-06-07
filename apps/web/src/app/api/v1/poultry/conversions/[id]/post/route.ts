@@ -133,7 +133,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     }
 
     // --- GL: DR output inventory accounts, CR source inventory account ---
-    const jeDate = rec.transaction_date ?? new Date().toISOString().split('T')[0];
+    const _td = rec.transaction_date;
+    const jeDate = (_td instanceof Date ? _td.toISOString().split('T')[0] : _td ? String(_td).substring(0, 10) : null) ?? new Date().toISOString().split('T')[0];
     const periodRows = await client.query(
       `SELECT id, status FROM fiscal_periods WHERE company_id = $1 AND $2::date BETWEEN start_date AND end_date LIMIT 1`,
       [rec.company_id, jeDate],

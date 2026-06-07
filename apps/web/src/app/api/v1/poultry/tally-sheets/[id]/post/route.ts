@@ -129,7 +129,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
     // --- GL: DR Inventory per item, CR Inventory Adjustment (production recognition) ---
     let tsJeId: string | null = null;
-    const jeDate = rec.transfer_date ?? new Date().toISOString().split('T')[0];
+    const _rd = rec.transfer_date;
+    const jeDate = (_rd instanceof Date ? _rd.toISOString().split('T')[0] : _rd ? String(_rd).substring(0, 10) : null) ?? new Date().toISOString().split('T')[0];
     const periodRows = await client.query(
       `SELECT id, status FROM fiscal_periods WHERE company_id = $1 AND $2::date BETWEEN start_date AND end_date LIMIT 1`,
       [rec.company_id, jeDate],
