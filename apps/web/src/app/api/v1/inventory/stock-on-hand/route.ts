@@ -29,24 +29,19 @@ export async function GET(request: NextRequest) {
     baseWhere += ` AND (i.sku ILIKE $${params.length} OR i.name ILIKE $${params.length})`;
   }
 
-  // Normalise poultry_inventory_balance: if warehouse_id IS NULL, fall back to
-  // the first warehouse of the company (alphabetical) so it shows up somewhere.
+  // Normalise poultry_inventory_balance: only include rows that have a warehouse_id.
+  // NULL-warehouse rows are excluded so they don't inflate a random warehouse's balance.
   const rows = await query(
     `WITH pib_norm AS (
        SELECT
          p.item_id,
-         COALESCE(p.warehouse_id,
-           (SELECT id FROM warehouses WHERE company_id = $1 ORDER BY name LIMIT 1)
-         ) AS warehouse_id,
+         p.warehouse_id,
          SUM(p.qty_kgs)    AS qty_kgs,
          MAX(p.avg_cost)   AS avg_cost,
          MAX(p.last_updated) AS last_updated
        FROM poultry_inventory_balance p
-       WHERE p.company_id = $1
-       GROUP BY p.item_id,
-         COALESCE(p.warehouse_id,
-           (SELECT id FROM warehouses WHERE company_id = $1 ORDER BY name LIMIT 1)
-         )
+       WHERE p.company_id = $1 AND p.warehouse_id IS NOT NULL
+       GROUP BY p.item_id, p.warehouse_id
      ),
      combined AS (
        SELECT
