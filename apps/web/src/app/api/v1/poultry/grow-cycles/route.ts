@@ -102,6 +102,32 @@ export async function POST(request: NextRequest) {
           [...baseInsertArgs, dto.remarks ?? null, auth.userId],
         );
     await client.query(`UPDATE chick_batches SET status='in_growing', heads_available=heads_available-$1 WHERE id=$2`, [heads, dto.batch_id]);
+
+    // Deduct DOC from stock_balances — they leave the warehouse and enter the farm
+    const batchItemRow = await client.query(
+      `SELECT item_id FROM chick_batches WHERE id = $1 LIMIT 1`, [dto.batch_id]);
+    const docItemId = batchItemRow.rows[0]?.item_id as string | null;
+    const gcWhRow = dto.branch_id
+      ? await client.query(`SELECT id FROM warehouses WHERE branch_id = $1 LIMIT 1`, [dto.branch_id])
+      : { rows: [] as Record<string, unknown>[] };
+    const gcWarehouseId = gcWhRow.rows[0]?.id as string | null;
+    if (docItemId && gcWarehouseId) {
+      await client.query(
+        `UPDATE stock_balances SET qty_on_hand = GREATEST(0, qty_on_hand - $1), last_movement_at = now()
+          WHERE item_id = $2 AND warehouse_id = $3`,
+        [heads, docItemId, gcWarehouseId],
+      );
+      await client.query(
+        `INSERT INTO stock_movements
+           (company_id, item_id, warehouse_id, movement_type, quantity, unit_cost, total_cost,
+            reference_type, reference_id, reference_no, created_by)
+         VALUES ($1,$2,$3,'grow_cycle_in',$4,$5,$6,'grow_cycle',$7,$8,$9)`,
+        [companyId, docItemId, gcWarehouseId,
+         -heads, Number(dto.chick_price_per_head ?? 0), heads * Number(dto.chick_price_per_head ?? 0),
+         hdr.id, docNo, auth.userId],
+      );
+    }
+
     await client.query('COMMIT');
     return ok(hdr, 201);
   } catch (e) { await client.query('ROLLBACK'); return err((e as Error).message, 500); }

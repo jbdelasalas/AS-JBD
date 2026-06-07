@@ -267,12 +267,35 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       [params.id],
     );
     if (Number(cnt) > 0) return err('Cannot delete: linked tally sheets exist', 409);
+
+    // Get grow cycle details before deleting to reverse stock deductions
+    const [gcDel] = await query<Record<string, unknown>>(
+      `SELECT g.heads_in, g.chick_price_per_head, g.branch_id, g.company_id, g.doc_no, b.item_id AS doc_item_id
+         FROM grow_cycles g
+         JOIN chick_batches b ON b.id = g.batch_id
+        WHERE g.id = $1`, [params.id]);
+
     await query(`DELETE FROM grow_item_consumption  WHERE grow_cycle_id = $1`, [params.id]);
     await query(`DELETE FROM grow_daily_mortality   WHERE grow_cycle_id = $1`, [params.id]);
     await query(`DELETE FROM grow_weekly_weights    WHERE grow_cycle_id = $1`, [params.id]);
     await query(`DELETE FROM grow_cycles            WHERE id           = $1`, [params.id]);
     // Return batch to available if it was in_growing
     await query(`UPDATE chick_batches SET status='available', heads_available=heads_in WHERE id=$1 AND status='in_growing'`, [rec.batch_id]);
+
+    // Return DOC back to stock_balances
+    if (gcDel?.doc_item_id && gcDel.branch_id) {
+      const whRows = await query<{ id: string }>(
+        `SELECT id FROM warehouses WHERE branch_id = $1 LIMIT 1`, [gcDel.branch_id]);
+      const whId = whRows[0]?.id;
+      if (whId) {
+        await query(
+          `UPDATE stock_balances SET qty_on_hand = qty_on_hand + $1, last_movement_at = now()
+            WHERE item_id = $2 AND warehouse_id = $3`,
+          [gcDel.heads_in, gcDel.doc_item_id, whId],
+        );
+      }
+    }
+
     return new Response(null, { status: 204 });
   } catch (e: unknown) { return err((e as Error).message, 500); }
 }
