@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
         `INSERT INTO stock_movements
            (company_id, item_id, warehouse_id, movement_type, quantity, unit_cost, total_cost,
             reference_type, reference_id, reference_no, created_by)
-         VALUES ($1,$2,$3,'receipt',$4,$5,$6,'goods_receipt',$7,$8,'system-backfill')
+         VALUES ($1,$2,$3,'receipt',$4,$5,$6,'goods_receipt',$7,$8,NULL)
          ON CONFLICT DO NOTHING`,
         [compId, itemId, whId, qty, cost, qty * cost, grId, grnNo],
       );
