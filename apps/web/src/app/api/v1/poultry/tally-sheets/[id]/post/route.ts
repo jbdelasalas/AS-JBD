@@ -72,12 +72,12 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       }
     }
 
-    // Resolve warehouse from destination_id or branch_id so stock_balances stays in sync
+    // Resolve warehouse for stock_balances sync: try branch first, fall back to tally sheet's warehouse_id
     const tsBranchId = (rec.destination_id ?? rec.branch_id) as string | null;
     const tsWhRow = tsBranchId
       ? await client.query(`SELECT id FROM warehouses WHERE branch_id = $1 LIMIT 1`, [tsBranchId])
       : { rows: [] };
-    const tsWarehouseId: string | null = tsWhRow.rows[0]?.id ?? null;
+    const tsWarehouseId: string | null = (tsWhRow.rows[0]?.id as string | null) ?? (rec.warehouse_id as string | null) ?? null;
 
     // Write inventory for each line
     for (const l of lines) {
