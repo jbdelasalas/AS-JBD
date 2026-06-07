@@ -158,7 +158,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       const defaultInvId: string | null = defInvRows.rows[0]?.id ?? null;
       const adjAcctId: string | null = adjAcctRows.rows[0]?.id ?? null;
 
-      if (defaultInvId && adjAcctId) {
+      // Only adjAcctId is required; defaultInvId is a fallback for items without inventory_account_id set
+      if (adjAcctId) {
         const itemAcctRows = await client.query(
           `SELECT id, inventory_account_id, name FROM items WHERE id = ANY($1::uuid[])`,
           [lines.map(l => l.item_id)],
@@ -181,6 +182,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
           if (amount <= 0) continue;
           const info = itemMap.get(String(l.item_id));
           const itemInvId = info?.inventory_account_id ?? defaultInvId;
+          if (!itemInvId) continue; // skip lines where neither item-level nor default account exists
           jeLines.push({ account_id: itemInvId, description: `Harvest — ${info?.name ?? l.item_id} (${rec.doc_no})`, debit: amount, credit: 0 });
           totalAmount = parseFloat((totalAmount + amount).toFixed(2));
         }

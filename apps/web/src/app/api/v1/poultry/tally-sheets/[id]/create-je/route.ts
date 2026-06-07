@@ -52,8 +52,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     ]);
     const defaultInvId: string | null = (defInvRows[0]?.id as string) ?? null;
     const adjAcctId: string | null = (adjAcctRows[0]?.id as string) ?? null;
-    if (!defaultInvId) return err('No inventory account (code 1200 or name containing "inventory") found in Chart of Accounts. Please create one.', 400);
-    if (!adjAcctId) return err('No inventory adjustment account (code 5020 or "inventory adjustment") found. Create it in Chart of Accounts.', 400);
+    // defaultInvId is only a fallback — items may have inventory_account_id set directly
+    if (!adjAcctId) return err('No inventory adjustment account (code 5020 or name "inventory adjustment") found. Create it in Chart of Accounts.', 400);
 
     // Compute avg cost per kg from grow cycle
     // Strategy: total grow cost (DOC + consumption) ÷ total harvested KGS for this cycle
@@ -120,6 +120,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       if (amount <= 0) continue;
       const info = itemMap.get(String(l.item_id));
       const itemInvId = info?.inventory_account_id ?? defaultInvId;
+      if (!itemInvId) return err(`Item "${info?.name ?? l.item_id}" has no inventory account set. Set it in Item Setup → Inventory Account.`, 400);
       jeLines.push({ account_id: itemInvId, description: `Harvest — ${info?.name ?? l.item_id} (${rec.doc_no})`, debit: amount, credit: 0 });
       totalAmount = parseFloat((totalAmount + amount).toFixed(2));
     }
