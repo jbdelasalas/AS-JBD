@@ -22,10 +22,7 @@ export async function POST(request: NextRequest) {
   async function getSysUser(compId: string): Promise<string | null> {
     if (sysUserCache.has(compId)) return sysUserCache.get(compId)!;
     const r = await client.query(
-      `SELECT u.id FROM users u
-        JOIN user_companies uc ON uc.user_id = u.id
-       WHERE uc.company_id = $1
-       ORDER BY u.created_at LIMIT 1`,
+      `SELECT user_id AS id FROM user_roles WHERE company_id = $1 LIMIT 1`,
       [compId],
     );
     const uid = r.rows[0]?.id ?? null;
