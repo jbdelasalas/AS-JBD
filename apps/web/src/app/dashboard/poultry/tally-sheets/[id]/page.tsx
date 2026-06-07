@@ -575,6 +575,19 @@ export default function TallySheetDetailPage() {
               View Journal Entry
             </Link>
           )}
+          {doc.status === 'posted' && !doc.je_id && (
+            <button onClick={async () => {
+              setBusy(true); setMsg(null);
+              try {
+                await api.post(`/poultry/tally-sheets/${id}/create-je`, {});
+                load();
+              } catch (e: unknown) { setMsg({ text: (e as Error).message, type: 'error' }); }
+              finally { setBusy(false); }
+            }} disabled={busy}
+              className="rounded border border-amber-400 bg-amber-50 px-5 py-2 text-sm text-amber-800 hover:bg-amber-100 disabled:opacity-50">
+              Create Journal Entry
+            </button>
+          )}
           {doc.status === 'posted' && (
             <>
               <button type="button"
