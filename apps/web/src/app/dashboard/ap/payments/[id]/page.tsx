@@ -92,6 +92,11 @@ export default function PaymentDetailPage() {
               Post Payment
             </button>
           )}
+          <button
+            onClick={() => window.open(`/dashboard/ap/payments/${id}/print`, '_blank')}
+            className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
+            Print Voucher
+          </button>
           {payment.je_id && (
             <Link href={`/dashboard/gl/journal-entries/${payment.je_id}`}
               className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
