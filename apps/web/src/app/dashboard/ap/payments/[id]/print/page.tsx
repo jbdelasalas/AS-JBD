@@ -91,8 +91,7 @@ export default function PrintVoucherPage() {
     || payment.applications.map(a => `Payment for ${a.internal_no}${a.bill_no ? ` (${a.bill_no})` : ''}`).join('; ')
     || `Payment to ${payment.supplier_name}`;
 
-  const BLANK_PART_ROWS = Math.max(0, 5);
-  const BLANK_GL_ROWS   = Math.max(0, 6 - lines.length);
+  const BLANK_GL_ROWS = Math.max(0, 6 - lines.length);
 
   return (
     <>
@@ -201,26 +200,20 @@ export default function PrintVoucherPage() {
                 PHP{n2(payment.amount)}
               </td>
             </tr>
-            {Array.from({ length: BLANK_PART_ROWS }).map((_, i) => (
-              <tr key={i}>
-                <td style={cell({ height: '7mm' })}>&nbsp;</td>
-                <td style={cell()}>&nbsp;</td>
-              </tr>
-            ))}
           </tbody>
         </table>
 
         {/* ── GL Accounts table ── */}
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '3mm', tableLayout: 'fixed' }}>
           <colgroup>
-            <col style={{ width: '13%' }} />
-            <col style={{ width: '51%' }} />
+            <col style={{ width: '16%' }} />
+            <col style={{ width: '48%' }} />
             <col style={{ width: '18%' }} />
             <col style={{ width: '18%' }} />
           </colgroup>
           <thead>
             <tr>
-              <th style={th()}>ACCOUNT NO.</th>
+              <th style={th({ whiteSpace: 'nowrap' })}>ACCOUNT NO.</th>
               <th style={th()}>ACCOUNT NAME</th>
               <th style={th()}>DEBIT</th>
               <th style={th()}>CREDIT</th>
