@@ -151,9 +151,21 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       await client.query(`INSERT INTO grow_weekly_weights (grow_cycle_id, week_no, weight_kg) VALUES ${vals}`, args);
     }
 
-    // Item consumption — bulk replace
+    // Item consumption — bulk replace + sync stock_balances
     const consumption = dto.item_consumption as Array<Record<string, unknown>> | undefined;
     if (consumption !== undefined) {
+      // Snapshot previous totals per item before deleting
+      const prevRows = await client.query(
+        `SELECT item_id, SUM(quantity) AS qty, MAX(unit_cost) AS unit_cost
+           FROM grow_item_consumption WHERE grow_cycle_id = $1 GROUP BY item_id`,
+        [params.id],
+      );
+      const prevMap = new Map<string, { qty: number; unit_cost: number }>(
+        (prevRows.rows as Array<Record<string, unknown>>).map(r => [
+          String(r.item_id), { qty: Number(r.qty), unit_cost: Number(r.unit_cost) },
+        ]),
+      );
+
       await client.query(`DELETE FROM grow_item_consumption WHERE grow_cycle_id = $1`, [params.id]);
       const active = consumption.filter(c => c.item_id);
       if (active.length) {
@@ -167,6 +179,63 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
           `INSERT INTO grow_item_consumption (grow_cycle_id, line_no, item_id, quantity, uom, unit_cost, total_cost, remarks) VALUES ${vals}`,
           args,
         );
+      }
+
+      // Resolve warehouse from grow cycle branch_id
+      const gcRow = await client.query(
+        `SELECT g.branch_id, g.company_id, g.cycle_no,
+                w.id AS warehouse_id
+           FROM grow_cycles g
+           LEFT JOIN warehouses w ON w.branch_id = g.branch_id
+          WHERE g.id = $1 LIMIT 1`,
+        [params.id],
+      );
+      const gc = gcRow.rows[0] as Record<string, unknown> | null;
+      const warehouseId = gc?.warehouse_id as string | null;
+      const companyId = gc?.company_id as string | null;
+      const cycleNo = gc?.cycle_no as string | null;
+
+      if (warehouseId && companyId) {
+        // Build new totals per item
+        const newMap = new Map<string, { qty: number; unit_cost: number }>();
+        for (const c of active) {
+          const itemId = String(c.item_id);
+          const qty = Number(c.quantity ?? 0);
+          const uc = Number(c.unit_cost ?? 0);
+          const prev = newMap.get(itemId);
+          newMap.set(itemId, { qty: (prev?.qty ?? 0) + qty, unit_cost: uc });
+        }
+
+        // All item IDs touched (union of old and new)
+        const allItemIds = new Set([...prevMap.keys(), ...newMap.keys()]);
+        for (const itemId of allItemIds) {
+          const prevQty = prevMap.get(itemId)?.qty ?? 0;
+          const newQty = newMap.get(itemId)?.qty ?? 0;
+          const delta = newQty - prevQty; // positive = more consumed, negative = less consumed
+          if (Math.abs(delta) < 0.0001) continue;
+          const unitCost = newMap.get(itemId)?.unit_cost ?? prevMap.get(itemId)?.unit_cost ?? 0;
+
+          // delta > 0 means additional consumption → deduct from stock
+          // delta < 0 means reduced consumption → return to stock
+          await client.query(
+            `UPDATE stock_balances SET qty_on_hand = qty_on_hand - $1, last_movement_at = now()
+              WHERE item_id = $2 AND warehouse_id = $3`,
+            [delta, itemId, warehouseId],
+          );
+          await client.query(
+            `INSERT INTO stock_movements
+               (company_id, item_id, warehouse_id, movement_type, quantity, unit_cost, total_cost,
+                reference_type, reference_id, reference_no, notes, created_by)
+             VALUES ($1,$2,$3,'consumption',$4,$5,$6,'grow_cycle',$7,$8,$9,$10)`,
+            [
+              companyId, itemId, warehouseId,
+              -delta, unitCost, Math.abs(delta) * unitCost,
+              params.id, cycleNo ?? params.id,
+              `Grow cycle consumption`,
+              auth.userId,
+            ],
+          );
+        }
       }
     }
 
