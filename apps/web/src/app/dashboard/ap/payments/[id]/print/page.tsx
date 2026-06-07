@@ -91,7 +91,6 @@ export default function PrintVoucherPage() {
     || payment.applications.map(a => `Payment for ${a.internal_no}${a.bill_no ? ` (${a.bill_no})` : ''}`).join('; ')
     || `Payment to ${payment.supplier_name}`;
 
-  const BLANK_GL_ROWS = Math.max(0, 6 - lines.length);
 
   return (
     <>
@@ -203,8 +202,8 @@ export default function PrintVoucherPage() {
           </tbody>
         </table>
 
-        {/* ── GL Accounts table ── */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '3mm', tableLayout: 'fixed' }}>
+        {/* ── GL Accounts table — data rows + tall filler + PREPARED/VERIFIED/APPROVED at bottom ── */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '0', tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: '16%' }} />
             <col style={{ width: '48%' }} />
@@ -220,6 +219,7 @@ export default function PrintVoucherPage() {
             </tr>
           </thead>
           <tbody>
+            {/* Data rows */}
             {lines.map((l, i) => (
               <tr key={i}>
                 <td style={cell({ textAlign: 'center' })}>{l.account_code}</td>
@@ -228,60 +228,60 @@ export default function PrintVoucherPage() {
                 <td style={cell({ textAlign: 'right' })}>{l.credit > 0 ? n2(l.credit) : ''}</td>
               </tr>
             ))}
-            {Array.from({ length: BLANK_GL_ROWS }).map((_, i) => (
-              <tr key={i}>
-                <td style={cell({ height: '7mm' })}>&nbsp;</td>
-                <td style={cell()}>&nbsp;</td>
-                <td style={cell()}>&nbsp;</td>
-                <td style={cell()}>&nbsp;</td>
-              </tr>
-            ))}
+            {/* Single tall filler row — extends box downward */}
+            <tr>
+              <td style={cell({ height: '55mm', verticalAlign: 'top' })}>&nbsp;</td>
+              <td style={cell({ verticalAlign: 'top' })}>&nbsp;</td>
+              <td style={cell({ verticalAlign: 'top' })}>&nbsp;</td>
+              <td style={cell({ verticalAlign: 'top' })}>&nbsp;</td>
+            </tr>
+            {/* PREPARED BY | VERIFIED BY | APPROVED BY — bottom row inside the GL border */}
+            <tr>
+              <td colSpan={4} style={{ border: B, padding: 0 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: '33.33%' }} />
+                    <col style={{ width: '33.33%' }} />
+                    <col style={{ width: '33.34%' }} />
+                  </colgroup>
+                  <tbody>
+                    <tr>
+                      <td style={{ borderRight: B, padding: '4px 6px', verticalAlign: 'top' }}>
+                        <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>PREPARED BY:</div>
+                        <div style={{ marginTop: '9mm', borderTop: B, paddingTop: '2px', minHeight: '5mm' }}>&nbsp;</div>
+                      </td>
+                      <td style={{ borderRight: B, padding: '4px 6px', verticalAlign: 'top' }}>
+                        <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>VERIFIED BY:</div>
+                        <div style={{ marginTop: '9mm', borderTop: B, paddingTop: '2px', minHeight: '5mm' }}>&nbsp;</div>
+                      </td>
+                      <td style={{ padding: '4px 6px', verticalAlign: 'top' }}>
+                        <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>APPROVED BY:</div>
+                        <div style={{ marginTop: '9mm', borderTop: B, paddingTop: '2px', minHeight: '5mm' }}>&nbsp;</div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
           </tbody>
         </table>
 
-        {/* ── Signature section ── */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-          <colgroup>
-            <col style={{ width: '33.33%' }} />
-            <col style={{ width: '33.33%' }} />
-            <col style={{ width: '33.34%' }} />
-          </colgroup>
-          <tbody>
-            {/* Row 1: Prepared / Verified / Approved */}
-            <tr>
-              <td style={cell({ verticalAlign: 'bottom', paddingBottom: '3px' })}>
-                <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>PREPARED BY:</div>
-                <div style={{ marginTop: '9mm', borderTop: B, paddingTop: '2px', fontSize: '9pt', minHeight: '5mm', textAlign: 'center' }}>&nbsp;</div>
-              </td>
-              <td style={cell({ verticalAlign: 'bottom', paddingBottom: '3px' })}>
-                <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>VERIFIED BY:</div>
-                <div style={{ marginTop: '9mm', borderTop: B, paddingTop: '2px', fontSize: '9pt', minHeight: '5mm', textAlign: 'center' }}>&nbsp;</div>
-              </td>
-              <td style={cell({ verticalAlign: 'bottom', paddingBottom: '3px' })}>
-                <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>APPROVED BY:</div>
-                <div style={{ marginTop: '9mm', borderTop: B, paddingTop: '2px', fontSize: '9pt', minHeight: '5mm', textAlign: 'center' }}>&nbsp;</div>
-              </td>
-            </tr>
-            {/* Row 2: Check No + blank + Received By */}
-            <tr>
-              <td colSpan={2} style={cell({ verticalAlign: 'top' })}>
-                <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>CHECK NO.</div>
-                <div style={{ borderBottom: B, marginTop: '8mm' }}>&nbsp;</div>
-              </td>
-              <td style={cell({ verticalAlign: 'top' })}>
-                <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>RECEIVED BY:</div>
-                <div style={{ marginTop: '8mm' }}>&nbsp;</div>
-              </td>
-            </tr>
-            {/* Row 3: Signature over printed name */}
-            <tr>
-              <td colSpan={3} style={cell({ textAlign: 'right', paddingBottom: '4px', paddingRight: '8px' })}>
-                <div style={{ fontSize: '9pt', fontWeight: 'bold', marginBottom: '8mm' }}>SIGNATURE OVER PRINTED NAME</div>
-                <div style={{ borderTop: B, width: '70mm', marginLeft: 'auto' }}>&nbsp;</div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        {/* ── CHECK NO. + RECEIVED BY — outside the bordered table ── */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: '4mm', gap: '8mm' }}>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: '9pt', fontWeight: 'bold' }}>CHECK NO.</span>
+            <div style={{ borderBottom: B, marginTop: '6mm', width: '50mm' }}>&nbsp;</div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: '9pt', fontWeight: 'bold' }}>RECEIVED BY:</span>
+          </div>
+        </div>
+
+        {/* ── SIGNATURE OVER PRINTED NAME ── */}
+        <div style={{ textAlign: 'center', marginTop: '6mm' }}>
+          <div style={{ fontSize: '9pt', fontWeight: 'bold', marginBottom: '6mm' }}>SIGNATURE OVER PRINTED NAME</div>
+          <div style={{ borderTop: B, width: '70mm', margin: '0 auto' }}>&nbsp;</div>
+        </div>
 
       </div>
 
