@@ -53,6 +53,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     // --- GL: Inventory Adjustment entries for each variance line ---
+    let countJeId: string | null = null;
     const periodRows = await client.query(
       `SELECT id, status FROM fiscal_periods WHERE company_id = $1 AND CURRENT_DATE BETWEEN start_date AND end_date LIMIT 1`,
       [cnt.company_id],
@@ -110,6 +111,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
                `Stock Count ${cnt.count_no} — variance adjustment`, params.id, auth.userId],
             );
             const jeId = jeInsert.rows[0].id;
+            countJeId = jeId;
             for (let i = 0; i < jeLines.length; i++) {
               const jl = jeLines[i];
               await client.query(
@@ -136,8 +138,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     await client.query(
-      `UPDATE stock_counts SET status='posted', posted_by=$1, posted_at=now(), updated_at=now() WHERE id=$2`,
-      [auth.userId, params.id],
+      `UPDATE stock_counts SET status='posted', posted_by=$1, posted_at=now(), updated_at=now(), je_id=$3 WHERE id=$2`,
+      [auth.userId, params.id, countJeId ?? null],
     );
 
     await client.query('COMMIT');

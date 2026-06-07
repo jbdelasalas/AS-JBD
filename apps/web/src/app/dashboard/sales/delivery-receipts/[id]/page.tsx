@@ -17,6 +17,7 @@ interface DR {
   customer_id: string; customer_name: string; payment_terms_days: number;
   order_no: string; so_id: string; warehouse_name: string;
   tally_sheet_id: string | null;
+  je_id: string | null;
   eff_branch_id: string | null; eff_building_id: string | null;
   eff_cost_center_id: string | null; eff_grow_reference_id: string | null;
   lines: DRLine[];
@@ -209,6 +210,12 @@ export default function DRDetailPage() {
             className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
             Create Sales Invoice
           </button>
+        )}
+        {dr.je_id && (
+          <Link href={`/dashboard/gl/journal-entries/${dr.je_id}`}
+            className="rounded border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
+            View Journal Entry
+          </Link>
         )}
         <button onClick={() => router.back()}
           className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:border-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">

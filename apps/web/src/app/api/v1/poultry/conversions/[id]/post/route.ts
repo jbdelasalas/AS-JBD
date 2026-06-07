@@ -196,7 +196,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
               [jeId, period.id],
             );
             await client.query(`UPDATE journal_entries SET posted_at = now(), posted_by = $2 WHERE id = $1`, [jeId, auth.userId]);
-            await client.query(`UPDATE conversions SET je_id = $2 WHERE id = $1`, [params.id, jeId]).catch(() => {});
+            await client.query(`UPDATE conversions SET je_id = $2 WHERE id = $1`, [params.id, jeId]);
           }
         }
       }

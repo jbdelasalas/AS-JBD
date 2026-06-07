@@ -128,6 +128,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     }
 
     // --- GL: DR Inventory per item, CR Inventory Adjustment (production recognition) ---
+    let tsJeId: string | null = null;
     const periodRows = await client.query(
       `SELECT id, status FROM fiscal_periods WHERE company_id = $1 AND $2::date BETWEEN start_date AND end_date LIMIT 1`,
       [rec.company_id, rec.transfer_date],
@@ -192,6 +193,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
                rec.doc_no, `Tally Sheet ${rec.doc_no}`, params.id, auth.userId],
             );
             const jeId = jeInsert.rows[0].id;
+            tsJeId = jeId;
             for (let i = 0; i < jeLines.length; i++) {
               const jl = jeLines[i];
               await client.query(
@@ -214,7 +216,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       }
     }
 
-    await client.query(`UPDATE tally_sheets SET status='posted', posted_by=$1, posted_at=now() WHERE id=$2`, [auth.userId, params.id]);
+    await client.query(`UPDATE tally_sheets SET status='posted', posted_by=$1, posted_at=now(), je_id=$3 WHERE id=$2`, [auth.userId, params.id, tsJeId ?? null]);
     await client.query('COMMIT');
     const [updated] = await query(`SELECT * FROM tally_sheets WHERE id = $1`, [params.id]);
     return ok(updated);

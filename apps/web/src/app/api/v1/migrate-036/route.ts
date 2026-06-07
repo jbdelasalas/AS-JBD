@@ -45,6 +45,16 @@ export async function POST(request: NextRequest) {
     results.push('ok: 036b advances_to_suppliers account');
   } catch (e) { results.push(`err: 036b advances_to_suppliers — ${(e as Error).message}`); }
 
+  // 040 — je_id on stock_counts, tally_sheets, conversions
+  for (const [label, sql] of [
+    ['stock_counts.je_id',   `ALTER TABLE stock_counts   ADD COLUMN IF NOT EXISTS je_id uuid REFERENCES journal_entries(id)`],
+    ['tally_sheets.je_id',   `ALTER TABLE tally_sheets   ADD COLUMN IF NOT EXISTS je_id uuid REFERENCES journal_entries(id)`],
+    ['conversions.je_id',    `ALTER TABLE conversions    ADD COLUMN IF NOT EXISTS je_id uuid REFERENCES journal_entries(id)`],
+  ] as [string, string][]) {
+    try { await query(sql); results.push(`ok: 040 ${label}`); }
+    catch (e) { results.push(`err: 040 ${label} — ${(e as Error).message}`); }
+  }
+
   // 039 — je_id on stock_adjustments + seed Inventory Adjustment account
   try {
     await query(`ALTER TABLE stock_adjustments ADD COLUMN IF NOT EXISTS je_id uuid REFERENCES journal_entries(id)`);

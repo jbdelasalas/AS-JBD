@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 
@@ -26,6 +27,7 @@ interface StockCount {
   created_at: string;
   started_at: string | null;
   posted_at: string | null;
+  je_id: string | null;
   warehouse_name: string;
   created_by_name: string;
   notes: string | null;
@@ -137,6 +139,12 @@ export default function StockCountDetailPage() {
                 Void
               </button>
             </>
+          )}
+          {cnt.je_id && (
+            <Link href={`/dashboard/gl/journal-entries/${cnt.je_id}`}
+              className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
+              View Journal Entry
+            </Link>
           )}
         </div>
       </div>

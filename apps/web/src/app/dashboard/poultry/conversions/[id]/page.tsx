@@ -11,6 +11,7 @@ interface Conversion {
   total_output_kgs: number; yield_pct: number | null; tally_sheet_no: string | null;
   po_no: string | null; supplier_name: string | null;
   branch_name: string | null; target_branch_name: string | null;
+  je_id: string | null;
   doa_heads: number; doa_kgs: number;
   short_over_heads: number; short_over_kgs: number;
   outputs: Array<{
@@ -219,6 +220,12 @@ export default function ConversionDetailPage() {
           <Link href={`/dashboard/poultry/deliveries/new?conversion_id=${doc.id}`}
             className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
             Create Delivery
+          </Link>
+        )}
+        {doc.je_id && (
+          <Link href={`/dashboard/gl/journal-entries/${doc.je_id}`}
+            className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
+            View Journal Entry
           </Link>
         )}
         {isAdmin && (

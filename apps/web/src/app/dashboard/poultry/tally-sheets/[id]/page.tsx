@@ -34,6 +34,7 @@ interface TallySheet {
   driver: string | null; helper: string | null;
   start_time: string | null; end_time: string | null; remarks: string | null;
   live_item_id: string | null;
+  je_id: string | null;
   lines: Line[];
 }
 
@@ -560,6 +561,12 @@ export default function TallySheetDetailPage() {
               className="rounded border border-red-300 bg-red-50 px-5 py-2 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-700 dark:bg-red-950 dark:text-red-400">
               Delete
             </button>
+          )}
+          {doc.je_id && (
+            <Link href={`/dashboard/gl/journal-entries/${doc.je_id}`}
+              className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
+              View Journal Entry
+            </Link>
           )}
           {doc.status === 'posted' && (
             <>
