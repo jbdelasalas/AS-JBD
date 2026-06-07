@@ -163,8 +163,7 @@ export default function PrintVoucherPage() {
           </div>
         </div>
 
-        {/* Divider between check stub and voucher body */}
-        <div style={{ borderTop: '1.5px solid #000', marginBottom: '3mm' }} />
+        <div style={{ marginBottom: '3mm' }} />
 
         {/* ─── VOUCHER BODY ────────────────────────────────────────── */}
 
@@ -198,6 +197,11 @@ export default function PrintVoucherPage() {
               <td style={cell({ verticalAlign: 'top', textAlign: 'right' })}>
                 PHP{n2(payment.amount)}
               </td>
+            </tr>
+            {/* tall filler row */}
+            <tr>
+              <td style={cell({ height: '35mm' })}>&nbsp;</td>
+              <td style={cell()}>&nbsp;</td>
             </tr>
           </tbody>
         </table>
