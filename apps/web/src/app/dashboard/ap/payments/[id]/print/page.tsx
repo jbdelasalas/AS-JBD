@@ -116,7 +116,7 @@ export default function PrintVoucherPage() {
         {/* Row 2: Payee + amount */}
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '2mm' }}>
           <span style={{ whiteSpace: 'nowrap', fontWeight: 'normal' }}>Payee</span>
-          <span style={{ display: 'inline-block', flex: 1, borderBottom: B, textAlign: 'center', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+          <span style={{ display: 'inline-block', flex: 1, borderBottom: B, textAlign: 'left', fontWeight: 'bold', letterSpacing: '0.5px', paddingLeft: '4px' }}>
             ***{payment.supplier_name.toUpperCase()}***
           </span>
           <span style={{ whiteSpace: 'nowrap' }}>&nbsp;(P</span>
@@ -129,7 +129,7 @@ export default function PrintVoucherPage() {
         {/* Row 3: Amount in words */}
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '4mm' }}>
           <span style={{ whiteSpace: 'nowrap' }}>Amount in words</span>
-          <span style={{ display: 'inline-block', flex: 1, borderBottom: B, textAlign: 'center', fontWeight: 'bold', letterSpacing: '0.5px', paddingLeft: '4px' }}>
+          <span style={{ display: 'inline-block', flex: 1, borderBottom: B, textAlign: 'left', fontWeight: 'bold', letterSpacing: '0.5px', paddingLeft: '4px' }}>
             ***{amountToWords(payment.amount)}***
           </span>
         </div>
