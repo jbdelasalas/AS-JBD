@@ -190,18 +190,18 @@ export default function PrintVoucherPage() {
           </thead>
           <tbody>
             <tr>
-              <td style={cell({ verticalAlign: 'top', lineHeight: 1.4 })}>
+              <td style={cell({ verticalAlign: 'top', lineHeight: 1.4, borderBottom: 'none' })}>
                 <div>dated {fmtDate(payment.payment_date)}</div>
                 <div>{particulars}</div>
               </td>
-              <td style={cell({ verticalAlign: 'top', textAlign: 'right' })}>
+              <td style={cell({ verticalAlign: 'top', textAlign: 'right', borderBottom: 'none' })}>
                 PHP{n2(payment.amount)}
               </td>
             </tr>
-            {/* tall filler row */}
+            {/* tall filler row — no top border so it merges with data row above */}
             <tr>
-              <td style={cell({ height: '35mm' })}>&nbsp;</td>
-              <td style={cell()}>&nbsp;</td>
+              <td style={cell({ height: '35mm', borderTop: 'none' })}>&nbsp;</td>
+              <td style={cell({ borderTop: 'none' })}>&nbsp;</td>
             </tr>
           </tbody>
         </table>
@@ -223,21 +223,25 @@ export default function PrintVoucherPage() {
             </tr>
           </thead>
           <tbody>
-            {/* Data rows */}
-            {lines.map((l, i) => (
-              <tr key={i}>
-                <td style={cell({ textAlign: 'center' })}>{l.account_code}</td>
-                <td style={cell()}>{l.account_name}</td>
-                <td style={cell({ textAlign: 'right' })}>{l.debit > 0 ? n2(l.debit) : ''}</td>
-                <td style={cell({ textAlign: 'right' })}>{l.credit > 0 ? n2(l.credit) : ''}</td>
-              </tr>
-            ))}
-            {/* Single tall filler row — extends box downward */}
+            {/* Data rows — last row has no bottom border so filler merges seamlessly */}
+            {lines.map((l, i) => {
+              const isLast = i === lines.length - 1;
+              const extra = isLast ? { borderBottom: 'none' } : {};
+              return (
+                <tr key={i}>
+                  <td style={cell({ textAlign: 'center', ...extra })}>{l.account_code}</td>
+                  <td style={cell({ ...extra })}>{l.account_name}</td>
+                  <td style={cell({ textAlign: 'right', ...extra })}>{l.debit > 0 ? n2(l.debit) : ''}</td>
+                  <td style={cell({ textAlign: 'right', ...extra })}>{l.credit > 0 ? n2(l.credit) : ''}</td>
+                </tr>
+              );
+            })}
+            {/* Single tall filler row — no top border so it merges with data rows above */}
             <tr>
-              <td style={cell({ height: '55mm', verticalAlign: 'top' })}>&nbsp;</td>
-              <td style={cell({ verticalAlign: 'top' })}>&nbsp;</td>
-              <td style={cell({ verticalAlign: 'top' })}>&nbsp;</td>
-              <td style={cell({ verticalAlign: 'top' })}>&nbsp;</td>
+              <td style={cell({ height: '55mm', verticalAlign: 'top', borderTop: 'none' })}>&nbsp;</td>
+              <td style={cell({ verticalAlign: 'top', borderTop: 'none' })}>&nbsp;</td>
+              <td style={cell({ verticalAlign: 'top', borderTop: 'none' })}>&nbsp;</td>
+              <td style={cell({ verticalAlign: 'top', borderTop: 'none' })}>&nbsp;</td>
             </tr>
             {/* PREPARED BY | VERIFIED BY | APPROVED BY — bottom row inside the GL border */}
             <tr>
