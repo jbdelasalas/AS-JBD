@@ -58,11 +58,15 @@ export default function TrialBalancePage() {
     return { ...r, net_debit: isDr ? Math.max(net, 0) : Math.max(-net, 0), net_credit: isDr ? Math.max(-net, 0) : Math.max(net, 0) };
   });
 
+  const totalNetDebit  = displayRows.reduce((s, r) => s + r.net_debit,  0);
+  const totalNetCredit = displayRows.reduce((s, r) => s + r.net_credit, 0);
+  const netBalanced = Math.abs(totalNetDebit - totalNetCredit) < 0.01;
+
   const totalsRow = data ? (
     <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm font-medium">
       <td colSpan={3} className="px-3 py-2 text-right text-xs text-slate-600 dark:text-slate-400">Totals</td>
-      <td className="px-3 py-2 text-right font-mono text-xs text-slate-900 dark:text-slate-100">{formatPHP(data.total_debit)}</td>
-      <td className="px-3 py-2 text-right font-mono text-xs text-slate-900 dark:text-slate-100">{formatPHP(data.total_credit)}</td>
+      <td className="px-3 py-2 text-right font-mono text-xs text-slate-900 dark:text-slate-100">{formatPHP(totalNetDebit)}</td>
+      <td className="px-3 py-2 text-right font-mono text-xs text-slate-900 dark:text-slate-100">{formatPHP(totalNetCredit)}</td>
     </tr>
   ) : undefined;
 
@@ -97,8 +101,8 @@ export default function TrialBalancePage() {
       {data && (
         <>
           <div className="mb-3 flex items-center gap-3 text-xs">
-            <span className={`rounded px-2 py-0.5 font-medium ${data.is_balanced ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-              {data.is_balanced ? '✓ Balanced' : '✗ Out of balance'}
+            <span className={`rounded px-2 py-0.5 font-medium ${netBalanced ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+              {netBalanced ? '✓ Balanced' : '✗ Out of balance'}
             </span>
             <span className="text-slate-600 dark:text-slate-400">{data.rows?.length ?? 0} accounts with movement</span>
           </div>
