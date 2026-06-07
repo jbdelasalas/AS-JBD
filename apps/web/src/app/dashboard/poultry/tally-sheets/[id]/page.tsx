@@ -76,10 +76,12 @@ export default function TallySheetDetailPage() {
   const [buildings, setBuildings]         = useState<Building[]>([]);
   const [deliveryMethods, setDeliveryMethods] = useState<DeliveryMethod[]>([]);
 
+  const today = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
   const load = useCallback(() => {
     api.get<TallySheet>(`/poultry/tally-sheets/${id}`).then(d => {
       setDoc(d);
-      setForm({ ...d, transfer_date: d.transfer_date || new Date().toISOString().split('T')[0] });
+      const rawDate = d.transfer_date ? String(d.transfer_date).substring(0, 10) : '';
+      setForm({ ...d, transfer_date: rawDate || today });
       setLines(d.lines.map(l => ({ ...l })));
     }).catch(() => {}).finally(() => setLoading(false));
   }, [id]);
