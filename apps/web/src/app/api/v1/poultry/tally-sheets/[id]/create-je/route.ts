@@ -55,8 +55,10 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     if (!defaultInvId) return err('No inventory control account (code 1200 or name "inventory") found. Create it in Chart of Accounts.', 400);
     if (!adjAcctId) return err('No inventory adjustment account (code 5020 or "inventory adjustment") found. Create it in Chart of Accounts.', 400);
 
-    // Compute live avg cost from grow cycle (with column existence guard)
-    let liveItemId: string | null = null;
+    // Compute avg cost per kg from grow cycle
+    // Strategy: total grow cost (DOC + consumption) ÷ total harvested KGS for this cycle
+    // If live_item_id is set, match by item; otherwise apply to ALL tally lines.
+    let liveItemId: string | null = null; // null = apply to all lines
     let liveAvgCostPerKg = 0;
     if (rec.grow_cycle_id) {
       try {
@@ -69,18 +71,28 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
             GROUP BY g.id, g.chick_price_per_head, g.heads_in, g.live_item_id`,
           [rec.grow_cycle_id]);
         const gc = gcRows[0];
-        if (gc?.live_item_id) {
-          liveItemId = gc.live_item_id as string;
-          const totalGrowCost = Number(gc.chick_price_per_head) * Number(gc.heads_in)
-                              + Number(gc.total_consumption_cost);
-          const prevKgsRows = await query<Record<string, unknown>>(
-            `SELECT COALESCE(SUM(tsl.net_kgs), 0) AS prev_kgs
-               FROM tally_sheet_lines tsl
-               JOIN tally_sheets ts ON ts.id = tsl.tally_sheet_id
-              WHERE ts.grow_cycle_id = $1 AND ts.status = 'posted' AND tsl.item_id = $2`,
-            [rec.grow_cycle_id, liveItemId]);
+        if (gc) {
+          liveItemId = (gc.live_item_id as string | null) ?? null;
+          const totalGrowCost = Number(gc.chick_price_per_head ?? 0) * Number(gc.heads_in ?? 0)
+                              + Number(gc.total_consumption_cost ?? 0);
+          // Total harvested KGS across all posted tally sheets for this grow cycle
+          const prevKgsRows = liveItemId
+            ? await query<Record<string, unknown>>(
+                `SELECT COALESCE(SUM(tsl.net_kgs), 0) AS prev_kgs
+                   FROM tally_sheet_lines tsl
+                   JOIN tally_sheets ts ON ts.id = tsl.tally_sheet_id
+                  WHERE ts.grow_cycle_id = $1 AND ts.status = 'posted' AND tsl.item_id = $2`,
+                [rec.grow_cycle_id, liveItemId])
+            : await query<Record<string, unknown>>(
+                `SELECT COALESCE(SUM(tsl.net_kgs), 0) AS prev_kgs
+                   FROM tally_sheet_lines tsl
+                   JOIN tally_sheets ts ON ts.id = tsl.tally_sheet_id
+                  WHERE ts.grow_cycle_id = $1 AND ts.status = 'posted'`,
+                [rec.grow_cycle_id]);
           const totalHarvestedKgs = Number(prevKgsRows[0]?.prev_kgs ?? 0);
-          if (totalHarvestedKgs > 0) liveAvgCostPerKg = totalGrowCost / totalHarvestedKgs;
+          if (totalHarvestedKgs > 0 && totalGrowCost > 0) {
+            liveAvgCostPerKg = totalGrowCost / totalHarvestedKgs;
+          }
         }
       } catch {
         // live_item_id column may not exist — skip cost lookup
@@ -95,12 +107,15 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       String(i.id), { name: String(i.name), inventory_account_id: (i.inventory_account_id as string | null) ?? null }]));
 
     // Build GL debit lines
+    // If liveItemId is set: only apply cost to lines matching that item
+    // If liveItemId is null: apply grow cycle avg cost to ALL lines (live_item_id not configured)
     const jeLines: Array<{ account_id: string; description: string; debit: number; credit: number }> = [];
     let totalAmount = 0;
     for (const l of lines) {
       const netKgs = Number(l.net_kgs ?? 0);
       if (netKgs <= 0) continue;
-      const avgCost = String(l.item_id) === liveItemId ? liveAvgCostPerKg : Number((l as Record<string, unknown>).unit_cost ?? 0);
+      const useGrowCost = liveItemId === null || String(l.item_id) === liveItemId;
+      const avgCost = useGrowCost ? liveAvgCostPerKg : Number((l as Record<string, unknown>).unit_cost ?? 0);
       const amount = parseFloat((netKgs * avgCost).toFixed(2));
       if (amount <= 0) continue;
       const info = itemMap.get(String(l.item_id));
@@ -110,9 +125,9 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     }
 
     if (jeLines.length === 0 || totalAmount <= 0) {
-      const hint = liveItemId
-        ? `Grow cycle live item avg cost = ₱${liveAvgCostPerKg.toFixed(4)}/kg. Add chick price and/or consumption costs to the grow cycle.`
-        : `Grow cycle has no Live Item configured. Edit the grow cycle and set the Live Item field.`;
+      const hint = rec.grow_cycle_id
+        ? `Grow cycle avg cost = ₱${liveAvgCostPerKg.toFixed(4)}/kg. Ensure the grow cycle has Chick Price Per Head > 0 and/or Item Consumption (feeds/medicine) with costs recorded.`
+        : `No grow cycle linked. Tally sheet lines have no unit cost — link a grow cycle or add cost data.`;
       return err(`Cannot create JE: all harvest lines have ₱0 value. ${hint}`, 400);
     }
 

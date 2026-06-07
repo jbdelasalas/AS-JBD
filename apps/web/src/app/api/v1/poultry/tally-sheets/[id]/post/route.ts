@@ -41,27 +41,32 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         [rec.grow_cycle_id],
       ).then(r => r.rows);
 
-      if (gc?.live_item_id) {
-        liveItemId = gc.live_item_id as string;
-        const totalDocCost = Number(gc.chick_price_per_head) * Number(gc.heads_in);
-        const totalConsumptionCost = Number(gc.total_consumption_cost);
-        const totalGrowCost = totalDocCost + totalConsumptionCost;
+      if (gc) {
+        liveItemId = (gc.live_item_id as string | null) ?? null;
+        const totalGrowCost = Number(gc.chick_price_per_head ?? 0) * Number(gc.heads_in ?? 0)
+                            + Number(gc.total_consumption_cost ?? 0);
 
-        // Sum kgs already posted from previous tally sheets for this grow cycle
-        const prevKgsResult = await client.query(
-          `SELECT COALESCE(SUM(tsl.net_kgs), 0) AS prev_kgs
-             FROM tally_sheet_lines tsl
-             JOIN tally_sheets ts ON ts.id = tsl.tally_sheet_id
-            WHERE ts.grow_cycle_id = $1 AND ts.status = 'posted' AND tsl.item_id = $2`,
-          [rec.grow_cycle_id, liveItemId],
-        );
+        // Sum kgs already posted + current batch (by live item if set, else all lines)
+        const prevKgsResult = liveItemId
+          ? await client.query(
+              `SELECT COALESCE(SUM(tsl.net_kgs), 0) AS prev_kgs
+                 FROM tally_sheet_lines tsl
+                 JOIN tally_sheets ts ON ts.id = tsl.tally_sheet_id
+                WHERE ts.grow_cycle_id = $1 AND ts.status = 'posted' AND tsl.item_id = $2`,
+              [rec.grow_cycle_id, liveItemId])
+          : await client.query(
+              `SELECT COALESCE(SUM(tsl.net_kgs), 0) AS prev_kgs
+                 FROM tally_sheet_lines tsl
+                 JOIN tally_sheets ts ON ts.id = tsl.tally_sheet_id
+                WHERE ts.grow_cycle_id = $1 AND ts.status = 'posted'`,
+              [rec.grow_cycle_id]);
         const prevKgs = Number(prevKgsResult.rows[0]?.prev_kgs ?? 0);
         const currentKgs = lines
-          .filter(l => l.item_id === liveItemId)
+          .filter(l => liveItemId === null || l.item_id === liveItemId)
           .reduce((s, l) => s + Number(l.net_kgs ?? 0), 0);
         const totalHarvestedKgs = prevKgs + currentKgs;
 
-        if (totalHarvestedKgs > 0) {
+        if (totalHarvestedKgs > 0 && totalGrowCost > 0) {
           liveAvgCostPerKg = totalGrowCost / totalHarvestedKgs;
         }
       }
@@ -94,7 +99,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
          SELECT $1,$2,$3,'in','tally_sheet',$4,doc_no,$5,$6,$7,$8,$9 FROM tally_sheets WHERE id=$4`,
         [rec.company_id, rec.warehouse_id, l.item_id, params.id, rec.transfer_date, heads, netKgs, newHeads, newKgs],
       );
-      const avgCost = l.item_id === liveItemId ? liveAvgCostPerKg : Number(bal.avg_cost ?? 0);
+      const useGrowCostForBal = liveItemId === null || l.item_id === liveItemId;
+      const avgCost = (useGrowCostForBal && liveAvgCostPerKg > 0) ? liveAvgCostPerKg : Number(bal.avg_cost ?? 0);
       await client.query(
         `INSERT INTO poultry_inventory_balance (company_id, warehouse_id, item_id, qty_heads, qty_kgs, avg_cost, last_updated)
          VALUES ($1,$2,$3,$4,$5,$6,now())
@@ -169,7 +175,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         for (const l of lines) {
           const netKgs = Number(l.net_kgs ?? 0);
           if (netKgs <= 0) continue;
-          const avgCost = l.item_id === liveItemId ? liveAvgCostPerKg : Number((l as Record<string,unknown>).unit_cost ?? 0);
+          const useGrowCost = liveItemId === null || l.item_id === liveItemId;
+          const avgCost = useGrowCost ? liveAvgCostPerKg : Number((l as Record<string,unknown>).unit_cost ?? 0);
           const amount = parseFloat((netKgs * avgCost).toFixed(2));
           if (amount <= 0) continue;
           const info = itemMap.get(String(l.item_id));
