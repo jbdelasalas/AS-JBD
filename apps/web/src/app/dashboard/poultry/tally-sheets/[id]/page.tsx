@@ -79,7 +79,7 @@ export default function TallySheetDetailPage() {
   const load = useCallback(() => {
     api.get<TallySheet>(`/poultry/tally-sheets/${id}`).then(d => {
       setDoc(d);
-      setForm({ ...d });
+      setForm({ ...d, transfer_date: d.transfer_date || new Date().toISOString().split('T')[0] });
       setLines(d.lines.map(l => ({ ...l })));
     }).catch(() => {}).finally(() => setLoading(false));
   }, [id]);
