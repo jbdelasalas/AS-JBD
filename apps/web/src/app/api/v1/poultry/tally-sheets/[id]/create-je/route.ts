@@ -42,7 +42,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     // Check GL accounts
     const [defInvRows, adjAcctRows] = await Promise.all([
       query<Record<string, unknown>>(
-        `SELECT id FROM accounts WHERE company_id = $1 AND is_control = true AND account_type = 'ASSET'
+        `SELECT id FROM accounts WHERE company_id = $1 AND account_type = 'ASSET'
            AND (code = '1200' OR name ILIKE '%inventory%') AND is_active = true ORDER BY code ASC LIMIT 1`,
         [rec.company_id]),
       query<Record<string, unknown>>(
@@ -52,7 +52,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     ]);
     const defaultInvId: string | null = (defInvRows[0]?.id as string) ?? null;
     const adjAcctId: string | null = (adjAcctRows[0]?.id as string) ?? null;
-    if (!defaultInvId) return err('No inventory control account (code 1200 or name "inventory") found. Create it in Chart of Accounts.', 400);
+    if (!defaultInvId) return err('No inventory account (code 1200 or name containing "inventory") found in Chart of Accounts. Please create one.', 400);
     if (!adjAcctId) return err('No inventory adjustment account (code 5020 or "inventory adjustment") found. Create it in Chart of Accounts.', 400);
 
     // Compute avg cost per kg from grow cycle
