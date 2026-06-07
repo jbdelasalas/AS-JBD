@@ -8,6 +8,7 @@ import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
 import { SearchableSelect } from '@/components/SearchableSelect';
 
 interface POOption { id: string; po_no: string; supplier_name: string; status: string; }
+interface WarehouseOption { id: string; name: string; }
 
 interface POLine {
   id: string;
@@ -59,6 +60,7 @@ function NewGoodsReceiptForm() {
   const tagData = useTaggingData();
 
   const [pos, setPos] = useState<POOption[]>([]);
+  const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
   const [selectedPoId, setSelectedPoId] = useState(params.get('po_id') ?? '');
   const [lines, setLines] = useState<ReceiptLine[]>([]);
   const [saving, setSaving] = useState(false);
@@ -80,6 +82,14 @@ function NewGoodsReceiptForm() {
     if (!cid) return;
     api.get<{ data: POOption[] }>(`/purchasing/purchase-orders?company_id=${cid}&status=approved,partial&limit=500`)
       .then(r => setPos(r.data)).catch(() => {});
+    api.get<Array<{ warehouse_id: string | null; warehouse_name: string | null }>>(`/inventory/locations?company_id=${cid}`)
+      .then(locs => {
+        const whs = locs
+          .filter(l => l.warehouse_id)
+          .map(l => ({ id: l.warehouse_id!, name: l.warehouse_name ?? l.warehouse_id! }));
+        setWarehouses(whs);
+        if (whs.length === 1) setForm(f => ({ ...f, warehouse_id: whs[0].id }));
+      }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -132,6 +142,7 @@ function NewGoodsReceiptForm() {
     e.preventDefault();
     setError(null);
     if (!selectedPoId) { setError('Select a purchase order'); return; }
+    if (!form.warehouse_id) { setError('Select a receiving warehouse'); return; }
     if (!lines.some(l => l.qty_received > 0)) { setError('Enter at least one quantity to receive'); return; }
     setSaving(true);
     try {
@@ -203,6 +214,15 @@ function NewGoodsReceiptForm() {
               <label className={lbl}>Receipt Date *</label>
               <input required type="date" value={form.receipt_date}
                 onChange={e => setForm(f => ({ ...f, receipt_date: e.target.value }))} className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Receiving Warehouse *</label>
+              <select required value={form.warehouse_id}
+                onChange={e => setForm(f => ({ ...f, warehouse_id: e.target.value }))}
+                className={inp}>
+                <option value="">— select warehouse —</option>
+                {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
             </div>
             <div>
               <label className={lbl}>Delivery Note / DR No.</label>
