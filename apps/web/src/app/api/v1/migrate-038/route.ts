@@ -17,6 +17,22 @@ export async function POST(request: NextRequest) {
   const client = await getPool().connect();
   const results: string[] = [];
 
+  // Resolve a system user per company for created_by (NOT NULL)
+  const sysUserCache = new Map<string, string>();
+  async function getSysUser(compId: string): Promise<string | null> {
+    if (sysUserCache.has(compId)) return sysUserCache.get(compId)!;
+    const r = await client.query(
+      `SELECT u.id FROM users u
+        JOIN user_companies uc ON uc.user_id = u.id
+       WHERE uc.company_id = $1
+       ORDER BY u.created_at LIMIT 1`,
+      [compId],
+    );
+    const uid = r.rows[0]?.id ?? null;
+    if (uid) sysUserCache.set(compId, uid);
+    return uid;
+  }
+
   try {
     await client.query('BEGIN');
 
@@ -86,13 +102,15 @@ export async function POST(request: NextRequest) {
       compId: string, itemId: string, whId: string, grId: string, grnNo: string,
       qty: number, cost: number, recDate: string,
     ) {
+      const sysUserId = await getSysUser(compId);
+      if (!sysUserId) return; // no user found — skip
       await client.query(
         `INSERT INTO stock_movements
            (company_id, item_id, warehouse_id, movement_type, quantity, unit_cost, total_cost,
             reference_type, reference_id, reference_no, created_by)
-         VALUES ($1,$2,$3,'receipt',$4,$5,$6,'goods_receipt',$7,$8,NULL)
+         VALUES ($1,$2,$3,'receipt',$4,$5,$6,'goods_receipt',$7,$8,$9)
          ON CONFLICT DO NOTHING`,
-        [compId, itemId, whId, qty, cost, qty * cost, grId, grnNo],
+        [compId, itemId, whId, qty, cost, qty * cost, grId, grnNo, sysUserId],
       );
       await client.query(
         `INSERT INTO stock_balances (item_id, warehouse_id, qty_on_hand, avg_cost, last_movement_at)
