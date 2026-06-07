@@ -23,6 +23,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     if (!rec) return err('Not found', 404);
     if (rec.status !== 'posted') return err('Tally sheet must be posted', 400);
     if (rec.je_id) return err('Journal entry already exists', 400);
+    if (!rec.grow_cycle_id) return err('No grow cycle linked. Cannot compute harvest cost without a grow cycle.', 400);
 
     const lines = await query<Record<string, unknown>>(
       `SELECT * FROM tally_sheet_lines WHERE tally_sheet_id = $1`, [params.id]);
@@ -35,108 +36,104 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     const periodRows = await query<Record<string, unknown>>(
       `SELECT id, status FROM fiscal_periods WHERE company_id = $1 AND $2::date BETWEEN start_date AND end_date LIMIT 1`,
       [rec.company_id, jeDate]);
-    if (!periodRows[0]) return err(`No fiscal period found for ${jeDate}. Create a fiscal period that covers this date in GL → Fiscal Periods.`, 400);
+    if (!periodRows[0]) return err(`No fiscal period found for ${jeDate}. Create one in GL → Fiscal Periods.`, 400);
     if (String(periodRows[0].status).toLowerCase() === 'closed') return err(`Fiscal period for ${jeDate} is closed. Re-open it first.`, 400);
     const period = periodRows[0];
 
-    // Check GL accounts
-    const [defInvRows, adjAcctRows] = await Promise.all([
-      query<Record<string, unknown>>(
-        `SELECT id FROM accounts WHERE company_id = $1 AND account_type = 'ASSET'
-           AND (code = '1200' OR name ILIKE '%inventory%') AND is_active = true ORDER BY code ASC LIMIT 1`,
-        [rec.company_id]),
-      query<Record<string, unknown>>(
-        `SELECT id FROM accounts WHERE company_id = $1
-           AND (code = '5020' OR name ILIKE '%inventory adjustment%') AND is_active = true ORDER BY code ASC LIMIT 1`,
-        [rec.company_id]),
-    ]);
-    const defaultInvId: string | null = (defInvRows[0]?.id as string) ?? null;
-    const adjAcctId: string | null = (adjAcctRows[0]?.id as string) ?? null;
-    // defaultInvId is only a fallback — items may have inventory_account_id set directly
-    if (!adjAcctId) return err('No inventory adjustment account (code 5020 or name "inventory adjustment") found. Create it in Chart of Accounts.', 400);
+    // Grow cycle + DOC item
+    const gcRows = await query<Record<string, unknown>>(
+      `SELECT g.chick_price_per_head, g.heads_in, g.total_mortality, b.item_id AS doc_item_id
+         FROM grow_cycles g
+         JOIN chick_batches b ON b.id = g.batch_id
+        WHERE g.id = $1`,
+      [rec.grow_cycle_id]);
+    if (!gcRows[0]) return err('Grow cycle not found.', 400);
+    const gc = gcRows[0];
 
-    // Compute avg cost per kg from grow cycle
-    // Strategy: total grow cost (DOC + consumption) ÷ total harvested KGS for this cycle
-    // If live_item_id is set, match by item; otherwise apply to ALL tally lines.
-    let liveItemId: string | null = null; // null = apply to all lines
-    let liveAvgCostPerKg = 0;
-    if (rec.grow_cycle_id) {
-      try {
-        const gcRows = await query<Record<string, unknown>>(
-          `SELECT g.chick_price_per_head, g.heads_in, g.live_item_id,
-                  COALESCE(SUM(c.total_cost), 0) AS total_consumption_cost
-             FROM grow_cycles g
-             LEFT JOIN grow_item_consumption c ON c.grow_cycle_id = g.id
-            WHERE g.id = $1
-            GROUP BY g.id, g.chick_price_per_head, g.heads_in, g.live_item_id`,
-          [rec.grow_cycle_id]);
-        const gc = gcRows[0];
-        if (gc) {
-          liveItemId = (gc.live_item_id as string | null) ?? null;
-          const totalGrowCost = Number(gc.chick_price_per_head ?? 0) * Number(gc.heads_in ?? 0)
-                              + Number(gc.total_consumption_cost ?? 0);
-          // Total harvested KGS across all posted tally sheets for this grow cycle
-          const prevKgsRows = liveItemId
-            ? await query<Record<string, unknown>>(
-                `SELECT COALESCE(SUM(tsl.net_kgs), 0) AS prev_kgs
-                   FROM tally_sheet_lines tsl
-                   JOIN tally_sheets ts ON ts.id = tsl.tally_sheet_id
-                  WHERE ts.grow_cycle_id = $1 AND ts.status = 'posted' AND tsl.item_id = $2`,
-                [rec.grow_cycle_id, liveItemId])
-            : await query<Record<string, unknown>>(
-                `SELECT COALESCE(SUM(tsl.net_kgs), 0) AS prev_kgs
-                   FROM tally_sheet_lines tsl
-                   JOIN tally_sheets ts ON ts.id = tsl.tally_sheet_id
-                  WHERE ts.grow_cycle_id = $1 AND ts.status = 'posted'`,
-                [rec.grow_cycle_id]);
-          const totalHarvestedKgs = Number(prevKgsRows[0]?.prev_kgs ?? 0);
-          if (totalHarvestedKgs > 0 && totalGrowCost > 0) {
-            liveAvgCostPerKg = totalGrowCost / totalHarvestedKgs;
-          }
-        }
-      } catch {
-        // live_item_id column may not exist — skip cost lookup
-      }
-    }
+    // Cost computation:
+    //   avg_cost_per_head = (DOC total + feeds + medicines) ÷ (heads_in − mortality)
+    //   this_harvest_cost = avg_cost_per_head × net_heads
+    const docCost = Number(gc.chick_price_per_head ?? 0) * Number(gc.heads_in ?? 0);
+    const totalAvailableHeads = Number(gc.heads_in ?? 0) - Number(gc.total_mortality ?? 0);
+    const thisHarvestHeads = Number(rec.net_heads ?? 0);
 
-    // Fetch item accounts
-    const itemAcctRows = await query<Record<string, unknown>>(
-      `SELECT id, inventory_account_id, name FROM items WHERE id = ANY($1::uuid[])`,
-      [lines.map(l => l.item_id)]);
-    const itemMap = new Map((itemAcctRows).map(i => [
-      String(i.id), { name: String(i.name), inventory_account_id: (i.inventory_account_id as string | null) ?? null }]));
+    if (totalAvailableHeads <= 0) return err(`No available heads (heads_in − mortality = ${totalAvailableHeads}). Check grow cycle mortality records.`, 400);
+    if (thisHarvestHeads <= 0) return err('This tally sheet has 0 net heads. Check the tally sheet lines.', 400);
 
-    // Build GL debit lines
-    // If liveItemId is set: only apply cost to lines matching that item
-    // If liveItemId is null: apply grow cycle avg cost to ALL lines (live_item_id not configured)
-    const jeLines: Array<{ account_id: string; description: string; debit: number; credit: number }> = [];
-    let totalAmount = 0;
+    // Consumption breakdown by item (for proportional CR entries)
+    const consRows = await query<Record<string, unknown>>(
+      `SELECT c.item_id, SUM(c.total_cost) AS total_cost, i.inventory_account_id, i.name
+         FROM grow_item_consumption c
+         JOIN items i ON i.id = c.item_id
+        WHERE c.grow_cycle_id = $1
+        GROUP BY c.item_id, i.inventory_account_id, i.name`,
+      [rec.grow_cycle_id]);
+
+    const totalConsCost = consRows.reduce((s, c) => s + Number(c.total_cost ?? 0), 0);
+    const totalGrowCost = docCost + totalConsCost;
+
+    if (totalGrowCost <= 0) return err('Total grow cost is ₱0. Ensure the grow cycle has Chick Price Per Head > 0 and/or item consumption recorded.', 400);
+
+    const thisHarvestCost = parseFloat((totalGrowCost / totalAvailableHeads * thisHarvestHeads).toFixed(2));
+    if (thisHarvestCost <= 0) return err('Computed harvest cost is ₱0.', 400);
+
+    // DR: tally line items grouped by inventory account, prorated by heads
+    const lineItemIds = [...new Set(lines.map(l => String(l.item_id)))];
+    const lineItemRows = await query<Record<string, unknown>>(
+      `SELECT id, inventory_account_id, name FROM items WHERE id = ANY($1::uuid[])`, [lineItemIds]);
+    const lineItemMap = new Map((lineItemRows).map(i => [
+      String(i.id),
+      { inventory_account_id: (i.inventory_account_id as string | null) ?? null, name: String(i.name) },
+    ]));
+
+    const totalLineHeads = lines.reduce((s, l) => s + Number(l.heads ?? 0), 0);
+    const drByAcct = new Map<string, number>();
     for (const l of lines) {
-      const netKgs = Number(l.net_kgs ?? 0);
-      if (netKgs <= 0) continue;
-      const useGrowCost = liveItemId === null || String(l.item_id) === liveItemId;
-      const avgCost = useGrowCost ? liveAvgCostPerKg : Number((l as Record<string, unknown>).unit_cost ?? 0);
-      const amount = parseFloat((netKgs * avgCost).toFixed(2));
-      if (amount <= 0) continue;
-      const info = itemMap.get(String(l.item_id));
-      const itemInvId = info?.inventory_account_id ?? defaultInvId;
-      if (!itemInvId) return err(`Item "${info?.name ?? l.item_id}" has no inventory account set. Set it in Item Setup → Inventory Account.`, 400);
-      jeLines.push({ account_id: itemInvId, description: `Harvest — ${info?.name ?? l.item_id} (${rec.doc_no})`, debit: amount, credit: 0 });
-      totalAmount = parseFloat((totalAmount + amount).toFixed(2));
+      const heads = Number(l.heads ?? 0);
+      if (heads <= 0 || totalLineHeads <= 0) continue;
+      const info = lineItemMap.get(String(l.item_id));
+      const acctId = info?.inventory_account_id;
+      if (!acctId) return err(`Item "${info?.name ?? l.item_id}" has no inventory account set. Set it in Item Setup → Inventory Account.`, 400);
+      const amount = parseFloat((thisHarvestCost * (heads / totalLineHeads)).toFixed(2));
+      if (amount > 0) drByAcct.set(acctId, (drByAcct.get(acctId) ?? 0) + amount);
+    }
+    if (drByAcct.size === 0) return err('No tally lines with heads > 0 and inventory account set.', 400);
+
+    // CR: DOC item account + each consumption item account, prorated by cost share
+    const crByAcct = new Map<string, { amount: number; desc: string }>();
+    if (docCost > 0 && gc.doc_item_id) {
+      const docItemRows = await query<Record<string, unknown>>(
+        `SELECT inventory_account_id FROM items WHERE id = $1 LIMIT 1`, [gc.doc_item_id]);
+      const docAcctId = (docItemRows[0]?.inventory_account_id as string | null) ?? null;
+      if (!docAcctId) return err('DOC (chick) item has no inventory account set. Set it in Item Setup → Inventory Account.', 400);
+      const share = parseFloat(((docCost / totalGrowCost) * thisHarvestCost).toFixed(2));
+      crByAcct.set(docAcctId, { amount: (crByAcct.get(docAcctId)?.amount ?? 0) + share, desc: 'DOC' });
+    }
+    for (const c of consRows) {
+      const cCost = Number(c.total_cost ?? 0);
+      const cAcctId = (c.inventory_account_id as string | null);
+      if (cCost <= 0) continue;
+      if (!cAcctId) return err(`Consumption item "${c.name}" has no inventory account set. Set it in Item Setup → Inventory Account.`, 400);
+      const share = parseFloat(((cCost / totalGrowCost) * thisHarvestCost).toFixed(2));
+      const existing = crByAcct.get(cAcctId);
+      crByAcct.set(cAcctId, { amount: (existing?.amount ?? 0) + share, desc: String(c.name) });
+    }
+    if (crByAcct.size === 0) return err('No source inventory accounts found (DOC/feeds/medicines). Ensure items have inventory accounts set.', 400);
+
+    // Rounding: adjust last CR so total CR = total DR exactly
+    const totalDrAmt = [...drByAcct.values()].reduce((s, v) => s + v, 0);
+    const totalCrAmt = [...crByAcct.values()].reduce((s, v) => s + v.amount, 0);
+    const roundAdj = parseFloat((totalDrAmt - totalCrAmt).toFixed(2));
+    if (roundAdj !== 0) {
+      const lastKey = [...crByAcct.keys()].at(-1)!;
+      const last = crByAcct.get(lastKey)!;
+      crByAcct.set(lastKey, { ...last, amount: parseFloat((last.amount + roundAdj).toFixed(2)) });
     }
 
-    if (jeLines.length === 0 || totalAmount <= 0) {
-      const hint = rec.grow_cycle_id
-        ? `Grow cycle avg cost = ₱${liveAvgCostPerKg.toFixed(4)}/kg. Ensure the grow cycle has Chick Price Per Head > 0 and/or Item Consumption (feeds/medicine) with costs recorded.`
-        : `No grow cycle linked. Tally sheet lines have no unit cost — link a grow cycle or add cost data.`;
-      return err(`Cannot create JE: all harvest lines have ₱0 value. ${hint}`, 400);
-    }
-
-    // --- Create JE inside transaction ---
+    // Create JE in transaction
     const client = await getPool().connect();
     try {
       await client.query('BEGIN');
-      jeLines.push({ account_id: adjAcctId, description: `Harvest recognition (${rec.doc_no})`, debit: 0, credit: totalAmount });
 
       const seriesRows = await client.query(
         `UPDATE document_series SET current_number = current_number + 1, updated_at = now()
@@ -152,14 +149,22 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         [rec.company_id, jeNo, jeDate, period.id,
          rec.doc_no, `Tally Sheet ${rec.doc_no}`, params.id, auth.userId]);
       const jeId = jeInsert.rows[0].id as string;
+      let lineNo = 1;
 
-      for (let i = 0; i < jeLines.length; i++) {
-        const jl = jeLines[i];
+      for (const [acctId, amount] of drByAcct) {
         await client.query(
           `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
-           VALUES ($1,$2,$3,$4,$5,$6,'PHP',1,$5,$6)`,
-          [jeId, i + 1, jl.account_id, jl.description, jl.debit, jl.credit]);
+           VALUES ($1,$2,$3,$4,$5,0,'PHP',1,$5,0)`,
+          [jeId, lineNo++, acctId, `Harvest — Live Chicken (${rec.doc_no})`, amount]);
       }
+      for (const [acctId, val] of crByAcct) {
+        if (val.amount <= 0) continue;
+        await client.query(
+          `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
+           VALUES ($1,$2,$3,$4,0,$5,'PHP',1,0,$5)`,
+          [jeId, lineNo++, acctId, `Harvest cost — ${val.desc} (${rec.doc_no})`, val.amount]);
+      }
+
       await client.query(
         `INSERT INTO account_balances (account_id, fiscal_period_id, debit_total, credit_total)
          SELECT jel.account_id, $2, SUM(jel.debit), SUM(jel.credit)
