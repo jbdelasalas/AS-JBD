@@ -6,8 +6,8 @@ import { api } from '@/lib/api';
 
 // ── Amount to words ──────────────────────────────────────────────────────────
 const ONES = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE',
-               'TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN',
-               'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'];
+  'TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN',
+  'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'];
 const TENS = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
 
 function chunk(n: number): string {
@@ -22,323 +22,288 @@ function amountToWords(amount: number): string {
   const pesos = Math.floor(total / 100);
   const centavos = total % 100;
   if (pesos === 0 && centavos === 0) return 'ZERO PESOS AND 00/100 ONLY';
-
   const parts: string[] = [];
-  const billions = Math.floor(pesos / 1_000_000_000);
-  const millions = Math.floor((pesos % 1_000_000_000) / 1_000_000);
-  const thousands = Math.floor((pesos % 1_000_000) / 1_000);
-  const remainder = pesos % 1_000;
-
-  if (billions) parts.push(chunk(billions) + ' BILLION');
-  if (millions) parts.push(chunk(millions) + ' MILLION');
-  if (thousands) parts.push(chunk(thousands) + ' THOUSAND');
-  if (remainder) parts.push(chunk(remainder));
-
-  const pesoWord = parts.join(' ') || 'ZERO';
-  return `${pesoWord} PESO${pesos !== 1 ? 'S' : ''} AND ${String(centavos).padStart(2, '0')}/100 ONLY`;
+  if (Math.floor(pesos / 1_000_000_000)) parts.push(chunk(Math.floor(pesos / 1_000_000_000)) + ' BILLION');
+  if (Math.floor((pesos % 1_000_000_000) / 1_000_000)) parts.push(chunk(Math.floor((pesos % 1_000_000_000) / 1_000_000)) + ' MILLION');
+  if (Math.floor((pesos % 1_000_000) / 1_000)) parts.push(chunk(Math.floor((pesos % 1_000_000) / 1_000)) + ' THOUSAND');
+  if (pesos % 1_000) parts.push(chunk(pesos % 1_000));
+  return `${parts.join(' ') || 'ZERO'} PESO${pesos !== 1 ? 'S' : ''} AND ${String(centavos).padStart(2, '0')}/100 ONLY`;
 }
 
 // ── Types ────────────────────────────────────────────────────────────────────
-interface Application {
-  bill_id: string;
-  internal_no: string;
-  bill_no: string;
-  bill_date: string;
-  amount_applied: number;
-}
-
+interface Application { bill_id: string; internal_no: string; bill_no: string; bill_date: string; amount_applied: number; }
 interface Payment {
-  id: string;
-  voucher_no: string;
-  payment_date: string;
-  payment_method: string;
-  reference: string | null;
-  remarks: string | null;
-  amount: number;
-  status: string;
-  supplier_name: string;
-  supplier_address: string | null;
-  je_id: string | null;
-  branch_id: string | null;
+  id: string; voucher_no: string; payment_date: string; payment_method: string;
+  reference: string | null; remarks: string | null; amount: number; status: string;
+  supplier_name: string; supplier_address: string | null; je_id: string | null;
   applications: Application[];
 }
+interface JELine { account_code: string; account_name: string; description: string; debit: number; credit: number; }
+interface Company { name: string; legal_name: string | null; tin: string | null; address: string | null; logo: string | null; }
 
-interface JELine {
-  account_code: string;
-  account_name: string;
-  description: string;
-  debit: number;
-  credit: number;
-}
-
-interface Company {
-  name: string;
-  legal_name: string | null;
-  tin: string | null;
-  address: string | null;
-  logo: string | null;
-}
-
-function fmt(n: number) {
+function n2(n: number) {
   return n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-
 function fmtDate(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-PH', { month: '2-digit', day: '2-digit', year: 'numeric' });
+  const d = new Date(iso + (iso.includes('T') ? '' : 'T00:00:00'));
+  return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
 }
+
+// ── Shared border/cell styles ─────────────────────────────────────────────────
+const B = '1px solid #000';
+const cell = (extra?: React.CSSProperties): React.CSSProperties => ({ border: B, padding: '3px 5px', ...extra });
+const th = (extra?: React.CSSProperties): React.CSSProperties => ({ border: B, padding: '3px 5px', fontWeight: 'bold', textAlign: 'center', backgroundColor: '#f2f2f2', ...extra });
 
 // ── Print Page ───────────────────────────────────────────────────────────────
 export default function PrintVoucherPage() {
   const { id } = useParams<{ id: string }>();
   const [payment, setPayment] = useState<Payment | null>(null);
-  const [lines, setLines]     = useState<JELine[]>([]);
+  const [lines, setLines] = useState<JELine[]>([]);
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const companyId = localStorage.getItem('company_id');
     if (!companyId) return;
-
     Promise.all([
       api.get<Payment>(`/ap/payments/${id}`),
       api.get<Company>(`/companies/${companyId}`),
     ]).then(async ([pmt, co]) => {
       setPayment(pmt);
       setCompany(co);
-
-      // Fetch GL lines — from posted JE if available, else from preview
       if (pmt.je_id) {
         const je = await api.get<{ lines: JELine[] }>(`/gl/journal-entries/${pmt.je_id}`);
-        setLines(je.lines.map(l => ({
-          ...l,
-          debit: Number(l.debit),
-          credit: Number(l.credit),
-        })));
+        setLines(je.lines.map(l => ({ ...l, debit: Number(l.debit), credit: Number(l.credit) })));
       } else {
         const preview = await api.get<{ lines: JELine[] }>(`/ap/payments/${id}/journal-preview`).catch(() => ({ lines: [] }));
         setLines(preview.lines ?? []);
       }
-    }).catch(e => setError((e as Error).message))
-      .finally(() => setLoading(false));
+    }).catch(e => setError((e as Error).message)).finally(() => setLoading(false));
   }, [id]);
 
-  useEffect(() => {
-    if (!loading && payment) {
-      setTimeout(() => window.print(), 300);
-    }
-  }, [loading, payment]);
+  useEffect(() => { if (!loading && payment) setTimeout(() => window.print(), 400); }, [loading, payment]);
 
-  if (loading) return (
-    <div className="flex h-screen items-center justify-center text-sm text-slate-500 print:hidden">
-      Preparing voucher…
-    </div>
-  );
-  if (error || !payment) return (
-    <div className="flex h-screen items-center justify-center text-sm text-red-600 print:hidden">
-      {error ?? 'Payment not found'}
-    </div>
-  );
+  if (loading) return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontSize: '13px', color: '#666' }}>Preparing voucher…</div>;
+  if (error || !payment) return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontSize: '13px', color: '#c00' }}>{error ?? 'Payment not found'}</div>;
 
   const particulars = payment.remarks
     || payment.applications.map(a => `Payment for ${a.internal_no}${a.bill_no ? ` (${a.bill_no})` : ''}`).join('; ')
     || `Payment to ${payment.supplier_name}`;
 
+  const BLANK_PART_ROWS = Math.max(0, 5);
+  const BLANK_GL_ROWS   = Math.max(0, 6 - lines.length);
+
   return (
     <>
-      {/* Screen-only toolbar */}
-      <div className="mb-4 flex gap-2 print:hidden">
-        <button
-          onClick={() => window.print()}
-          className="rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-        >
-          Print
-        </button>
-        <button
-          onClick={() => window.close()}
-          className="rounded border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-        >
-          Close
-        </button>
+      {/* ── Screen toolbar ── */}
+      <div className="print:hidden" style={{ padding: '12px 16px', display: 'flex', gap: '8px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+        <button onClick={() => window.print()} style={{ background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '4px', padding: '6px 16px', fontSize: '13px', cursor: 'pointer', fontWeight: 500 }}>Print</button>
+        <button onClick={() => window.close()} style={{ background: '#fff', color: '#374151', border: '1px solid #d1d5db', borderRadius: '4px', padding: '6px 16px', fontSize: '13px', cursor: 'pointer' }}>Close</button>
       </div>
 
-      {/* ── Voucher ─────────────────────────────────────────────────────── */}
-      <div className="voucher mx-auto bg-white text-black" style={{ width: '215mm', minHeight: '279mm', fontFamily: 'Arial, sans-serif', fontSize: '10pt', padding: '10mm 12mm' }}>
+      {/* ── Voucher ── */}
+      <div className="voucher" style={{ width: '210mm', margin: '0 auto', padding: '8mm 10mm 10mm', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '10pt', color: '#000', background: '#fff', boxSizing: 'border-box' }}>
 
-        {/* Top: logo + company info | date */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4mm' }}>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-            {company?.logo && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={company.logo} alt="logo" style={{ height: '52px', width: 'auto', objectFit: 'contain' }} />
-            )}
-            <div>
-              <div style={{ fontWeight: 'bold', fontSize: '12pt', lineHeight: 1.2 }}>
-                {company?.legal_name || company?.name}
-              </div>
-              {company?.address && (
-                <div style={{ fontSize: '8pt', color: '#444', maxWidth: '120mm', lineHeight: 1.4 }}>
-                  {company.address}
-                </div>
-              )}
-              {company?.tin && (
-                <div style={{ fontSize: '8pt', color: '#444' }}>VAT Reg. TIN: {company.tin}</div>
-              )}
-            </div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <table style={{ borderCollapse: 'collapse', fontSize: '10pt' }}>
-              <tbody>
-                <tr>
-                  <td style={{ paddingRight: '4px' }}>Date</td>
-                  <td style={{ borderBottom: '1px solid black', minWidth: '30mm', paddingLeft: '4px' }}>
-                    {fmtDate(payment.payment_date)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        {/* ─── CHECK STUB TOP ─────────────────────────────────────── */}
+
+        {/* Row 1: Date — right aligned */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '3mm', alignItems: 'baseline', gap: '4px' }}>
+          <span>Date</span>
+          <span style={{ display: 'inline-block', borderBottom: B, minWidth: '38mm', paddingLeft: '4px', paddingRight: '4px', textAlign: 'center' }}>
+            {fmtDate(payment.payment_date)}
+          </span>
         </div>
 
-        {/* Payee + amount row */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', marginBottom: '2mm', borderBottom: '1px solid black', paddingBottom: '1mm' }}>
-          <span style={{ whiteSpace: 'nowrap' }}>Payee</span>
-          <span style={{ flex: 1, borderBottom: '1px solid black', fontWeight: 'bold', textAlign: 'center', letterSpacing: '1px' }}>
+        {/* Row 2: Payee + amount */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '2mm' }}>
+          <span style={{ whiteSpace: 'nowrap', fontWeight: 'normal' }}>Payee</span>
+          <span style={{ display: 'inline-block', flex: 1, borderBottom: B, textAlign: 'center', fontWeight: 'bold', letterSpacing: '0.5px' }}>
             ***{payment.supplier_name.toUpperCase()}***
           </span>
-          <span style={{ whiteSpace: 'nowrap', marginLeft: '4px' }}>(₱</span>
-          <span style={{ borderBottom: '1px solid black', minWidth: '32mm', fontWeight: 'bold', textAlign: 'center' }}>
-            ****{fmt(payment.amount)}***
+          <span style={{ whiteSpace: 'nowrap' }}>&nbsp;(P</span>
+          <span style={{ display: 'inline-block', borderBottom: B, minWidth: '36mm', textAlign: 'center', fontWeight: 'bold' }}>
+            ****{n2(payment.amount)}***
           </span>
           <span>)</span>
         </div>
 
-        {/* Amount in words */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', marginBottom: '4mm' }}>
+        {/* Row 3: Amount in words */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '4mm' }}>
           <span style={{ whiteSpace: 'nowrap' }}>Amount in words</span>
-          <span style={{ flex: 1, borderBottom: '1px solid black', fontWeight: 'bold', paddingLeft: '4px' }}>
+          <span style={{ display: 'inline-block', flex: 1, borderBottom: B, textAlign: 'center', fontWeight: 'bold', letterSpacing: '0.5px', paddingLeft: '4px' }}>
             ***{amountToWords(payment.amount)}***
           </span>
         </div>
 
-        {/* Title */}
-        <div style={{ textAlign: 'center', marginBottom: '2mm' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-            <span style={{ fontSize: '14pt', fontWeight: 'bold', letterSpacing: '2px' }}>CHECK VOUCHER</span>
-            <span style={{ fontSize: '12pt' }}>
-              N<sup>o</sup>&nbsp;
-              <span style={{ color: '#c00', fontWeight: 'bold', fontSize: '14pt' }}>{payment.voucher_no}</span>
-            </span>
+        {/* Row 4: Company info (left) + signatory lines (right) */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '3mm' }}>
+          {/* Company logo + info */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {company?.logo && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={company.logo} alt="logo" style={{ height: '56px', width: 'auto', objectFit: 'contain' }} />
+            )}
+            <div>
+              <div style={{ fontWeight: 'bold', fontSize: '13pt', lineHeight: 1.1, textTransform: 'uppercase' }}>
+                {company?.legal_name || company?.name || ''}
+              </div>
+              {company?.address && (
+                <div style={{ fontSize: '8pt', color: '#333', lineHeight: 1.4, maxWidth: '110mm' }}>
+                  {company.address}
+                </div>
+              )}
+              {company?.tin && (
+                <div style={{ fontSize: '8pt', color: '#333' }}>VAT Reg. TIN:{company.tin}</div>
+              )}
+            </div>
+          </div>
+          {/* Signatory lines */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8mm', minWidth: '55mm', paddingBottom: '2mm' }}>
+            <div style={{ borderBottom: B }}>&nbsp;</div>
+            <div style={{ borderBottom: B }}>&nbsp;</div>
           </div>
         </div>
 
-        {/* Particulars / Amount table */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '4mm', border: '1.5px solid black' }}>
+        {/* Divider between check stub and voucher body */}
+        <div style={{ borderTop: '1.5px solid #000', marginBottom: '3mm' }} />
+
+        {/* ─── VOUCHER BODY ────────────────────────────────────────── */}
+
+        {/* Title row */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2mm' }}>
+          <span style={{ fontSize: '14pt', fontWeight: 'bold', letterSpacing: '3px' }}>CHECK VOUCHER</span>
+          <span style={{ fontSize: '11pt' }}>
+            N<sup style={{ fontSize: '8pt' }}>o</sup>&nbsp;
+            <span style={{ color: '#cc0000', fontWeight: 'bold', fontSize: '15pt' }}>{payment.voucher_no}</span>
+          </span>
+        </div>
+
+        {/* ── Particulars table ── */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '3mm', tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '76%' }} />
+            <col style={{ width: '24%' }} />
+          </colgroup>
           <thead>
-            <tr style={{ backgroundColor: '#f0f0f0' }}>
-              <th style={{ border: '1px solid black', padding: '3px 6px', textAlign: 'center', fontWeight: 'bold', width: '75%' }}>PARTICULARS</th>
-              <th style={{ border: '1px solid black', padding: '3px 6px', textAlign: 'center', fontWeight: 'bold', width: '25%' }}>AMOUNT</th>
+            <tr>
+              <th style={th()}>PARTICULARS</th>
+              <th style={th()}>AMOUNT</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td style={{ border: '1px solid black', padding: '4px 6px', verticalAlign: 'top', minHeight: '20mm' }}>
+              <td style={cell({ verticalAlign: 'top', lineHeight: 1.4 })}>
                 <div>dated {fmtDate(payment.payment_date)}</div>
-                <div style={{ marginTop: '2px' }}>{particulars}</div>
+                <div>{particulars}</div>
               </td>
-              <td style={{ border: '1px solid black', padding: '4px 6px', verticalAlign: 'top', textAlign: 'right' }}>
-                PHP{fmt(payment.amount)}
+              <td style={cell({ verticalAlign: 'top', textAlign: 'right' })}>
+                PHP{n2(payment.amount)}
               </td>
             </tr>
-            {/* blank rows for space */}
-            {[0, 1, 2, 3].map(i => (
+            {Array.from({ length: BLANK_PART_ROWS }).map((_, i) => (
               <tr key={i}>
-                <td style={{ border: '1px solid black', padding: '0', height: '7mm' }}>&nbsp;</td>
-                <td style={{ border: '1px solid black', padding: '0' }}>&nbsp;</td>
+                <td style={cell({ height: '7mm' })}>&nbsp;</td>
+                <td style={cell()}>&nbsp;</td>
               </tr>
             ))}
           </tbody>
         </table>
 
-        {/* GL Account lines */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '6mm', border: '1.5px solid black' }}>
+        {/* ── GL Accounts table ── */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '3mm', tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '13%' }} />
+            <col style={{ width: '51%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '18%' }} />
+          </colgroup>
           <thead>
-            <tr style={{ backgroundColor: '#f0f0f0' }}>
-              <th style={{ border: '1px solid black', padding: '3px 6px', textAlign: 'center', fontWeight: 'bold', width: '12%' }}>ACCOUNT NO.</th>
-              <th style={{ border: '1px solid black', padding: '3px 6px', textAlign: 'center', fontWeight: 'bold', width: '52%' }}>ACCOUNT NAME</th>
-              <th style={{ border: '1px solid black', padding: '3px 6px', textAlign: 'center', fontWeight: 'bold', width: '18%' }}>DEBIT</th>
-              <th style={{ border: '1px solid black', padding: '3px 6px', textAlign: 'center', fontWeight: 'bold', width: '18%' }}>CREDIT</th>
+            <tr>
+              <th style={th()}>ACCOUNT NO.</th>
+              <th style={th()}>ACCOUNT NAME</th>
+              <th style={th()}>DEBIT</th>
+              <th style={th()}>CREDIT</th>
             </tr>
           </thead>
           <tbody>
             {lines.map((l, i) => (
               <tr key={i}>
-                <td style={{ border: '1px solid black', padding: '3px 6px', textAlign: 'center' }}>{l.account_code}</td>
-                <td style={{ border: '1px solid black', padding: '3px 6px' }}>{l.account_name}</td>
-                <td style={{ border: '1px solid black', padding: '3px 6px', textAlign: 'right' }}>
-                  {l.debit > 0 ? fmt(l.debit) : ''}
-                </td>
-                <td style={{ border: '1px solid black', padding: '3px 6px', textAlign: 'right' }}>
-                  {l.credit > 0 ? fmt(l.credit) : ''}
-                </td>
+                <td style={cell({ textAlign: 'center' })}>{l.account_code}</td>
+                <td style={cell()}>{l.account_name}</td>
+                <td style={cell({ textAlign: 'right' })}>{l.debit > 0 ? n2(l.debit) : ''}</td>
+                <td style={cell({ textAlign: 'right' })}>{l.credit > 0 ? n2(l.credit) : ''}</td>
               </tr>
             ))}
-            {/* blank fill rows */}
-            {Array.from({ length: Math.max(0, 5 - lines.length) }).map((_, i) => (
-              <tr key={`blank-${i}`}>
-                <td style={{ border: '1px solid black', padding: '0', height: '7mm' }}>&nbsp;</td>
-                <td style={{ border: '1px solid black' }}>&nbsp;</td>
-                <td style={{ border: '1px solid black' }}>&nbsp;</td>
-                <td style={{ border: '1px solid black' }}>&nbsp;</td>
+            {Array.from({ length: BLANK_GL_ROWS }).map((_, i) => (
+              <tr key={i}>
+                <td style={cell({ height: '7mm' })}>&nbsp;</td>
+                <td style={cell()}>&nbsp;</td>
+                <td style={cell()}>&nbsp;</td>
+                <td style={cell()}>&nbsp;</td>
               </tr>
             ))}
           </tbody>
         </table>
 
-        {/* Signatures */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid black' }}>
+        {/* ── Signature section ── */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '33.33%' }} />
+            <col style={{ width: '33.33%' }} />
+            <col style={{ width: '33.34%' }} />
+          </colgroup>
           <tbody>
+            {/* Row 1: Prepared / Verified / Approved */}
             <tr>
-              <td style={{ border: '1px solid black', padding: '3px 6px', width: '25%' }}>
-                <div style={{ fontWeight: 'bold', fontSize: '9pt' }}>PREPARED BY:</div>
-                <div style={{ borderTop: '1px solid black', marginTop: '8mm', paddingTop: '2px', fontSize: '9pt', textAlign: 'center' }}>&nbsp;</div>
+              <td style={cell({ verticalAlign: 'bottom', paddingBottom: '3px' })}>
+                <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>PREPARED BY:</div>
+                <div style={{ marginTop: '9mm', borderTop: B, paddingTop: '2px', fontSize: '9pt', minHeight: '5mm', textAlign: 'center' }}>&nbsp;</div>
               </td>
-              <td style={{ border: '1px solid black', padding: '3px 6px', width: '25%' }}>
-                <div style={{ fontWeight: 'bold', fontSize: '9pt' }}>VERIFIED BY:</div>
-                <div style={{ borderTop: '1px solid black', marginTop: '8mm', paddingTop: '2px', fontSize: '9pt', textAlign: 'center' }}>&nbsp;</div>
+              <td style={cell({ verticalAlign: 'bottom', paddingBottom: '3px' })}>
+                <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>VERIFIED BY:</div>
+                <div style={{ marginTop: '9mm', borderTop: B, paddingTop: '2px', fontSize: '9pt', minHeight: '5mm', textAlign: 'center' }}>&nbsp;</div>
               </td>
-              <td style={{ border: '1px solid black', padding: '3px 6px', width: '50%' }}>
-                <div style={{ fontWeight: 'bold', fontSize: '9pt' }}>APPROVED BY:</div>
-                <div style={{ borderTop: '1px solid black', marginTop: '8mm', paddingTop: '2px', fontSize: '9pt', textAlign: 'center' }}>&nbsp;</div>
+              <td style={cell({ verticalAlign: 'bottom', paddingBottom: '3px' })}>
+                <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>APPROVED BY:</div>
+                <div style={{ marginTop: '9mm', borderTop: B, paddingTop: '2px', fontSize: '9pt', minHeight: '5mm', textAlign: 'center' }}>&nbsp;</div>
               </td>
             </tr>
+            {/* Row 2: Check No + blank + Received By */}
             <tr>
-              <td colSpan={2} style={{ border: '1px solid black', padding: '3px 6px' }}>
-                <div style={{ fontWeight: 'bold', fontSize: '9pt' }}>CHECK NO.</div>
-                <div style={{ borderBottom: '1px solid black', minHeight: '8mm' }}>&nbsp;</div>
+              <td colSpan={2} style={cell({ verticalAlign: 'top' })}>
+                <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>CHECK NO.</div>
+                <div style={{ borderBottom: B, marginTop: '8mm' }}>&nbsp;</div>
               </td>
-              <td style={{ border: '1px solid black', padding: '3px 6px' }}>
-                <div style={{ fontWeight: 'bold', fontSize: '9pt' }}>RECEIVED BY:</div>
-                <div style={{ height: '8mm' }}>&nbsp;</div>
+              <td style={cell({ verticalAlign: 'top' })}>
+                <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>RECEIVED BY:</div>
+                <div style={{ marginTop: '8mm' }}>&nbsp;</div>
               </td>
             </tr>
+            {/* Row 3: Signature over printed name */}
             <tr>
-              <td colSpan={3} style={{ border: '1px solid black', padding: '3px 6px', textAlign: 'right' }}>
-                <div style={{ fontWeight: 'bold', fontSize: '9pt', marginBottom: '6mm' }}>SIGNATURE OVER PRINTED NAME</div>
-                <div style={{ borderTop: '1px solid black', maxWidth: '80mm', marginLeft: 'auto' }}>&nbsp;</div>
+              <td colSpan={3} style={cell({ textAlign: 'right', paddingBottom: '4px', paddingRight: '8px' })}>
+                <div style={{ fontSize: '9pt', fontWeight: 'bold', marginBottom: '8mm' }}>SIGNATURE OVER PRINTED NAME</div>
+                <div style={{ borderTop: B, width: '70mm', marginLeft: 'auto' }}>&nbsp;</div>
               </td>
             </tr>
           </tbody>
         </table>
+
       </div>
 
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          .voucher, .voucher * { visibility: visible; }
-          .voucher { position: fixed; top: 0; left: 0; width: 100%; }
-          @page { size: Letter; margin: 0; }
+          body > *:not(.voucher-root) { display: none !important; }
+          .print\\:hidden { display: none !important; }
+          .voucher {
+            position: fixed !important;
+            top: 0 !important; left: 0 !important;
+            width: 210mm !important;
+            margin: 0 !important;
+            padding: 8mm 10mm 10mm !important;
+          }
+          @page { size: Letter portrait; margin: 0; }
         }
       `}</style>
     </>
