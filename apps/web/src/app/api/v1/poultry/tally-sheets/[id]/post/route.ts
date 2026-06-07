@@ -136,7 +136,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       [rec.company_id, jeDate],
     );
     const period = periodRows.rows[0];
-    if (period && period.status !== 'closed' && tsWarehouseId) {
+    if (period && period.status !== 'closed') {
       const [defInvRows, adjAcctRows] = await Promise.all([
         client.query(
           `SELECT id FROM accounts WHERE company_id = $1 AND is_control = true AND account_type = 'ASSET'

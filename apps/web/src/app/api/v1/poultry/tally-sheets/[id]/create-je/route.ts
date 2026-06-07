@@ -39,15 +39,6 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     if (String(periodRows[0].status).toLowerCase() === 'closed') return err(`Fiscal period for ${jeDate} is closed. Re-open it first.`, 400);
     const period = periodRows[0];
 
-    // Resolve warehouse from destination or branch
-    const branchForWarehouse = (rec.destination_id ?? rec.branch_id) as string | null;
-    const warehouseRows = branchForWarehouse
-      ? await query<Record<string, unknown>>(
-          `SELECT id FROM warehouses WHERE branch_id = $1 LIMIT 1`, [branchForWarehouse])
-      : [];
-    const tsWarehouseId: string | null = (warehouseRows[0]?.id as string) ?? null;
-    if (!tsWarehouseId) return err('No warehouse found for the destination/branch. Ensure a warehouse is linked to this branch in admin settings.', 400);
-
     // Check GL accounts
     const [defInvRows, adjAcctRows] = await Promise.all([
       query<Record<string, unknown>>(
