@@ -143,7 +143,12 @@ export default function TallySheetDetailPage() {
 
   async function action(act: string) {
     setBusy(true); setMsg(null);
-    try { await api.post(`/poultry/tally-sheets/${id}/${act}`, {}); load(); }
+    try {
+      // Always persist latest form + lines before any state transition
+      await api.patch(`/poultry/tally-sheets/${id}`, { ...form, lines });
+      await api.post(`/poultry/tally-sheets/${id}/${act}`, {});
+      load();
+    }
     catch (e: unknown) { setMsg({ text: (e as Error).message, type: 'error' }); }
     finally { setBusy(false); }
   }
