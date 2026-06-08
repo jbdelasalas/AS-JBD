@@ -17,6 +17,7 @@ interface DR {
   customer_id: string; customer_name: string; payment_terms_days: number;
   order_no: string; so_id: string; warehouse_name: string;
   tally_sheet_id: string | null;
+  tally_doc_no: string | null;
   je_id: string | null;
   eff_branch_id: string | null; eff_building_id: string | null;
   eff_cost_center_id: string | null; eff_grow_reference_id: string | null;
@@ -202,7 +203,7 @@ export default function DRDetailPage() {
           <div>
             <div className="mb-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">Tally Sheet</div>
             {dr.tally_sheet_id
-              ? <div className="text-sm"><Link href={`/dashboard/poultry/tally-sheets/${dr.tally_sheet_id}`} className="text-brand-700 hover:underline dark:text-brand-400">View Tally Sheet</Link></div>
+              ? <div className="text-sm"><Link href={`/dashboard/poultry/tally-sheets/${dr.tally_sheet_id}`} className="text-brand-700 hover:underline dark:text-brand-400">{dr.tally_doc_no ?? 'View Tally Sheet'}</Link></div>
               : <form className="flex gap-1.5" onSubmit={async e => {
                   e.preventDefault();
                   const input = (e.currentTarget.elements.namedItem('tsno') as HTMLInputElement).value.trim();
@@ -223,13 +224,6 @@ export default function DRDetailPage() {
                 </form>
             }
           </div>
-          <Field label="Journal Entry" value={
-            dr.je_id
-              ? <Link href={`/dashboard/gl/journal-entries/${dr.je_id}`} className="text-brand-700 hover:underline dark:text-brand-400">
-                  View Journal Entry
-                </Link>
-              : null
-          } />
           {dr.notes && <div className="col-span-4"><Field label="Notes" value={dr.notes} /></div>}
         </div>
       </div>
@@ -381,10 +375,18 @@ export default function DRDetailPage() {
             </>
           )}
           {dr.status === 'posted' && (
-            <button onClick={goCreateSI}
-              className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
-              Create Sales Invoice
-            </button>
+            <>
+              <button onClick={goCreateSI}
+                className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
+                Create Sales Invoice
+              </button>
+              {dr.je_id && (
+                <Link href={`/dashboard/gl/journal-entries/${dr.je_id}`}
+                  className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:border-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                  View Journal Entry
+                </Link>
+              )}
+            </>
           )}
           {!editing && (
             <>

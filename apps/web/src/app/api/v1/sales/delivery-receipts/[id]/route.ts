@@ -174,11 +174,13 @@ export async function GET(
               COALESCE(dr.building_id, so.building_id)       AS eff_building_id,
               COALESCE(dr.cost_center_id, so.cost_center_id) AS eff_cost_center_id,
               COALESCE(dr.grow_reference_id, so.grow_reference_id) AS eff_grow_reference_id,
-              w.name AS warehouse_name
+              w.name AS warehouse_name,
+              ts.doc_no AS tally_doc_no
          FROM delivery_receipts dr
          JOIN customers c ON c.id = dr.customer_id
          JOIN sales_orders so ON so.id = dr.so_id
          JOIN warehouses w ON w.id = dr.warehouse_id
+         LEFT JOIN tally_sheets ts ON ts.id = dr.tally_sheet_id
         WHERE dr.id = $1 LIMIT 1`,
       [params.id],
     ) as Record<string, unknown>[];
