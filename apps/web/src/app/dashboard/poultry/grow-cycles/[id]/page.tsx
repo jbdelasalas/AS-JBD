@@ -246,9 +246,11 @@ export default function GrowCycleDetailPage() {
   const totalDailyMortality = DAYS.reduce((s, d) => s + (parseFloat(dailyMortality[d] || '0') || 0), 0);
   const totalMortalityWithCulling = totalDailyMortality + (parseFloat(culling) || 0);
   const totalConsumptionCost = consumption.reduce((s, c) => s + (parseFloat(c.quantity) || 0) * (parseFloat(c.unit_cost) || 0), 0);
-  const approxChickPricePerHead = doc.heads_available > 0
-    ? doc.chick_price_per_head + totalConsumptionCost / doc.heads_available
-    : doc.chick_price_per_head;
+  const chickPrice = Number(doc.chick_price_per_head) || 0;
+  const headsAvailable = Number(doc.heads_available) || 0;
+  const approxChickPricePerHead = headsAvailable > 0
+    ? chickPrice + totalConsumptionCost / headsAvailable
+    : chickPrice;
 
   return (
     <div className="space-y-0">
@@ -533,7 +535,7 @@ export default function GrowCycleDetailPage() {
             <span>Culling: <strong className="text-amber-600">{(parseFloat(culling) || 0).toLocaleString()}</strong></span>
             <span>Total Mortality: <strong className="text-red-600">{totalMortalityWithCulling.toLocaleString()}</strong></span>
             <span>Mortality Rate: <strong className="text-slate-700 dark:text-slate-300">
-              {doc.heads_in > 0 ? ((totalMortalityWithCulling / doc.heads_in) * 100).toFixed(2) : '0.00'}%
+              {Number(doc.heads_in) > 0 ? ((totalMortalityWithCulling / Number(doc.heads_in)) * 100).toFixed(2) : '0.00'}%
             </strong></span>
           </div>
         </div>
