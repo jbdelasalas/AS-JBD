@@ -660,20 +660,24 @@ export default function TallySheetDetailPage() {
           )}
           {doc.status === 'posted' && (
             <>
-              <button type="button" onClick={openTransferModal}
-                className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
-                Create Conversion
-              </button>
+              {!doc.conversion_id && (
+                <button type="button" onClick={openTransferModal}
+                  className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
+                  Create Conversion
+                </button>
+              )}
               {doc.transfer_je_id && (
                 <Link href={`/dashboard/gl/journal-entries/${doc.transfer_je_id}`}
                   className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
                   View Transfer JE
                 </Link>
               )}
-              <button type="button" onClick={openDRModal}
-                className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-                Create DR
-              </button>
+              {!doc.dr_id && (
+                <button type="button" onClick={openDRModal}
+                  className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+                  Create DR
+                </button>
+              )}
             </>
           )}
           <Link
