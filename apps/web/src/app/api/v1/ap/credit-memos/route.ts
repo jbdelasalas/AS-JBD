@@ -4,6 +4,55 @@ import { query, getPool } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
 
+async function ensureTables() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS bill_credit_memos (
+      id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      company_id     uuid NOT NULL,
+      supplier_id    uuid NOT NULL,
+      bill_id        uuid,
+      memo_no        text NOT NULL,
+      memo_date      date NOT NULL,
+      reason         text,
+      subtotal       numeric(18,2) NOT NULL DEFAULT 0,
+      vat_amount     numeric(18,2) NOT NULL DEFAULT 0,
+      total          numeric(18,2) NOT NULL DEFAULT 0,
+      amount_applied numeric(18,2) NOT NULL DEFAULT 0,
+      balance        numeric(18,2) NOT NULL DEFAULT 0,
+      status         text NOT NULL DEFAULT 'draft',
+      je_id          uuid,
+      branch_id      uuid,
+      building_id    uuid,
+      cost_center_id uuid,
+      grow_reference_id uuid,
+      notes          text,
+      created_by     uuid,
+      created_at     timestamptz NOT NULL DEFAULT now(),
+      updated_at     timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS bill_credit_memo_lines (
+      id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      memo_id        uuid NOT NULL REFERENCES bill_credit_memos(id) ON DELETE CASCADE,
+      line_no        int NOT NULL,
+      description    text NOT NULL,
+      expense_account_id uuid,
+      quantity       numeric(18,4) NOT NULL DEFAULT 1,
+      unit_price     numeric(18,4) NOT NULL DEFAULT 0,
+      vat_rate       numeric(6,2)  NOT NULL DEFAULT 0,
+      line_subtotal  numeric(18,2) NOT NULL DEFAULT 0,
+      line_vat       numeric(18,2) NOT NULL DEFAULT 0,
+      line_total     numeric(18,2) NOT NULL DEFAULT 0,
+      branch_id      uuid,
+      building_id    uuid,
+      cost_center_id uuid,
+      grow_reference_id uuid,
+      created_at     timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+}
+
 function mapRow(r: Record<string, unknown>) {
   return {
     ...r,
@@ -17,6 +66,7 @@ function mapRow(r: Record<string, unknown>) {
 
 export async function GET(request: NextRequest) {
   try { await requireAuth(request); } catch (e) { return e as Response; }
+  await ensureTables();
 
   const { searchParams } = new URL(request.url);
   const companyId = searchParams.get('company_id');
@@ -73,6 +123,8 @@ export async function POST(request: NextRequest) {
   if (!companyId || !supplierId) return err('company_id and supplier_id are required', 400);
   if (!dto.memo_date) return err('memo_date is required', 400);
 
+  await ensureTables();
+
   const supplierRows = await query(
     `SELECT id FROM suppliers WHERE id = $1 AND company_id = $2 AND is_active = true`,
     [supplierId, companyId],
@@ -82,54 +134,6 @@ export async function POST(request: NextRequest) {
   const client = await getPool().connect();
   try {
     await client.query('BEGIN');
-
-    // Ensure table exists
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS bill_credit_memos (
-        id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        company_id     uuid NOT NULL,
-        supplier_id    uuid NOT NULL,
-        bill_id        uuid,
-        memo_no        text NOT NULL,
-        memo_date      date NOT NULL,
-        reason         text,
-        subtotal       numeric(18,2) NOT NULL DEFAULT 0,
-        vat_amount     numeric(18,2) NOT NULL DEFAULT 0,
-        total          numeric(18,2) NOT NULL DEFAULT 0,
-        amount_applied numeric(18,2) NOT NULL DEFAULT 0,
-        balance        numeric(18,2) NOT NULL DEFAULT 0,
-        status         text NOT NULL DEFAULT 'draft',
-        je_id          uuid,
-        branch_id      uuid,
-        building_id    uuid,
-        cost_center_id uuid,
-        grow_reference_id uuid,
-        notes          text,
-        created_by     uuid,
-        created_at     timestamptz NOT NULL DEFAULT now(),
-        updated_at     timestamptz NOT NULL DEFAULT now()
-      )
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS bill_credit_memo_lines (
-        id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        memo_id        uuid NOT NULL REFERENCES bill_credit_memos(id) ON DELETE CASCADE,
-        line_no        int NOT NULL,
-        description    text NOT NULL,
-        expense_account_id uuid,
-        quantity       numeric(18,4) NOT NULL DEFAULT 1,
-        unit_price     numeric(18,4) NOT NULL DEFAULT 0,
-        vat_rate       numeric(6,2)  NOT NULL DEFAULT 0,
-        line_subtotal  numeric(18,2) NOT NULL DEFAULT 0,
-        line_vat       numeric(18,2) NOT NULL DEFAULT 0,
-        line_total     numeric(18,2) NOT NULL DEFAULT 0,
-        branch_id      uuid,
-        building_id    uuid,
-        cost_center_id uuid,
-        grow_reference_id uuid,
-        created_at     timestamptz NOT NULL DEFAULT now()
-      )
-    `);
 
     const seqRows = await client.query(
       `SELECT COUNT(*)::int AS c FROM bill_credit_memos WHERE company_id = $1`, [companyId]);
