@@ -68,25 +68,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       ? new Date(tally.transfer_date as string | Date).toISOString().split('T')[0]
       : new Date().toISOString().split('T')[0];
 
-    // Insert DR — use savepoint so a FK failure doesn't abort the whole transaction
-    let drId: string;
-    await client.query('SAVEPOINT before_dr_insert');
-    try {
-      const r = await client.query(
-        `INSERT INTO delivery_receipts (company_id, branch_id, dr_no, so_id, customer_id, warehouse_id, delivery_date, status, tally_sheet_id, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,'draft',$8,$9) RETURNING id`,
-        [so.company_id, branchId, drNo, soId, so.customer_id, warehouseId, deliveryDate, params.id, auth.userId]);
-      drId = r.rows[0].id as string;
-      await client.query('RELEASE SAVEPOINT before_dr_insert');
-    } catch {
-      // FK/column not yet migrated — rollback to savepoint and insert without tally_sheet_id
-      await client.query('ROLLBACK TO SAVEPOINT before_dr_insert');
-      const r = await client.query(
-        `INSERT INTO delivery_receipts (company_id, branch_id, dr_no, so_id, customer_id, warehouse_id, delivery_date, status, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,'draft',$8) RETURNING id`,
-        [so.company_id, branchId, drNo, soId, so.customer_id, warehouseId, deliveryDate, auth.userId]);
-      drId = r.rows[0].id as string;
-    }
+    // Insert DR (tally_sheet_id linked via separate UPDATE after commit to avoid FK issues)
+    const drRow = await client.query(
+      `INSERT INTO delivery_receipts (company_id, branch_id, dr_no, so_id, customer_id, warehouse_id, delivery_date, status, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'draft',$8) RETURNING id`,
+      [so.company_id, branchId, drNo, soId, so.customer_id, warehouseId, deliveryDate, auth.userId]);
+    const drId: string = drRow.rows[0].id as string;
 
     // Get avg costs
     const itemIds = tallyLines.map(l => l.item_id as string).filter(Boolean);
@@ -111,6 +98,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     await client.query('COMMIT');
+
+    // Best-effort: link tally_sheet_id after commit (column may not exist yet in all envs)
+    query(`UPDATE delivery_receipts SET tally_sheet_id = $1 WHERE id = $2`, [params.id, drId]).catch(() => {});
+
     return ok({ dr_id: drId, dr_no: drNo });
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});
