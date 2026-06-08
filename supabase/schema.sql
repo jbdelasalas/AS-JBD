@@ -1528,4 +1528,61 @@ ALTER TABLE companies
   ADD COLUMN IF NOT EXISTS email   varchar(200),
   ADD COLUMN IF NOT EXISTS website varchar(200),
   ADD COLUMN IF NOT EXISTS logo    text;
+
+-- ================================================================
+-- EMPLOYEE EXPENSE REPORTS (AP)
+-- ================================================================
+CREATE TABLE IF NOT EXISTS employee_expense_reports (
+  id               uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id       uuid NOT NULL REFERENCES companies(id),
+  branch_id        uuid REFERENCES branches(id),
+  er_no            varchar(50) NOT NULL,
+  employee_id      uuid NOT NULL REFERENCES employees(id),
+  report_date      date NOT NULL,
+  period_from      date,
+  period_to        date,
+  purpose          text,
+  notes            text,
+  total            numeric(18,2) NOT NULL DEFAULT 0,
+  status           varchar(30) NOT NULL DEFAULT 'draft'
+                     CHECK (status IN ('draft','pending_approval','approved','cancelled')),
+  approved_by      uuid REFERENCES users(id),
+  approved_at      timestamptz,
+  cancelled_by     uuid REFERENCES users(id),
+  cancelled_at     timestamptz,
+  cancel_reason    text,
+  je_id            uuid REFERENCES journal_entries(id),
+  created_by       uuid NOT NULL REFERENCES users(id),
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  updated_at       timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (company_id, er_no)
+);
+
+CREATE OR REPLACE TRIGGER employee_expense_reports_updated
+  BEFORE UPDATE ON employee_expense_reports
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE INDEX IF NOT EXISTS idx_eer_employee ON employee_expense_reports (employee_id);
+CREATE INDEX IF NOT EXISTS idx_eer_status   ON employee_expense_reports (status);
+CREATE INDEX IF NOT EXISTS idx_eer_company  ON employee_expense_reports (company_id);
+
+CREATE TABLE IF NOT EXISTS expense_report_lines (
+  id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  er_id               uuid NOT NULL REFERENCES employee_expense_reports(id) ON DELETE CASCADE,
+  line_no             int NOT NULL,
+  expense_account_id  uuid REFERENCES accounts(id),
+  description         text NOT NULL,
+  receipt_date        date NOT NULL,
+  amount              numeric(18,2) NOT NULL,
+  notes               text,
+  UNIQUE (er_id, line_no)
+);
+
+-- Document series for expense reports
+INSERT INTO document_series (company_id, doc_type, prefix, start_number, current_number)
+SELECT id, 'expense_report', 'ER-', 1, 0
+FROM companies
+WHERE NOT EXISTS (
+  SELECT 1 FROM document_series ds WHERE ds.company_id = companies.id AND ds.doc_type = 'expense_report'
+);
 INSERT INTO app_settings (key, value) VALUES ('company_name', '') ON CONFLICT DO NOTHING;

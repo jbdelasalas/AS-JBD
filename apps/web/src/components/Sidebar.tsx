@@ -36,8 +36,9 @@ const NAV: NavItem[] = [
     href: '/dashboard/ap',
     label: 'Payables',
     children: [
-      { href: '/dashboard/ap/bills',    label: 'Bills' },
-      { href: '/dashboard/ap/payments', label: 'Payments' },
+      { href: '/dashboard/ap/bills',           label: 'Bills' },
+      { href: '/dashboard/ap/payments',         label: 'Payments' },
+      { href: '/dashboard/ap/expense-reports',  label: 'Expense Reports' },
     ],
   },
   {

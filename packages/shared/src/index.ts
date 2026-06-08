@@ -991,3 +991,70 @@ export interface VatReturn2550Q {
   vat_payable: number;
   excess_input: number;
 }
+
+// ================================================================
+// EMPLOYEE EXPENSE REPORTS (AP)
+// ================================================================
+export type ExpenseReportStatus =
+  | 'draft'
+  | 'pending_approval'
+  | 'approved'
+  | 'cancelled';
+
+export interface ExpenseReportLine {
+  id: string;
+  er_id: string;
+  line_no: number;
+  expense_account_id: string | null;
+  account_code?: string | null;
+  account_name?: string | null;
+  description: string;
+  receipt_date: string;
+  amount: number;
+  notes: string | null;
+}
+
+export interface EmployeeExpenseReport {
+  id: string;
+  company_id: string;
+  branch_id: string | null;
+  er_no: string;
+  employee_id: string;
+  employee_name?: string;
+  employee_no?: string;
+  report_date: string;
+  period_from: string | null;
+  period_to: string | null;
+  purpose: string | null;
+  notes: string | null;
+  total: number;
+  status: ExpenseReportStatus;
+  approved_by: string | null;
+  approved_at: string | null;
+  cancelled_by: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  je_id: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  lines?: ExpenseReportLine[];
+}
+
+export interface CreateExpenseReportDto {
+  company_id: string;
+  branch_id?: string;
+  employee_id: string;
+  report_date: string;
+  period_from?: string;
+  period_to?: string;
+  purpose?: string;
+  notes?: string;
+  lines: Array<{
+    expense_account_id?: string;
+    description: string;
+    receipt_date: string;
+    amount: number;
+    notes?: string;
+  }>;
+}
