@@ -45,6 +45,12 @@ export default function DRDetailPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editDate, setEditDate] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editWarehouseId, setEditWarehouseId] = useState('');
+  const [editLines, setEditLines] = useState<Array<{ id: string; item_id: string; item_name: string | null; item_sku: string | null; item_uom: string | null; so_line_id: string | null; qty_delivered: number; unit_cost: number; so_unit_price: number | null }>>([]);
+  const [editLocations, setEditLocations] = useState<Array<{ id: string; code: string; name: string; warehouse_id: string | null; warehouse_name: string | null }>>([]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -98,6 +104,49 @@ export default function DRDetailPage() {
       })),
     }));
     router.push('/dashboard/ar/invoices/new');
+  }
+
+  function startEdit() {
+    if (!dr) return;
+    setEditDate(dr.delivery_date?.split('T')[0] ?? '');
+    setEditNotes(dr.notes ?? '');
+    setEditWarehouseId((dr as unknown as Record<string, unknown>).warehouse_id as string ?? '');
+    setEditLines(dr.lines.map(l => ({
+      id: l.id, item_id: l.item_id, item_name: l.item_name, item_sku: l.item_sku, item_uom: l.item_uom,
+      so_line_id: (l as unknown as Record<string, unknown>).so_line_id as string | null ?? null,
+      qty_delivered: l.qty_delivered, unit_cost: l.unit_cost, so_unit_price: l.so_unit_price,
+    })));
+    const cid = localStorage.getItem('company_id') ?? '';
+    api.get<Array<{ id: string; code: string; name: string; warehouse_id: string | null; warehouse_name: string | null }>>(
+      `/inventory/locations?company_id=${cid}`
+    ).then(locs => setEditLocations(locs.filter(l => l.warehouse_id))).catch(() => {});
+    setEditing(true);
+    setMsg(null);
+  }
+
+  async function saveEdit() {
+    if (!dr) return;
+    setBusy(true); setMsg(null);
+    try {
+      await api.patch(`/sales/delivery-receipts/${id}`, {
+        delivery_date: editDate || undefined,
+        warehouse_id: editWarehouseId || undefined,
+        notes: editNotes || null,
+        lines: editLines.map(l => ({
+          item_id: l.item_id,
+          so_line_id: l.so_line_id,
+          qty_delivered: Number(l.qty_delivered),
+          unit_cost: l.unit_cost,
+          description: l.item_name ?? '',
+        })),
+      });
+      setEditing(false);
+      load();
+    } catch (e: unknown) {
+      setMsg((e as Error).message ?? 'Save failed');
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (loading) return <div className="py-10 text-center text-sm text-slate-500">Loading…</div>;
@@ -219,32 +268,115 @@ export default function DRDetailPage() {
         </div>
       </div>
 
+      {/* Edit form (shown when editing) */}
+      {editing && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-5 dark:border-amber-800 dark:bg-amber-950/30 space-y-4">
+          <div className="text-sm font-medium text-amber-800 dark:text-amber-300">Edit Delivery Receipt</div>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Delivery Date</label>
+              <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)}
+                className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Warehouse</label>
+              <select value={editWarehouseId} onChange={e => setEditWarehouseId(e.target.value)}
+                className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                <option value="">— select —</option>
+                {editLocations.map(l => (
+                  <option key={l.warehouse_id!} value={l.warehouse_id!}>{l.code} — {l.warehouse_name ?? l.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Notes</label>
+              <input type="text" value={editNotes} onChange={e => setEditNotes(e.target.value)}
+                className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
+          </div>
+          <div>
+            <div className="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">Lines — Qty Delivered</div>
+            <div className="space-y-1">
+              {editLines.map((l, i) => (
+                <div key={l.id} className="flex items-center gap-3 text-sm">
+                  <span className="w-6 text-right text-xs text-slate-400">{i + 1}</span>
+                  <span className="font-mono text-xs text-slate-500 w-24">{l.item_sku ?? '—'}</span>
+                  <span className="flex-1 dark:text-slate-300">{l.item_name ?? '—'}</span>
+                  <span className="text-xs text-slate-400 w-10">{l.item_uom ?? ''}</span>
+                  <input
+                    type="number" min="0" step="0.01"
+                    value={l.qty_delivered}
+                    onChange={e => {
+                      const updated = [...editLines];
+                      updated[i] = { ...updated[i], qty_delivered: Number(e.target.value) };
+                      setEditLines(updated);
+                    }}
+                    className="w-28 rounded border border-slate-300 px-2 py-1 text-right text-sm font-mono dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  />
+                  {l.so_unit_price != null && (
+                    <span className="text-xs text-slate-400 w-28 text-right font-mono">
+                      {formatPHP(l.so_unit_price)}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Actions */}
-      <div className="flex gap-3">
-        {dr.status === 'draft' && (
-          <button onClick={doPost} disabled={busy}
-            className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
-            {busy ? 'Posting…' : 'Post DR'}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-3">
+          {dr.status === 'draft' && !editing && (
+            <>
+              <button onClick={startEdit} disabled={busy}
+                className="rounded bg-amber-500 px-5 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50">
+                Edit
+              </button>
+              <button onClick={doPost} disabled={busy}
+                className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
+                {busy ? 'Posting…' : 'Post DR'}
+              </button>
+            </>
+          )}
+          {editing && (
+            <>
+              <button onClick={saveEdit} disabled={busy}
+                className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                {busy ? 'Saving…' : 'Save Changes'}
+              </button>
+              <button onClick={() => { setEditing(false); setMsg(null); }} disabled={busy}
+                className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:border-slate-600 dark:text-slate-300 hover:bg-slate-50">
+                Cancel
+              </button>
+            </>
+          )}
+          {dr.status === 'posted' && (
+            <button onClick={goCreateSI}
+              className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
+              Create Sales Invoice
+            </button>
+          )}
+          {!editing && (
+            <>
+              <Link href={`/print/dr/${id}`} target="_blank"
+                className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:border-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                Print
+              </Link>
+              <button onClick={() => router.back()}
+                className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:border-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                Back
+              </button>
+            </>
+          )}
+        </div>
+        {dr.status === 'draft' && !editing && (
+          <button onClick={handleDelete} disabled={busy}
+            className="rounded border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-700 dark:bg-red-950 dark:text-red-400">
+            Delete
           </button>
         )}
-        {dr.status === 'posted' && (
-          <button onClick={goCreateSI}
-            className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
-            Create Sales Invoice
-          </button>
-        )}
-        <Link href={`/print/dr/${id}`} target="_blank"
-          className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:border-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
-          Print
-        </Link>
-        <button onClick={() => router.back()}
-          className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:border-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
-          Back
-        </button>
-        <button onClick={handleDelete} disabled={busy}
-          className="rounded border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-700 dark:bg-red-950 dark:text-red-400">
-          Delete
-        </button>
       </div>
     </div>
   );
