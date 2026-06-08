@@ -6,7 +6,7 @@ function accessSecret(): Uint8Array {
 }
 
 function expiresIn(): string {
-  return process.env.JWT_ACCESS_EXPIRES ?? '15m';
+  return process.env.JWT_ACCESS_EXPIRES ?? '25m';
 }
 
 export interface JwtPayload {

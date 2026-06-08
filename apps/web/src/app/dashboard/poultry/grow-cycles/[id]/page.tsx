@@ -312,7 +312,7 @@ export default function GrowCycleDetailPage() {
           <Field label="Heads" value={<span className="font-semibold">{Number(doc.heads_in).toLocaleString()}</span>} />
           <Field label="Available / Harvested" value={<span className="text-emerald-600 font-semibold">{Number(doc.heads_available).toLocaleString()} / {Number(doc.heads_harvested).toLocaleString()}</span>} />
           <Field label="Chick Price/Head" value={Number(doc.chick_price_per_head).toFixed(6)} />
-          <Field label="Approx Chick Price/Head" value={approxChickPricePerHead.toFixed(6)} />
+          <Field label="Approx Chick Price/Head" value={approxChickPricePerHead != null ? Number(approxChickPricePerHead).toFixed(6) : '—'} />
           <Field label="Est. Harvest Recovery" value={doc.est_harvest_recovery != null ? Number(doc.est_harvest_recovery).toFixed(2) : <span className="text-red-500">—</span>} />
 
           {/* Editable fields */}

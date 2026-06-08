@@ -100,6 +100,6 @@ export async function POST(request: NextRequest) {
   return ok({
     access_token: newAccess,
     refresh_token: newRefresh,
-    expires_in: parseExpiryToSeconds(process.env.JWT_ACCESS_EXPIRES ?? '15m'),
+    expires_in: parseExpiryToSeconds(process.env.JWT_ACCESS_EXPIRES ?? '25m'),
   });
 }

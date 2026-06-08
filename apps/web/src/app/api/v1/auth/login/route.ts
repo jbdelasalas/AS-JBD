@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { type NextRequest } from 'next/server';
-import { compare } from '@node-rs/bcrypt';
+import { compare } from 'bcryptjs';
 import * as crypto from 'crypto';
 import { getPool } from '@/lib/db';
 
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     return ok({
       access_token: accessToken,
       refresh_token: refreshToken,
-      expires_in: parseExpiryToSeconds(process.env.JWT_ACCESS_EXPIRES ?? '15m'),
+      expires_in: parseExpiryToSeconds(process.env.JWT_ACCESS_EXPIRES ?? '25m'),
       user: {
         id: user.id,
         email: user.email,

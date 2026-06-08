@@ -23,7 +23,37 @@ export function clearAuth() {
   localStorage.removeItem('permissions');
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+let _refreshing: Promise<boolean> | null = null;
+
+async function tryRefresh(): Promise<boolean> {
+  if (_refreshing) return _refreshing;
+  _refreshing = (async () => {
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
+      if (!raw) return false;
+      const res = await fetch(`${BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: raw }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (data?.data?.access_token) {
+        localStorage.setItem('access_token', data.data.access_token);
+        localStorage.setItem('refresh_token', data.data.refresh_token);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    } finally {
+      _refreshing = null;
+    }
+  })();
+  return _refreshing;
+}
+
+async function request<T>(path: string, init: RequestInit = {}, _retry = false): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...((init.headers as Record<string, string>) ?? {}),
@@ -45,7 +75,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   if (res.status === 401) {
-    // For now: just clear and redirect. A real app would attempt refresh first.
+    if (!_retry) {
+      const refreshed = await tryRefresh();
+      if (refreshed) return request<T>(path, init, true);
+    }
     clearAuth();
     if (typeof window !== 'undefined') window.location.href = '/login';
     throw new ApiError(401, null, 'Unauthorized');

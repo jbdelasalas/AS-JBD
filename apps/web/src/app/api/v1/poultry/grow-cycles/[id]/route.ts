@@ -183,7 +183,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
       // Resolve warehouse from grow cycle branch_id
       const gcRow = await client.query(
-        `SELECT g.branch_id, g.company_id, g.cycle_no,
+        `SELECT g.branch_id, g.company_id, g.doc_no,
                 w.id AS warehouse_id
            FROM grow_cycles g
            LEFT JOIN warehouses w ON w.branch_id = g.branch_id
@@ -193,7 +193,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       const gc = gcRow.rows[0] as Record<string, unknown> | null;
       const warehouseId = gc?.warehouse_id as string | null;
       const companyId = gc?.company_id as string | null;
-      const cycleNo = gc?.cycle_no as string | null;
+      const cycleNo = gc?.doc_no as string | null;
 
       if (warehouseId && companyId) {
         // Build new totals per item
