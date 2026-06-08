@@ -31,8 +31,6 @@ const TABLES = [
   'inventory_ins',
   'order_in_lines',
   'order_ins',
-  'grow_references',
-  'farm_buildings',
   // Financials
   'wht_certificates',
   'sc_pwd_transactions',
@@ -81,16 +79,6 @@ const TABLES = [
   'retail_shifts',
   'pumps',
   'fuel_tanks',
-  // Master data (keep accounts + cost_centers)
-  'uom_conversions',
-  'uoms',
-  'items',
-  'item_categories',
-  'warehouses',
-  'payment_methods',
-  'customers',
-  'suppliers',
-  'departments',
 ];
 
 export async function POST(request: NextRequest) {
