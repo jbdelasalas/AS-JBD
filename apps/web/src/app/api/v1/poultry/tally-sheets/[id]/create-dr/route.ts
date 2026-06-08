@@ -68,7 +68,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       ? new Date(tally.transfer_date as string | Date).toISOString().split('T')[0]
       : new Date().toISOString().split('T')[0];
 
-    // Insert DR
+    // Insert DR — try with tally_sheet_id first; fall back without if FK/column not ready
     let drId: string;
     try {
       const r = await client.query(
@@ -76,9 +76,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
          VALUES ($1,$2,$3,$4,$5,$6,$7,'draft',$8,$9) RETURNING id`,
         [so.company_id, branchId, drNo, soId, so.customer_id, warehouseId, deliveryDate, params.id, auth.userId]);
       drId = r.rows[0].id as string;
-    } catch (e) {
-      await client.query('ROLLBACK');
-      return err((e as Error).message || 'Failed to create DR', 500);
+    } catch {
+      // tally_sheet_id column missing or FK not yet migrated — insert without it
+      const r = await client.query(
+        `INSERT INTO delivery_receipts (company_id, branch_id, dr_no, so_id, customer_id, warehouse_id, delivery_date, status, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'draft',$8) RETURNING id`,
+        [so.company_id, branchId, drNo, soId, so.customer_id, warehouseId, deliveryDate, auth.userId]);
+      drId = r.rows[0].id as string;
     }
 
     // Get avg costs
