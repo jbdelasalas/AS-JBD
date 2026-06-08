@@ -77,7 +77,6 @@ export default function DRPrintPage() {
   const lines       = dr.lines;
   const totalKgs    = lines.reduce((s, l) => s + Number(l.qty_delivered), 0);
   const totalHeads  = lines.reduce((s, l) => s + (headsMap.get(l.item_id) ?? 0), 0);
-  const totalAmount = lines.reduce((s, l) => s + Number(l.qty_delivered) * Number(l.so_unit_price ?? 0) * (1 - Number(l.so_discount_pct ?? 0) / 100), 0);
   const blankRows   = Math.max(0, MIN_ROWS - lines.length);
   const termsLabel  = dr.payment_terms_days ? `Net ${dr.payment_terms_days}` : '';
 
@@ -165,25 +164,19 @@ export default function DRPrintPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt', marginBottom: '8pt' }}>
           <thead>
             <tr style={{ background: '#000', color: '#fff' }}>
-              <th style={thStyle('center', '60pt')}>HEADS/PIECES</th>
-              <th style={thStyle('center', '72pt')}>KILOGRAMS</th>
+              <th style={thStyle('center', '80pt')}>HEADS/PIECES</th>
+              <th style={thStyle('center', '100pt')}>KILOGRAMS</th>
               <th style={thStyle('left')}>PRODUCTS DESCRIPTION</th>
-              <th style={thStyle('right', '60pt')}>PRICE</th>
-              <th style={thStyle('right', '80pt')}>AMOUNT</th>
             </tr>
           </thead>
           <tbody>
             {lines.map(l => {
-              const heads   = headsMap.get(l.item_id);
-              const discPct = Number(l.so_discount_pct ?? 0);
-              const amount  = Number(l.qty_delivered) * Number(l.so_unit_price ?? 0) * (1 - discPct / 100);
+              const heads = headsMap.get(l.item_id);
               return (
                 <tr key={l.id} style={{ borderBottom: '1px solid #ccc' }}>
                   <td style={tdStyle('center')}>{heads ? fmtNum(heads, 0) : ''}</td>
                   <td style={tdStyle('center')}>{fmtNum(Number(l.qty_delivered), 2)}</td>
                   <td style={tdStyle('left')}>{l.item_name ?? l.description}</td>
-                  <td style={tdStyle('right')}>{l.so_unit_price != null ? fmtNum(Number(l.so_unit_price)) : ''}</td>
-                  <td style={tdStyle('right')}>{l.so_unit_price != null ? fmtNum(amount) : ''}</td>
                 </tr>
               );
             })}
@@ -192,8 +185,6 @@ export default function DRPrintPage() {
                 <td style={tdStyle('center')}>&nbsp;</td>
                 <td style={tdStyle('center')}>&nbsp;</td>
                 <td style={tdStyle('left')}>&nbsp;</td>
-                <td style={tdStyle('right')}>&nbsp;</td>
-                <td style={tdStyle('right')}>&nbsp;</td>
               </tr>
             ))}
             {/* Totals */}
@@ -203,8 +194,6 @@ export default function DRPrintPage() {
               </td>
               <td style={{ ...tdStyle('center'), fontWeight: 'bold' }}>{fmtNum(totalKgs, 2)}</td>
               <td style={{ ...tdStyle('center'), fontWeight: 'bold', letterSpacing: '2pt' }}>TOTAL</td>
-              <td style={tdStyle('right')}></td>
-              <td style={{ ...tdStyle('right'), fontWeight: 'bold' }}>{fmtNum(totalAmount)}</td>
             </tr>
           </tbody>
         </table>
