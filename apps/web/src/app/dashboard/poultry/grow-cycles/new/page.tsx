@@ -34,7 +34,7 @@ export default function NewGrowCyclePage() {
     batch_id: '', branch_id: '', building_id: '',
     grow_reference: '', cost_center_id: '', year: new Date().getFullYear().toString(),
     start_date: now, expected_end_date: endDefault,
-    heads: '', approx_heads: '', est_harvest_recovery: '70',
+    heads: '', approx_heads: '', est_harvest_recovery: '97',
     chick_price_per_head: '', approx_chick_price_per_head: '',
     live_item_id: '',
     remarks: '',
