@@ -77,7 +77,7 @@ export default function DRPrintPage() {
   const lines       = dr.lines;
   const totalKgs    = lines.reduce((s, l) => s + Number(l.qty_delivered), 0);
   const totalHeads  = lines.reduce((s, l) => s + (headsMap.get(l.item_id) ?? 0), 0);
-  const totalAmount = lines.reduce((s, l) => s + Number(l.qty_delivered) * Number(l.so_unit_price ?? 0), 0);
+  const totalAmount = lines.reduce((s, l) => s + Number(l.qty_delivered) * Number(l.so_unit_price ?? 0) * (1 - Number(l.so_discount_pct ?? 0) / 100), 0);
   const blankRows   = Math.max(0, MIN_ROWS - lines.length);
   const termsLabel  = dr.payment_terms_days ? `Net ${dr.payment_terms_days}` : '';
 
@@ -174,8 +174,9 @@ export default function DRPrintPage() {
           </thead>
           <tbody>
             {lines.map(l => {
-              const heads  = headsMap.get(l.item_id);
-              const amount = Number(l.qty_delivered) * Number(l.so_unit_price ?? 0);
+              const heads   = headsMap.get(l.item_id);
+              const discPct = Number(l.so_discount_pct ?? 0);
+              const amount  = Number(l.qty_delivered) * Number(l.so_unit_price ?? 0) * (1 - discPct / 100);
               return (
                 <tr key={l.id} style={{ borderBottom: '1px solid #ccc' }}>
                   <td style={tdStyle('center')}>{heads ? fmtNum(heads, 0) : ''}</td>
