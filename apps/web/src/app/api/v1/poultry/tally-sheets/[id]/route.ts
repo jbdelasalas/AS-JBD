@@ -15,7 +15,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
               br.code   AS branch_code,    br.name  AS branch_name,
               fb.code   AS building_code,  fb.name  AS building_name,
               cc.code   AS cost_center_code, cc.name AS cost_center_name,
-              gr.code   AS grow_ref_code,  gr.name  AS grow_ref_name
+              gr.code   AS grow_ref_code,  gr.name  AS grow_ref_name,
+              dr.id     AS dr_id,          dr.dr_no AS dr_no,
+              cv.id     AS conversion_id,  cv.doc_no AS conversion_no
          FROM tally_sheets t
          LEFT JOIN grow_cycles g  ON g.id  = t.grow_cycle_id
          LEFT JOIN suppliers s    ON s.id  = t.supplier_id
@@ -24,6 +26,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
          LEFT JOIN farm_buildings fb ON fb.id = t.building_id
          LEFT JOIN cost_centers cc   ON cc.id = t.cost_center_id
          LEFT JOIN grow_references gr ON gr.id = t.grow_reference_id
+         LEFT JOIN delivery_receipts dr ON dr.tally_sheet_id = t.id AND dr.status != 'voided'
+         LEFT JOIN conversions cv       ON cv.tally_sheet_id = t.id AND cv.status != 'voided'
         WHERE t.id = $1`, [params.id]);
     if (!hdr) return err('Not found', 404);
     const lines = await query(

@@ -18,6 +18,14 @@ interface InvoiceRow {
   status: string;
 }
 
+interface Location {
+  id: string;
+  code: string;
+  name: string;
+  warehouse_id: string | null;
+  warehouse_name: string | null;
+}
+
 const STATUS_STYLES: Record<string, string> = {
   draft:               'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
   pending_approval:    'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
@@ -56,6 +64,10 @@ export default function SalesOrderDetailPage() {
   const [approveNotes, setApproveNotes] = useState('');
   const [showApprove, setShowApprove] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showDR, setShowDR] = useState(false);
+  const [drWh, setDrWh] = useState('');
+  const [drDate, setDrDate] = useState(new Date().toISOString().split('T')[0]);
+  const [drLocations, setDrLocations] = useState<Location[]>([]);
 
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('company_id') ?? '' : '';
 
@@ -86,6 +98,44 @@ export default function SalesOrderDetailPage() {
     setBusy(true); setActionMsg(null);
     try { await api.delete(`/sales/orders/${id}`); router.push('/dashboard/sales/orders'); }
     catch (e: unknown) { setActionMsg((e as Error).message ?? 'Delete failed'); setBusy(false); }
+  }
+
+  useEffect(() => {
+    if (!showDR) return;
+    const cid = localStorage.getItem('company_id') ?? '';
+    api.get<Location[]>(`/inventory/locations?company_id=${cid}`)
+      .then(locs => setDrLocations(locs.filter(l => l.warehouse_id)))
+      .catch(() => {});
+  }, [showDR]);
+
+  async function handleCreateDR() {
+    if (!drWh || !drDate || !order) return;
+    setBusy(true); setActionMsg(null);
+    try {
+      const cid = localStorage.getItem('company_id') ?? '';
+      const loc = drLocations.find(l => l.warehouse_id === drWh);
+      const lines = (order.lines ?? [])
+        .map(l => ({
+          item_id: l.item_id,
+          description: l.description,
+          qty_delivered: Number(l.quantity) - Number(l.qty_delivered),
+          so_line_id: l.id,
+        }))
+        .filter(l => l.qty_delivered > 0);
+      if (!lines.length) { setActionMsg('All lines are already fully delivered.'); setBusy(false); return; }
+      const dr = await api.post<{ id: string }>('/sales/delivery-receipts', {
+        company_id: cid,
+        so_id: order.id,
+        warehouse_id: drWh,
+        branch_id: loc?.id ?? null,
+        delivery_date: drDate,
+        lines,
+      });
+      router.push(`/dashboard/sales/delivery-receipts/${dr.id}`);
+    } catch (e: unknown) {
+      setActionMsg((e as Error).message ?? 'Failed to create DR');
+      setBusy(false);
+    }
   }
 
   if (loading) return <div className="py-10 text-center text-sm text-slate-500">Loading…</div>;
@@ -253,10 +303,10 @@ export default function SalesOrderDetailPage() {
               )}
               {['approved','partially_delivered'].includes(order.status) && (
                 <>
-                  <Link href={`/dashboard/ar/invoices/new?so_id=${order.id}`}
-                    className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
-                    Create Invoice
-                  </Link>
+                  <button onClick={() => setShowDR(true)} disabled={busy}
+                    className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
+                    Create DR
+                  </button>
                   <button onClick={() => doAction('close')} disabled={busy}
                     className="rounded bg-purple-600 px-5 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50">
                     {busy ? 'Closing…' : 'Close Order'}
@@ -333,6 +383,43 @@ export default function SalesOrderDetailPage() {
                 Confirm Approval
               </button>
               <button onClick={() => setShowApprove(false)}
+                className="flex-1 rounded border border-slate-300 py-2 text-sm text-slate-700 dark:text-slate-300">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create DR modal */}
+      {showDR && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-96 rounded-lg bg-white dark:bg-slate-900 p-6 shadow-xl">
+            <h2 className="mb-4 text-base font-semibold text-slate-900 dark:text-slate-100">Create Delivery Receipt</h2>
+            <div className="mb-3">
+              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Warehouse</label>
+              <select value={drWh} onChange={e => setDrWh(e.target.value)}
+                className="w-full rounded border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                <option value="">Select warehouse…</option>
+                {drLocations.map(l => (
+                  <option key={l.warehouse_id!} value={l.warehouse_id!}>
+                    {l.code} — {l.warehouse_name ?? l.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="mb-5">
+              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Delivery Date</label>
+              <input type="date" value={drDate} onChange={e => setDrDate(e.target.value)}
+                className="w-full rounded border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
+            <div className="flex gap-2">
+              <button disabled={!drWh || !drDate || busy}
+                onClick={() => { setShowDR(false); handleCreateDR(); }}
+                className="flex-1 rounded bg-emerald-600 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-40">
+                {busy ? 'Creating…' : 'Create DR'}
+              </button>
+              <button onClick={() => setShowDR(false)}
                 className="flex-1 rounded border border-slate-300 py-2 text-sm text-slate-700 dark:text-slate-300">
                 Cancel
               </button>

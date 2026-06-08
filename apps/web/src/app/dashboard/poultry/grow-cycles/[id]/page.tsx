@@ -172,6 +172,7 @@ export default function GrowCycleDetailPage() {
         setHarvesting(false);
         return;
       }
+      const growRefId = growRefs.find(g => g.name === doc.grow_reference)?.id ?? null;
       const ts = await api.post<{ id: string }>('/poultry/tally-sheets', {
         company_id:        cid,
         grow_cycle_id:     id,
@@ -182,9 +183,10 @@ export default function GrowCycleDetailPage() {
         branch_id:         doc.branch_id    || null,
         building_id:       doc.building_id  || null,
         cost_center_id:    doc.cost_center_id || null,
+        grow_reference_id: growRefId,
         remarks:           `Generated from growing ${doc.doc_no}`,
         lines: [{
-          item_id:   doc.live_item_id,   // live chicken, not DOC
+          item_id:   doc.live_item_id,
           heads,
           gross_kgs: 0,
           crate_kgs: 0,

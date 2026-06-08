@@ -35,6 +35,7 @@ function NewTallySheetForm() {
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState<string | null>(null);
   const prevGrowCycleId = useRef<string>('');
+  const [gcGrowRefName, setGcGrowRefName] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     grow_cycle_id:    params.get('grow_cycle_id') ?? '',
@@ -79,18 +80,40 @@ function NewTallySheetForm() {
     api.get<DeliveryMethod[]>(`/admin/delivery-methods?company_id=${cid}`).then(r => setDeliveryMethods(Array.isArray(r) ? r : [])).catch(() => {});
   }, []);
 
-  // When grow cycle changes, auto-fill first line item with live_item_id
+  // When grow cycle changes, auto-fill header fields and line 1 from the grow cycle
   useEffect(() => {
     if (!form.grow_cycle_id || form.grow_cycle_id === prevGrowCycleId.current) return;
     prevGrowCycleId.current = form.grow_cycle_id;
-    api.get<{ live_item_id: string | null }>(`/poultry/grow-cycles/${form.grow_cycle_id}`)
+    api.get<{
+      live_item_id: string | null;
+      grow_reference: string | null;
+      branch_id: string | null;
+      building_id: string | null;
+      cost_center_id: string | null;
+      heads_available: number;
+    }>(`/poultry/grow-cycles/${form.grow_cycle_id}`)
       .then(gc => {
+        const heads = gc.heads_available > 0 ? String(gc.heads_available) : '';
         if (gc.live_item_id) {
-          setLines(prev => prev.map((l, i) => i === 0 ? { ...l, item_id: gc.live_item_id! } : l));
+          setLines(prev => prev.map((l, i) => i === 0
+            ? { ...l, item_id: gc.live_item_id!, heads: gc.heads_available > 0 ? gc.heads_available : l.heads }
+            : l));
         }
+        if (heads) setF('harvested_heads', heads);
+        if (gc.branch_id)      setF('branch_id', gc.branch_id);
+        if (gc.building_id)    setF('building_id', gc.building_id);
+        if (gc.cost_center_id) setF('cost_center_id', gc.cost_center_id);
+        setGcGrowRefName(gc.grow_reference ?? null);
       })
       .catch(() => {});
   }, [form.grow_cycle_id]);
+
+  // Map grow reference name → ID once growRefs are loaded
+  useEffect(() => {
+    if (!gcGrowRefName || !growRefs.length) return;
+    const match = growRefs.find(g => g.name === gcGrowRefName);
+    if (match) setF('grow_reference_id', match.id);
+  }, [gcGrowRefName, growRefs]);
 
   function setF(field: string, value: string | number) {
     setForm(f => ({ ...f, [field]: value }));

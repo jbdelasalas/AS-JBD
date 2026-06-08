@@ -36,6 +36,10 @@ interface TallySheet {
   live_item_id: string | null;
   je_id: string | null;
   transfer_je_id: string | null;
+  dr_id: string | null;
+  dr_no: string | null;
+  conversion_id: string | null;
+  conversion_no: string | null;
   lines: Line[];
 }
 
@@ -88,7 +92,20 @@ export default function TallySheetDetailPage() {
       setDoc(d);
       const rawDate = d.transfer_date ? String(d.transfer_date).substring(0, 10) : '';
       setForm({ ...d, transfer_date: rawDate || today });
-      setLines(d.lines.map(l => ({ ...l })));
+      const loadedLines = d.lines.map(l => ({ ...l }));
+      if (loadedLines.length === 0 && d.status === 'saved' && d.harvested_heads > 0) {
+        setLines([{
+          line_no: 1,
+          item_id: d.live_item_id ?? '',
+          heads: d.harvested_heads,
+          gross_kgs: 0,
+          crate_kgs: 0,
+          net_kgs: 0,
+          remarks: '',
+        }]);
+      } else {
+        setLines(loadedLines);
+      }
     }).catch(() => {}).finally(() => setLoading(false));
   }, [id]);
 
@@ -511,6 +528,37 @@ export default function TallySheetDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Related Documents */}
+        {(doc.dr_id || doc.conversion_id || doc.je_id || doc.transfer_je_id) && (
+          <div className="border-b border-slate-100 dark:border-slate-700 px-6 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 bg-slate-50 dark:bg-slate-800/50">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Related Documents:</span>
+            {doc.dr_id && doc.dr_no && (
+              <Link href={`/dashboard/sales/delivery-receipts/${doc.dr_id}`}
+                className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline dark:text-brand-400">
+                <span className="text-slate-400">DR</span> {doc.dr_no}
+              </Link>
+            )}
+            {doc.conversion_id && doc.conversion_no && (
+              <Link href={`/dashboard/poultry/conversions/${doc.conversion_id}`}
+                className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline dark:text-brand-400">
+                <span className="text-slate-400">Conversion</span> {doc.conversion_no}
+              </Link>
+            )}
+            {doc.je_id && (
+              <Link href={`/dashboard/gl/journal-entries/${doc.je_id}`}
+                className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline dark:text-brand-400">
+                <span className="text-slate-400">JE</span> (Tally)
+              </Link>
+            )}
+            {doc.transfer_je_id && (
+              <Link href={`/dashboard/gl/journal-entries/${doc.transfer_je_id}`}
+                className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline dark:text-brand-400">
+                <span className="text-slate-400">JE</span> (Transfer)
+              </Link>
+            )}
+          </div>
+        )}
 
         {/* Lines table */}
         <div className="overflow-x-auto">
