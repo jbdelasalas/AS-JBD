@@ -119,7 +119,7 @@ export default function DRDetailPage() {
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{dr.customer_name}</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link href={`/dashboard/sales/delivery-receipts/${id}/print`} target="_blank"
+          <Link href={`/print/dr/${id}`} target="_blank"
             className="rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
             🖨 Print
           </Link>
