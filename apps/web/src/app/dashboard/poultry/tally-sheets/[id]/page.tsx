@@ -529,37 +529,6 @@ export default function TallySheetDetailPage() {
           </div>
         </div>
 
-        {/* Related Documents */}
-        {(doc.dr_id || doc.conversion_id || doc.je_id || doc.transfer_je_id) && (
-          <div className="border-b border-slate-100 dark:border-slate-700 px-6 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 bg-slate-50 dark:bg-slate-800/50">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Related Documents:</span>
-            {doc.dr_id && doc.dr_no && (
-              <Link href={`/dashboard/sales/delivery-receipts/${doc.dr_id}`}
-                className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline dark:text-brand-400">
-                <span className="text-slate-400">DR</span> {doc.dr_no}
-              </Link>
-            )}
-            {doc.conversion_id && doc.conversion_no && (
-              <Link href={`/dashboard/poultry/conversions/${doc.conversion_id}`}
-                className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline dark:text-brand-400">
-                <span className="text-slate-400">Conversion</span> {doc.conversion_no}
-              </Link>
-            )}
-            {doc.je_id && (
-              <Link href={`/dashboard/gl/journal-entries/${doc.je_id}`}
-                className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline dark:text-brand-400">
-                <span className="text-slate-400">JE</span> (Tally)
-              </Link>
-            )}
-            {doc.transfer_je_id && (
-              <Link href={`/dashboard/gl/journal-entries/${doc.transfer_je_id}`}
-                className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline dark:text-brand-400">
-                <span className="text-slate-400">JE</span> (Transfer)
-              </Link>
-            )}
-          </div>
-        )}
-
         {/* Lines table */}
         <div className="overflow-x-auto">
           <table className="min-w-full text-xs">
@@ -599,7 +568,24 @@ export default function TallySheetDetailPage() {
                       <input type="text" value={l.remarks ?? ''}
                         onChange={e => updateLine(i, 'remarks', e.target.value)}
                         className={tinp} />
-                    ) : (l.remarks || '—')}
+                    ) : (
+                      <div className="flex flex-col gap-0.5">
+                        {l.remarks && <span>{l.remarks}</span>}
+                        {doc.dr_id && doc.dr_no && (
+                          <Link href={`/dashboard/sales/delivery-receipts/${doc.dr_id}`}
+                            className="text-brand-700 hover:underline dark:text-brand-400 font-medium">
+                            {doc.dr_no}
+                          </Link>
+                        )}
+                        {doc.conversion_id && doc.conversion_no && (
+                          <Link href={`/dashboard/poultry/conversions/${doc.conversion_id}`}
+                            className="text-brand-700 hover:underline dark:text-brand-400 font-medium">
+                            {doc.conversion_no}
+                          </Link>
+                        )}
+                        {!l.remarks && !doc.dr_id && !doc.conversion_id && '—'}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-2 text-center">
                     {isEditable && (
