@@ -51,6 +51,7 @@ export default function DRDetailPage() {
   const [editWarehouseId, setEditWarehouseId] = useState('');
   const [editLines, setEditLines] = useState<Array<{ id: string; item_id: string; item_name: string | null; item_sku: string | null; item_uom: string | null; so_line_id: string | null; qty_delivered: number; unit_cost: number; so_unit_price: number | null }>>([]);
   const [editLocations, setEditLocations] = useState<Array<{ id: string; code: string; name: string; warehouse_id: string | null; warehouse_name: string | null }>>([]);
+  const [editTallyNo, setEditTallyNo] = useState('');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -110,6 +111,7 @@ export default function DRDetailPage() {
     if (!dr) return;
     setEditDate(dr.delivery_date?.split('T')[0] ?? '');
     setEditNotes(dr.notes ?? '');
+    setEditTallyNo('');
     setEditWarehouseId((dr as unknown as Record<string, unknown>).warehouse_id as string ?? '');
     setEditLines(dr.lines.map(l => ({
       id: l.id, item_id: l.item_id, item_name: l.item_name, item_sku: l.item_sku, item_uom: l.item_uom,
@@ -132,6 +134,7 @@ export default function DRDetailPage() {
         delivery_date: editDate || undefined,
         warehouse_id: editWarehouseId || undefined,
         notes: editNotes || null,
+        ...(editTallyNo.trim() ? { tally_sheet_no: editTallyNo.trim() } : {}),
         lines: editLines.map(l => ({
           item_id: l.item_id,
           so_line_id: l.so_line_id,
@@ -196,13 +199,30 @@ export default function DRDetailPage() {
             </Link>
           } />
           <Field label="Payment Terms" value={dr.payment_terms_days ? `${dr.payment_terms_days} days` : null} />
-          <Field label="Tally Sheet" value={
-            dr.tally_sheet_id
-              ? <Link href={`/dashboard/poultry/tally-sheets/${dr.tally_sheet_id}`} className="text-brand-700 hover:underline dark:text-brand-400">
-                  View Tally Sheet
-                </Link>
-              : null
-          } />
+          <div>
+            <div className="mb-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">Tally Sheet</div>
+            {dr.tally_sheet_id
+              ? <div className="text-sm"><Link href={`/dashboard/poultry/tally-sheets/${dr.tally_sheet_id}`} className="text-brand-700 hover:underline dark:text-brand-400">View Tally Sheet</Link></div>
+              : <form className="flex gap-1.5" onSubmit={async e => {
+                  e.preventDefault();
+                  const input = (e.currentTarget.elements.namedItem('tsno') as HTMLInputElement).value.trim();
+                  if (!input) return;
+                  setBusy(true); setMsg(null);
+                  try {
+                    await api.patch(`/sales/delivery-receipts/${id}`, { tally_sheet_no: input });
+                    load();
+                  } catch (err: unknown) { setMsg((err as Error).message ?? 'Failed'); }
+                  finally { setBusy(false); }
+                }}>
+                  <input name="tsno" type="text" placeholder="TS-2026-XXXXXX"
+                    className="rounded border border-slate-300 px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 w-36" />
+                  <button type="submit" disabled={busy}
+                    className="rounded border border-brand-300 bg-brand-50 px-2 py-1 text-xs text-brand-700 hover:bg-brand-100 disabled:opacity-50">
+                    Link
+                  </button>
+                </form>
+            }
+          </div>
           <Field label="Journal Entry" value={
             dr.je_id
               ? <Link href={`/dashboard/gl/journal-entries/${dr.je_id}`} className="text-brand-700 hover:underline dark:text-brand-400">
@@ -292,6 +312,14 @@ export default function DRDetailPage() {
               <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Notes</label>
               <input type="text" value={editNotes} onChange={e => setEditNotes(e.target.value)}
                 className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                Link Tally Sheet <span className="font-normal text-slate-400">(current: {dr.tally_sheet_id ? 'linked' : 'none'})</span>
+              </label>
+              <input type="text" value={editTallyNo} onChange={e => setEditTallyNo(e.target.value)}
+                placeholder="e.g. TS-2026-000005"
+                className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 placeholder:text-slate-400" />
             </div>
           </div>
           <div>

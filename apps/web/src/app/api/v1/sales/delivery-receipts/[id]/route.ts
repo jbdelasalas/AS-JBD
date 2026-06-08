@@ -17,7 +17,11 @@ export async function PATCH(
   const [dr] = await query<{ status: string; company_id: string; so_id: string }>(
     `SELECT status, company_id, so_id FROM delivery_receipts WHERE id = $1`, [params.id]);
   if (!dr) return err('Not found', 404);
-  if (dr.status !== 'draft') return err('Only draft delivery receipts can be edited', 409);
+
+  // Allow tally_sheet linking on posted DRs; all other edits require draft
+  const tallyOnlyPatch = ('tally_sheet_id' in dto || 'tally_sheet_no' in dto) &&
+    !('delivery_date' in dto) && !('warehouse_id' in dto) && !('notes' in dto) && !('lines' in dto);
+  if (dr.status !== 'draft' && !tallyOnlyPatch) return err('Only draft delivery receipts can be edited', 409);
 
   const lines = dto.lines as Array<Record<string, unknown>> | undefined;
 
@@ -48,14 +52,26 @@ export async function PATCH(
   try {
     await client.query('BEGIN');
 
+    // Resolve tally_sheet_id: accept UUID directly or look up by ts_no
+    let tallySheetId: string | null | undefined = undefined; // undefined = don't change
+    if ('tally_sheet_id' in dto) {
+      tallySheetId = (dto.tally_sheet_id as string | null) || null;
+    } else if (dto.tally_sheet_no) {
+      const tsRow = await client.query(
+        `SELECT id FROM tally_sheets WHERE ts_no = $1 LIMIT 1`, [dto.tally_sheet_no]);
+      tallySheetId = tsRow.rows[0]?.id ?? null;
+    }
+
     await client.query(
       `UPDATE delivery_receipts SET
-         delivery_date = COALESCE($2, delivery_date),
-         warehouse_id  = COALESCE($3, warehouse_id),
-         notes         = $4,
-         updated_at    = now()
+         delivery_date  = COALESCE($2, delivery_date),
+         warehouse_id   = COALESCE($3, warehouse_id),
+         notes          = $4,
+         tally_sheet_id = CASE WHEN $5::boolean THEN $6::uuid ELSE tally_sheet_id END,
+         updated_at     = now()
        WHERE id = $1`,
-      [params.id, dto.delivery_date ?? null, dto.warehouse_id ?? null, dto.notes ?? null],
+      [params.id, dto.delivery_date ?? null, dto.warehouse_id ?? null, dto.notes ?? null,
+       tallySheetId !== undefined, tallySheetId ?? null],
     );
 
     if (lines !== undefined) {
