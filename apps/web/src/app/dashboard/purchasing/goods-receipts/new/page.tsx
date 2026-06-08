@@ -8,7 +8,7 @@ import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
 import { SearchableSelect } from '@/components/SearchableSelect';
 
 interface POOption { id: string; po_no: string; supplier_name: string; status: string; }
-interface WarehouseOption { id: string; name: string; }
+interface WarehouseOption { id: string; name: string; branch_id: string | null; }
 
 interface POLine {
   id: string;
@@ -82,11 +82,11 @@ function NewGoodsReceiptForm() {
     if (!cid) return;
     api.get<{ data: POOption[] }>(`/purchasing/purchase-orders?company_id=${cid}&status=approved,partial&limit=500`)
       .then(r => setPos(r.data)).catch(() => {});
-    api.get<Array<{ warehouse_id: string | null; warehouse_name: string | null }>>(`/inventory/locations?company_id=${cid}`)
+    api.get<Array<{ id: string; warehouse_id: string | null; warehouse_name: string | null }>>(`/inventory/locations?company_id=${cid}`)
       .then(locs => {
         const whs = locs
           .filter(l => l.warehouse_id)
-          .map(l => ({ id: l.warehouse_id!, name: l.warehouse_name ?? l.warehouse_id! }));
+          .map(l => ({ id: l.warehouse_id!, name: l.warehouse_name ?? l.warehouse_id!, branch_id: l.id }));
         setWarehouses(whs);
         if (whs.length === 1) setForm(f => ({ ...f, warehouse_id: whs[0].id }));
       }).catch(() => {});
@@ -125,6 +125,12 @@ function NewGoodsReceiptForm() {
       .catch(() => {})
       .finally(() => setLoadingLines(false));
   }, [selectedPoId]);
+
+  useEffect(() => {
+    if (!tags.branch_id) return;
+    const match = warehouses.find(w => w.branch_id === tags.branch_id);
+    if (match) setForm(f => ({ ...f, warehouse_id: match.id }));
+  }, [tags.branch_id, warehouses]);
 
   function handleTagChange(field: keyof TaggingValues, val: string) {
     setTags(t => ({ ...t, [field]: val }));
