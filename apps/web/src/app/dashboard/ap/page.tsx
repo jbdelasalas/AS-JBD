@@ -13,9 +13,10 @@ interface APSummary {
 }
 
 const MODULES = [
-  { href: '/dashboard/admin/master-data/suppliers', label: 'Suppliers',  desc: 'Manage vendor master records, TIN, payment terms, and EWT rates.',   color: 'border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-700 dark:bg-brand-900/20 dark:text-brand-300' },
-  { href: '/dashboard/ap/bills',             label: 'Bills',      desc: 'Enter vendor invoices, match to POs, and track AP balances.',         color: 'border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-700 dark:bg-brand-900/20 dark:text-brand-300' },
-  { href: '/dashboard/ap/payments',          label: 'Payments',   desc: 'Record supplier payments, generate vouchers, and post to GL.',        color: 'border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-700 dark:bg-brand-900/20 dark:text-brand-300' },
+  { href: '/dashboard/admin/master-data/suppliers', label: 'Suppliers',     desc: 'Manage vendor master records, TIN, payment terms, and EWT rates.',   color: 'border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-700 dark:bg-brand-900/20 dark:text-brand-300' },
+  { href: '/dashboard/ap/bills',             label: 'Bills',         desc: 'Enter vendor invoices, match to POs, and track AP balances.',         color: 'border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-700 dark:bg-brand-900/20 dark:text-brand-300' },
+  { href: '/dashboard/ap/credit-memos',      label: 'Credit Memos',  desc: 'Issue supplier credit notes to reduce AP balances.',                  color: 'border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-700 dark:bg-brand-900/20 dark:text-brand-300' },
+  { href: '/dashboard/ap/payments',          label: 'Payments',      desc: 'Record supplier payments, generate vouchers, and post to GL.',        color: 'border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-700 dark:bg-brand-900/20 dark:text-brand-300' },
 ];
 
 export default function ApHomePage() {
