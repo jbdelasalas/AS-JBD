@@ -118,10 +118,16 @@ export default function DRDetailPage() {
           </div>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{dr.customer_name}</p>
         </div>
-        <Link href="/dashboard/sales/delivery-receipts"
-          className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
-          ← Back to list
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href={`/dashboard/sales/delivery-receipts/${id}/print`} target="_blank"
+            className="rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
+            🖨 Print
+          </Link>
+          <Link href="/dashboard/sales/delivery-receipts"
+            className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+            ← Back to list
+          </Link>
+        </div>
       </div>
 
       {msg && (
@@ -214,35 +220,31 @@ export default function DRDetailPage() {
       </div>
 
       {/* Actions */}
-      <div className="flex items-center justify-between">
-        <div className="flex gap-3">
-          {dr.status === 'draft' && (
-            <button onClick={doPost} disabled={busy}
-              className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
-              {busy ? 'Posting…' : 'Post DR'}
-            </button>
-          )}
-          {dr.status === 'posted' && (
-            <button onClick={goCreateSI}
-              className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
-              Create Sales Invoice
-            </button>
-          )}
-          <button onClick={() => window.print()}
-            className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:border-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
-            Print
-          </button>
-          <button onClick={() => router.back()}
-            className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:border-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
-            Back
-          </button>
-        </div>
+      <div className="flex gap-3">
         {dr.status === 'draft' && (
-          <button onClick={handleDelete} disabled={busy}
-            className="rounded border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-700 dark:bg-red-950 dark:text-red-400">
-            Delete
+          <button onClick={doPost} disabled={busy}
+            className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
+            {busy ? 'Posting…' : 'Post DR'}
           </button>
         )}
+        {dr.status === 'posted' && (
+          <button onClick={goCreateSI}
+            className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
+            Create Sales Invoice
+          </button>
+        )}
+        <button onClick={() => window.print()}
+          className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:border-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+          Print
+        </button>
+        <button onClick={() => router.back()}
+          className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:border-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+          Back
+        </button>
+        <button onClick={handleDelete} disabled={busy}
+          className="rounded border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-700 dark:bg-red-950 dark:text-red-400">
+          Delete
+        </button>
       </div>
     </div>
   );
