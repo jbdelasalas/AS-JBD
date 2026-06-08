@@ -143,7 +143,7 @@ export default function DRDetailPage() {
           <Field label="Payment Terms" value={dr.payment_terms_days ? `${dr.payment_terms_days} days` : null} />
           <Field label="Tally Sheet" value={
             dr.tally_sheet_id
-              ? <Link href={`/dashboard/sales/tally-sheets/${dr.tally_sheet_id}`} className="text-brand-700 hover:underline dark:text-brand-400">
+              ? <Link href={`/dashboard/poultry/tally-sheets/${dr.tally_sheet_id}`} className="text-brand-700 hover:underline dark:text-brand-400">
                   View Tally Sheet
                 </Link>
               : null
@@ -228,6 +228,10 @@ export default function DRDetailPage() {
               Create Sales Invoice
             </button>
           )}
+          <button onClick={() => window.print()}
+            className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:border-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+            Print
+          </button>
           <button onClick={() => router.back()}
             className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:border-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
             Back
