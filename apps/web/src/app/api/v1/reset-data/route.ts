@@ -31,6 +31,8 @@ const TABLES = [
   'inventory_ins',
   'order_in_lines',
   'order_ins',
+  'purchase_order_lines',
+  'purchase_orders',
   // Financials
   'wht_certificates',
   'sc_pwd_transactions',
