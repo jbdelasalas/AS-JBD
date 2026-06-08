@@ -82,13 +82,16 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     if (!cosRows[0]) return err('Cannot find "Cos - Live" account. Create an expense account with "Cos" and "Live" in the name.', 400);
     const cosLiveAcctId = String(cosRows[0].id);
 
-    // Sales-Live account: revenue account with "sales" and "live" in name
+    // Sales-Live account: prioritise "Sales DR - Live" accounts (e.g. "Sales DR - Live Chicken")
     const salesRows = await query<Record<string, unknown>>(
       `SELECT id, code, name FROM accounts
         WHERE company_id = $1 AND is_active = true
-          AND (name ILIKE '%sales%live%' OR name ILIKE '%revenue%live%' OR name ILIKE '%income%live%')
-        ORDER BY code LIMIT 1`, [rec.company_id]);
-    if (!salesRows[0]) return err('Cannot find "Sales - Live" account. Create a revenue account with "Sales" and "Live" in the name.', 400);
+          AND (name ILIKE '%sales%dr%live%' OR name ILIKE '%sales%live%'
+               OR name ILIKE '%revenue%live%' OR name ILIKE '%income%live%')
+        ORDER BY
+          CASE WHEN name ILIKE '%sales%dr%live%' THEN 0 ELSE 1 END, code
+        LIMIT 1`, [rec.company_id]);
+    if (!salesRows[0]) return err('Cannot find "Sales DR - Live" account. Create a revenue account with "Sales DR" and "Live" in the name.', 400);
     const salesLiveAcctId = String(salesRows[0].id);
 
     const liveCostAmt = parseFloat(liveCost.toFixed(2));

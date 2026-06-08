@@ -43,6 +43,14 @@ interface TallySheet {
   lines: Line[];
 }
 
+interface TransferAccount { id: string; code: string; name: string; }
+interface TransferPreview {
+  live_cost: number;
+  net_kgs: number;
+  net_heads: number;
+  accounts: { cos_live: TransferAccount | null; invty_live: TransferAccount | null; sales_live: TransferAccount | null };
+}
+
 const STATUS_COLORS: Record<string, string> = {
   saved:    'bg-slate-100 text-slate-700',
   posted:   'bg-emerald-100 text-emerald-700',
@@ -76,6 +84,9 @@ export default function TallySheetDetailPage() {
   const [transferPrice, setTransferPrice] = useState('');
   const [transferBusy, setTransferBusy] = useState(false);
   const [transferMsg, setTransferMsg] = useState<string | null>(null);
+  const [preview, setPreview] = useState<TransferPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   // Reference data
   const [suppliers, setSuppliers]   = useState<Supplier[]>([]);
@@ -200,7 +211,14 @@ export default function TallySheetDetailPage() {
   function openTransferModal() {
     setTransferMsg(null);
     setTransferPrice('');
+    setPreview(null);
+    setPreviewError(null);
+    setPreviewLoading(true);
     setShowTransferModal(true);
+    api.get<TransferPreview>(`/poultry/tally-sheets/${id}/transfer-je-preview`)
+      .then(r => setPreview(r))
+      .catch(e => setPreviewError((e as Error).message ?? 'Could not load preview'))
+      .finally(() => setPreviewLoading(false));
   }
 
   async function postTransferJE() {
@@ -696,63 +714,109 @@ export default function TallySheetDetailPage() {
       {/* Transfer JE modal */}
       {showTransferModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-[500px] rounded-lg bg-white dark:bg-slate-900 p-6 shadow-xl">
+          <div className="w-[540px] rounded-lg bg-white dark:bg-slate-900 p-6 shadow-xl">
             <h2 className="mb-1 text-base font-semibold text-slate-900 dark:text-slate-100">Post Transfer Journal Entry</h2>
             <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
-              A transfer JE will be posted to record the movement of live chickens to the trading location before creating the item conversion.
+              Records the movement of live chickens to the trading location before creating the item conversion.
             </p>
 
-            <div className="mb-4 overflow-hidden rounded border border-slate-200 dark:border-slate-700">
-              <table className="min-w-full text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">Account</th>
-                    <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">Debit</th>
-                    <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">Credit</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                  <tr>
-                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">Cos - Live</td>
-                    <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">Live cost</td>
-                    <td className="px-3 py-2 text-right"></td>
-                  </tr>
-                  <tr>
-                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">Invty Live</td>
-                    <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">Transfer price</td>
-                    <td className="px-3 py-2 text-right"></td>
-                  </tr>
-                  <tr>
-                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">Invty Live</td>
-                    <td className="px-3 py-2 text-right"></td>
-                    <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">Live cost</td>
-                  </tr>
-                  <tr>
-                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">Sales - Live</td>
-                    <td className="px-3 py-2 text-right"></td>
-                    <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">Transfer price</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
+            {/* Transfer price input — above table so amounts update live */}
             <div className="mb-4">
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Transfer Price (₱) *</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Transfer Price — Total Amount (₱) *</label>
               <input
                 type="number" min="0" step="0.01"
                 value={transferPrice}
                 onChange={e => setTransferPrice(e.target.value)}
                 placeholder="0.00"
+                autoFocus
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               />
             </div>
+
+            {/* Live JE preview table */}
+            {previewLoading ? (
+              <div className="mb-4 rounded border border-slate-200 dark:border-slate-700 py-6 text-center text-xs text-slate-400">Loading accounts…</div>
+            ) : previewError ? (
+              <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">{previewError}</div>
+            ) : (
+              (() => {
+                const liveCostAmt  = preview?.live_cost ?? 0;
+                const transferAmt  = parseFloat(transferPrice) || 0;
+                const fmt = (n: number) => n > 0 ? `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+                const accts = preview?.accounts;
+                return (
+                  <div className="mb-4 overflow-hidden rounded border border-slate-200 dark:border-slate-700">
+                    <table className="min-w-full text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-800">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium text-slate-500 dark:text-slate-400">Account</th>
+                          <th className="px-3 py-2 text-right font-medium text-slate-500 dark:text-slate-400">Debit</th>
+                          <th className="px-3 py-2 text-right font-medium text-slate-500 dark:text-slate-400">Credit</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                        <tr>
+                          <td className="px-3 py-2">
+                            <div className="font-medium text-slate-800 dark:text-slate-200">{accts?.cos_live?.name ?? 'Cos - Live'}</div>
+                            {accts?.cos_live?.code && <div className="text-slate-400">{accts.cos_live.code}</div>}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-slate-800 dark:text-slate-200">{fmt(liveCostAmt)}</td>
+                          <td className="px-3 py-2 text-right"></td>
+                        </tr>
+                        <tr>
+                          <td className="px-3 py-2">
+                            <div className="font-medium text-slate-800 dark:text-slate-200">{accts?.invty_live?.name ?? 'Invty - Live'}</div>
+                            {accts?.invty_live?.code && <div className="text-slate-400">{accts.invty_live.code}</div>}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-slate-800 dark:text-slate-200">{fmt(transferAmt)}</td>
+                          <td className="px-3 py-2 text-right"></td>
+                        </tr>
+                        <tr>
+                          <td className="px-3 py-2">
+                            <div className="font-medium text-slate-800 dark:text-slate-200">{accts?.invty_live?.name ?? 'Invty - Live'}</div>
+                            {accts?.invty_live?.code && <div className="text-slate-400">{accts.invty_live.code}</div>}
+                          </td>
+                          <td className="px-3 py-2 text-right"></td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-slate-800 dark:text-slate-200">{fmt(liveCostAmt)}</td>
+                        </tr>
+                        <tr className="bg-slate-50/50 dark:bg-slate-800/50">
+                          <td className="px-3 py-2">
+                            <div className="font-medium text-slate-800 dark:text-slate-200">{accts?.sales_live?.name ?? 'Sales DR - Live Chicken'}</div>
+                            {accts?.sales_live?.code && <div className="text-slate-400">{accts.sales_live.code}</div>}
+                          </td>
+                          <td className="px-3 py-2 text-right"></td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-slate-800 dark:text-slate-200">{fmt(transferAmt)}</td>
+                        </tr>
+                        {/* Totals row */}
+                        <tr className="border-t-2 border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800">
+                          <td className="px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300">Total</td>
+                          <td className="px-3 py-1.5 text-right font-mono font-bold text-slate-800 dark:text-slate-200">
+                            {fmt(liveCostAmt + transferAmt)}
+                          </td>
+                          <td className="px-3 py-1.5 text-right font-mono font-bold text-slate-800 dark:text-slate-200">
+                            {fmt(liveCostAmt + transferAmt)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    {preview && (
+                      <div className="border-t border-slate-200 dark:border-slate-700 px-3 py-2 text-xs text-slate-400 flex gap-4">
+                        <span>Live cost: <strong className="text-slate-600 dark:text-slate-300">₱{liveCostAmt.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</strong></span>
+                        <span>KGS: <strong className="text-slate-600 dark:text-slate-300">{preview.net_kgs.toFixed(4)}</strong></span>
+                        <span>Heads: <strong className="text-slate-600 dark:text-slate-300">{preview.net_heads.toLocaleString()}</strong></span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()
+            )}
 
             {transferMsg && (
               <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">{transferMsg}</div>
             )}
 
             <div className="flex gap-3">
-              <button onClick={postTransferJE} disabled={transferBusy || !transferPrice}
+              <button onClick={postTransferJE} disabled={transferBusy || !transferPrice || previewLoading}
                 className="flex-1 rounded bg-brand-600 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
                 {transferBusy ? 'Posting…' : 'Post JE & Create Conversion'}
               </button>
