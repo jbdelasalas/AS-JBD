@@ -180,7 +180,7 @@ export default function DRPrintPage() {
               return (
                 <tr key={l.id} style={{ borderBottom: '1px solid #ccc' }}>
                   <td style={tdStyle('center')}>{heads ? fmtNum(heads, 0) : ''}</td>
-                  <td style={tdStyle('center')}>{fmtNum(Number(l.qty_delivered), 3)}</td>
+                  <td style={tdStyle('center')}>{fmtNum(Number(l.qty_delivered), 2)}</td>
                   <td style={tdStyle('left')}>{l.item_name ?? l.description}</td>
                   <td style={tdStyle('right')}>{l.so_unit_price != null ? fmtNum(Number(l.so_unit_price)) : ''}</td>
                   <td style={tdStyle('right')}>{l.so_unit_price != null ? fmtNum(amount) : ''}</td>
@@ -201,7 +201,7 @@ export default function DRPrintPage() {
               <td style={{ ...tdStyle('center'), fontWeight: 'bold' }}>
                 {totalHeads > 0 ? fmtNum(totalHeads, 0) : ''}
               </td>
-              <td style={{ ...tdStyle('center'), fontWeight: 'bold' }}>{fmtNum(totalKgs, 3)}</td>
+              <td style={{ ...tdStyle('center'), fontWeight: 'bold' }}>{fmtNum(totalKgs, 2)}</td>
               <td style={{ ...tdStyle('center'), fontWeight: 'bold', letterSpacing: '2pt' }}>TOTAL</td>
               <td style={tdStyle('right')}></td>
               <td style={{ ...tdStyle('right'), fontWeight: 'bold' }}>{fmtNum(totalAmount)}</td>
