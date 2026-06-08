@@ -4,6 +4,28 @@ import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
 
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try { auth = await requireAuth(request); } catch (e) { return e as Response; }
+
+  const [dr] = await query<{ status: string; company_id: string }>(
+    `SELECT status, company_id FROM delivery_receipts WHERE id = $1`, [params.id]);
+  if (!dr) return err('Not found', 404);
+  if (dr.status !== 'draft') return err('Only draft delivery receipts can be deleted', 409);
+
+  await query(`DELETE FROM delivery_receipt_lines WHERE dr_id = $1`, [params.id]);
+  await query(`DELETE FROM delivery_receipts WHERE id = $1`, [params.id]);
+  await query(
+    `INSERT INTO audit_log (user_id, company_id, action, entity_type, entity_id) VALUES ($1,$2,'delete','delivery_receipt',$3)`,
+    [auth.userId, dr.company_id, params.id],
+  ).catch(() => {});
+
+  return new Response(null, { status: 204 });
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } },

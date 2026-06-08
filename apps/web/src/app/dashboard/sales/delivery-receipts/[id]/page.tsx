@@ -53,6 +53,15 @@ export default function DRDetailPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  async function handleDelete() {
+    if (!window.confirm('Delete this delivery receipt? This cannot be undone.')) return;
+    setBusy(true); setMsg(null);
+    try {
+      await api.delete(`/sales/delivery-receipts/${id}`);
+      router.push('/dashboard/sales/delivery-receipts');
+    } catch (e: unknown) { setMsg((e as Error).message ?? 'Delete failed'); setBusy(false); }
+  }
+
   async function doPost() {
     if (!window.confirm('Post this delivery receipt? Stock will be decremented.')) return;
     setBusy(true); setMsg(null);
@@ -205,23 +214,31 @@ export default function DRDetailPage() {
       </div>
 
       {/* Actions */}
-      <div className="flex gap-3">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-3">
+          {dr.status === 'draft' && (
+            <button onClick={doPost} disabled={busy}
+              className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
+              {busy ? 'Posting…' : 'Post DR'}
+            </button>
+          )}
+          {dr.status === 'posted' && (
+            <button onClick={goCreateSI}
+              className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
+              Create Sales Invoice
+            </button>
+          )}
+          <button onClick={() => router.back()}
+            className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:border-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+            Back
+          </button>
+        </div>
         {dr.status === 'draft' && (
-          <button onClick={doPost} disabled={busy}
-            className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
-            {busy ? 'Posting…' : 'Post DR'}
+          <button onClick={handleDelete} disabled={busy}
+            className="rounded border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-700 dark:bg-red-950 dark:text-red-400">
+            Delete
           </button>
         )}
-        {dr.status === 'posted' && (
-          <button onClick={goCreateSI}
-            className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
-            Create Sales Invoice
-          </button>
-        )}
-        <button onClick={() => router.back()}
-          className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:border-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
-          Back
-        </button>
       </div>
     </div>
   );
