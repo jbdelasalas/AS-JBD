@@ -142,7 +142,8 @@ export async function POST(
 
       const itemAcctRows = await client.query(
         `SELECT drl.item_id, drl.qty_delivered, drl.unit_cost, i.name AS item_name,
-                i.cogs_account_id, i.inventory_account_id, i.revenue_account_id,
+                i.cogs_account_id, i.inventory_account_id,
+                COALESCE(i.dr_revenue_account_id, i.revenue_account_id) AS revenue_account_id,
                 COALESCE(sol.unit_price, 0)   AS unit_price,
                 COALESCE(sol.discount_pct, 0) AS discount_pct,
                 COALESCE(sol.vat_rate, 0)     AS vat_rate

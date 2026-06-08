@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
               i.cogs_account_id,      a2.code||' - '||a2.name AS cogs_account_name,
               i.revenue_account_id,   a3.code||' - '||a3.name AS revenue_account_name,
               i.purchase_variance_account_id, a4.code||' - '||a4.name AS purchase_variance_account_name,
+              i.dr_revenue_account_id, a5.code||' - '||a5.name AS dr_revenue_account_name,
               i.default_warehouse_id, w.name AS default_warehouse_name
          FROM items i
          LEFT JOIN item_categories ic ON ic.id = i.category_id
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest) {
          LEFT JOIN accounts a2 ON a2.id = i.cogs_account_id
          LEFT JOIN accounts a3 ON a3.id = i.revenue_account_id
          LEFT JOIN accounts a4 ON a4.id = i.purchase_variance_account_id
+         LEFT JOIN accounts a5 ON a5.id = i.dr_revenue_account_id
          LEFT JOIN warehouses w ON w.id = i.default_warehouse_id
         WHERE ${where}
         ORDER BY i.sku
@@ -108,11 +110,11 @@ export async function POST(request: NextRequest) {
        (company_id, sku, name, uom, item_type, costing_method,
         standard_cost, selling_price, reorder_point, category_id, is_active,
         inventory_account_id, cogs_account_id, revenue_account_id, purchase_variance_account_id,
-        default_warehouse_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+        dr_revenue_account_id, default_warehouse_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
      RETURNING id, sku, name, uom, item_type, costing_method, standard_cost, selling_price, reorder_point, is_active,
                inventory_account_id, cogs_account_id, revenue_account_id, purchase_variance_account_id,
-               default_warehouse_id`,
+               dr_revenue_account_id, default_warehouse_id`,
     [
       companyId, sku, dto.name,
       dto.uom ?? 'PCS',
@@ -127,6 +129,7 @@ export async function POST(request: NextRequest) {
       dto.cogs_account_id ?? null,
       dto.revenue_account_id ?? null,
       dto.purchase_variance_account_id ?? null,
+      dto.dr_revenue_account_id ?? null,
       dto.default_warehouse_id ?? null,
     ],
   );

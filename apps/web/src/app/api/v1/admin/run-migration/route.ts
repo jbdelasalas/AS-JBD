@@ -23,6 +23,9 @@ export async function POST(request: NextRequest) {
     await query(`CREATE INDEX IF NOT EXISTS idx_dr_tally_sheet ON delivery_receipts (tally_sheet_id)`);
     results.push('Ensured index idx_dr_tally_sheet');
 
+    await query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS dr_revenue_account_id uuid REFERENCES accounts(id)`);
+    results.push('Added items.dr_revenue_account_id column');
+
     return ok({ success: true, results });
   } catch (e: unknown) {
     return err((e as Error).message, 500);

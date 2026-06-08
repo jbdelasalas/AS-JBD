@@ -22,6 +22,7 @@ interface Item {
   cogs_account_id: string | null;            cogs_account_name: string | null;
   revenue_account_id: string | null;         revenue_account_name: string | null;
   purchase_variance_account_id: string | null; purchase_variance_account_name: string | null;
+  dr_revenue_account_id: string | null;      dr_revenue_account_name: string | null;
   default_warehouse_id: string | null; default_warehouse_name: string | null;
 }
 
@@ -92,6 +93,7 @@ export default function ItemDetailPage() {
         cogs_account_id: form.cogs_account_id || null,
         revenue_account_id: form.revenue_account_id || null,
         purchase_variance_account_id: form.purchase_variance_account_id || null,
+        dr_revenue_account_id: form.dr_revenue_account_id || null,
         default_warehouse_id: form.default_warehouse_id || null,
       });
       setSaved(true); setEditing(false); load();
@@ -224,10 +226,18 @@ export default function ItemDetailPage() {
                 </select>
               </div>
               <div>
+                <label className={lbl}>Sales DR Revenue Account</label>
+                <select value={form.dr_revenue_account_id ?? ''} onChange={(e) => set('dr_revenue_account_id', e.target.value || null)} className={inp}>
+                  {acctOpts}
+                </select>
+                <p className="mt-0.5 text-[10px] text-slate-400">Used when posting Delivery Receipt (interim revenue)</p>
+              </div>
+              <div>
                 <label className={lbl}>Sales Revenue Account</label>
                 <select value={form.revenue_account_id ?? ''} onChange={(e) => set('revenue_account_id', e.target.value || null)} className={inp}>
                   {acctOpts}
                 </select>
+                <p className="mt-0.5 text-[10px] text-slate-400">Used when posting Sales Invoice (recognized revenue)</p>
               </div>
               <div>
                 <label className={lbl}>Purchase Variance Account</label>
@@ -295,10 +305,11 @@ export default function ItemDetailPage() {
               <div className="mb-3 text-xs font-medium text-slate-600 dark:text-slate-400">Accounting Integration</div>
               <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
                 {([
-                  ['Inventory Account',        item.inventory_account_name],
-                  ['COGS Account',             item.cogs_account_name],
-                  ['Sales Revenue Account',    item.revenue_account_name],
-                  ['Purchase Variance Account',item.purchase_variance_account_name],
+                  ['Inventory Account',           item.inventory_account_name],
+                  ['COGS Account',                item.cogs_account_name],
+                  ['Sales DR Revenue Account',    item.dr_revenue_account_name],
+                  ['Sales Revenue Account',       item.revenue_account_name],
+                  ['Purchase Variance Account',   item.purchase_variance_account_name],
                 ] as [string, string | null][]).map(([k, v]) => (
                   <div key={k} className="flex gap-2">
                     <dt className="w-48 shrink-0 text-slate-500 dark:text-slate-400">{k}</dt>

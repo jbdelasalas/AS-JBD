@@ -30,6 +30,7 @@ export default function NewItemPage() {
     cogs_account_id: '',
     revenue_account_id: '',
     purchase_variance_account_id: '',
+    dr_revenue_account_id: '',
     location_id: '',
     default_warehouse_id: '',
   });
@@ -69,6 +70,7 @@ export default function NewItemPage() {
         cogs_account_id: form.cogs_account_id || null,
         revenue_account_id: form.revenue_account_id || null,
         purchase_variance_account_id: form.purchase_variance_account_id || null,
+        dr_revenue_account_id: form.dr_revenue_account_id || null,
         default_warehouse_id: form.default_warehouse_id || null,
       });
       router.push('/dashboard/inventory/items');
@@ -187,11 +189,20 @@ export default function NewItemPage() {
               </select>
             </div>
             <div>
+              <label className={lbl}>Sales DR Revenue Account</label>
+              <select value={form.dr_revenue_account_id} onChange={(e) => set('dr_revenue_account_id', e.target.value)} className={inp}>
+                {accountOptions}
+                {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+              </select>
+              <p className="mt-0.5 text-[10px] text-slate-400">Used when posting Delivery Receipt (interim revenue)</p>
+            </div>
+            <div>
               <label className={lbl}>Sales Revenue Account</label>
               <select value={form.revenue_account_id} onChange={(e) => set('revenue_account_id', e.target.value)} className={inp}>
                 {accountOptions}
                 {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
               </select>
+              <p className="mt-0.5 text-[10px] text-slate-400">Used when posting Sales Invoice (recognized revenue)</p>
             </div>
             <div>
               <label className={lbl}>Purchase Variance Account</label>

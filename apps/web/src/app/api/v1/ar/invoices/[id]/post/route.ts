@@ -126,7 +126,10 @@ export async function POST(
     const vatAccountId = vatAccountRows.rows[0]?.id;
 
     const invoiceLines = await client.query(
-      `SELECT sil.*, i.revenue_account_id AS item_revenue_acct FROM sales_invoice_lines sil LEFT JOIN items i ON i.id = sil.item_id WHERE sil.invoice_id = $1`,
+      `SELECT sil.*, i.revenue_account_id AS item_revenue_acct,
+              i.dr_revenue_account_id AS item_dr_revenue_acct
+         FROM sales_invoice_lines sil LEFT JOIN items i ON i.id = sil.item_id
+        WHERE sil.invoice_id = $1`,
       [id],
     );
 
@@ -159,15 +162,40 @@ export async function POST(
       [je.id, lineNo++, arAccountId, `AR — ${inv.invoice_no}`, total],
     );
 
-    // CR Revenue per line
+    // Revenue entries per line
+    // If invoice is from a DR: Dr DR Revenue Account → Cr Sales Revenue Account (revenue reclassification)
+    // If direct invoice: Cr Sales Revenue Account only
+    const isFromDR = !!inv.dr_id;
     for (const l of invoiceLines.rows as Array<Record<string, unknown>>) {
       const revenueAcct = l.revenue_account_id ?? l.item_revenue_acct;
       if (!revenueAcct) continue;
       const lineSubtotal = Number(l.line_subtotal);
-      await client.query(
-        `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit) VALUES ($1,$2,$3,$4,0,$5,'PHP',1,0,$5)`,
-        [je.id, lineNo++, revenueAcct, l.description, lineSubtotal],
-      );
+      if (isFromDR) {
+        const drRevenueAcct = l.item_dr_revenue_acct as string | null;
+        if (drRevenueAcct) {
+          // Dr Sales DR Revenue Account (reverse interim revenue from DR posting)
+          await client.query(
+            `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit) VALUES ($1,$2,$3,$4,$5,0,'PHP',1,$5,0)`,
+            [je.id, lineNo++, drRevenueAcct, l.description, lineSubtotal],
+          );
+          // Cr Sales Revenue Account (recognized revenue)
+          await client.query(
+            `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit) VALUES ($1,$2,$3,$4,0,$5,'PHP',1,0,$5)`,
+            [je.id, lineNo++, revenueAcct, l.description, lineSubtotal],
+          );
+        } else {
+          // No DR revenue account tagged — fall back to plain Cr Revenue
+          await client.query(
+            `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit) VALUES ($1,$2,$3,$4,0,$5,'PHP',1,0,$5)`,
+            [je.id, lineNo++, revenueAcct, l.description, lineSubtotal],
+          );
+        }
+      } else {
+        await client.query(
+          `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit) VALUES ($1,$2,$3,$4,0,$5,'PHP',1,0,$5)`,
+          [je.id, lineNo++, revenueAcct, l.description, lineSubtotal],
+        );
+      }
     }
 
     // CR Output VAT
@@ -178,10 +206,12 @@ export async function POST(
       );
     }
 
-    // Catch-all revenue if lines don't account for full subtotal
-    const lineRevTotal = (invoiceLines.rows as Array<Record<string, unknown>>)
-      .filter((l) => l.revenue_account_id ?? l.item_revenue_acct)
-      .reduce((s, l) => s + Number(l.line_subtotal), 0);
+    // Catch-all revenue if lines don't account for full subtotal (skip for DR-linked invoices — Dr/Cr pairs net to 0)
+    const lineRevTotal = isFromDR
+      ? subtotal
+      : (invoiceLines.rows as Array<Record<string, unknown>>)
+          .filter((l) => l.revenue_account_id ?? l.item_revenue_acct)
+          .reduce((s, l) => s + Number(l.line_subtotal), 0);
 
     if (Math.abs(lineRevTotal - subtotal) > 0.01) {
       const defaultRevRows = await client.query(
