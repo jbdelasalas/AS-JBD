@@ -16,7 +16,7 @@ interface Conversion {
   short_over_heads: number; short_over_kgs: number;
   outputs: Array<{
     id: string; line_no: number; item_name: string; sku: string; category: string | null;
-    heads: number; kgs: number; unit_cost: number; total_cost: number; delivery_ref_no: string | null;
+    heads: number; kgs: number; unit_cost: number; dressing_fee: number; total_cost: number; delivery_ref_no: string | null;
   }>;
 }
 
@@ -68,7 +68,10 @@ export default function ConversionDetailPage() {
   if (loading) return <div className="py-12 text-center text-sm text-slate-500">Loading…</div>;
   if (!doc) return <div className="py-12 text-center text-sm text-red-500">Not found.</div>;
 
-  const totalOutHeads = doc.outputs.reduce((s, o) => s + Number(o.heads), 0);
+  const totalOutHeads    = doc.outputs.reduce((s, o) => s + Number(o.heads), 0);
+  const totalOutAmount   = doc.outputs.reduce((s, o) => s + Number(o.kgs) * Number(o.unit_cost), 0);
+  const totalDressingFee = doc.outputs.reduce((s, o) => s + Number(o.dressing_fee ?? 0), 0);
+  const totalOutTotal    = doc.outputs.reduce((s, o) => s + Number(o.total_cost), 0);
 
   return (
     <div className="space-y-0">
@@ -158,32 +161,40 @@ export default function ConversionDetailPage() {
           <table className="min-w-full text-xs">
             <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500">
               <tr>
-                <th className="px-3 py-2 text-left font-medium">Line No.</th>
+                <th className="px-3 py-2 text-left font-medium">#</th>
                 <th className="px-3 py-2 text-left font-medium">Item</th>
                 <th className="px-3 py-2 text-left font-medium">Unit</th>
                 <th className="px-3 py-2 text-right font-medium">Heads</th>
-                <th className="px-3 py-2 text-right font-medium">Quantity (KGS)</th>
-                <th className="px-3 py-2 text-right font-medium">Unit Cost</th>
-                <th className="px-3 py-2 text-right font-medium">Total Cost</th>
-                <th className="px-3 py-2 text-left font-medium">Delivery Ref No.</th>
+                <th className="px-3 py-2 text-right font-medium">KGS</th>
+                <th className="px-3 py-2 text-right font-medium">Price/kg</th>
+                <th className="px-3 py-2 text-right font-medium">Amount</th>
+                <th className="px-3 py-2 text-right font-medium">Dressing Fee</th>
+                <th className="px-3 py-2 text-right font-medium">Total Amount</th>
+                <th className="px-3 py-2 text-left font-medium">Delivery Ref</th>
               </tr>
             </thead>
             <tbody>
-              {doc.outputs.map(o => (
-                <tr key={o.id} className="border-b border-slate-50 dark:border-slate-700 last:border-0">
-                  <td className="px-3 py-2 text-slate-400">{o.line_no}</td>
-                  <td className="px-3 py-2 font-medium dark:text-slate-200">
-                    {o.category && <span className="mr-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{o.category}</span>}
-                    {o.sku} — {o.item_name}
-                  </td>
-                  <td className="px-3 py-2 text-slate-500">kgs</td>
-                  <td className="px-3 py-2 text-right font-mono">{Number(o.heads).toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right font-mono">{Number(o.kgs).toFixed(6)}</td>
-                  <td className="px-3 py-2 text-right font-mono">₱{Number(o.unit_cost).toFixed(4)}</td>
-                  <td className="px-3 py-2 text-right font-mono font-semibold">₱{Number(o.total_cost).toFixed(2)}</td>
-                  <td className="px-3 py-2 text-slate-500">{o.delivery_ref_no ?? '—'}</td>
-                </tr>
-              ))}
+              {doc.outputs.map(o => {
+                const amount = Number(o.kgs) * Number(o.unit_cost);
+                const dressFee = Number(o.dressing_fee ?? 0);
+                return (
+                  <tr key={o.id} className="border-b border-slate-50 dark:border-slate-700 last:border-0">
+                    <td className="px-3 py-2 text-slate-400">{o.line_no}</td>
+                    <td className="px-3 py-2 font-medium dark:text-slate-200">
+                      {o.category && <span className="mr-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{o.category}</span>}
+                      {o.sku} — {o.item_name}
+                    </td>
+                    <td className="px-3 py-2 text-slate-500">kgs</td>
+                    <td className="px-3 py-2 text-right font-mono">{Number(o.heads).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right font-mono">{Number(o.kgs).toFixed(6)}</td>
+                    <td className="px-3 py-2 text-right font-mono">₱{Number(o.unit_cost).toLocaleString('en-PH', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</td>
+                    <td className="px-3 py-2 text-right font-mono">₱{amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2 text-right font-mono">₱{dressFee.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2 text-right font-mono font-semibold">₱{Number(o.total_cost).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2 text-slate-500">{o.delivery_ref_no ?? '—'}</td>
+                  </tr>
+                );
+              })}
             </tbody>
             <tfoot>
               <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold">
@@ -191,7 +202,9 @@ export default function ConversionDetailPage() {
                 <td className="px-3 py-2 text-right font-mono">{totalOutHeads.toLocaleString()}</td>
                 <td className="px-3 py-2 text-right font-mono">{Number(doc.total_output_kgs).toFixed(6)}</td>
                 <td />
-                <td className="px-3 py-2 text-right font-mono">₱{doc.outputs.reduce((s, o) => s + Number(o.total_cost), 0).toFixed(2)}</td>
+                <td className="px-3 py-2 text-right font-mono">₱{totalOutAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-3 py-2 text-right font-mono">₱{totalDressingFee.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-3 py-2 text-right font-mono">₱{totalOutTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td />
               </tr>
             </tfoot>

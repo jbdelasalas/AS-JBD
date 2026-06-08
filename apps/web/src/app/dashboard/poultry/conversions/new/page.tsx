@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 interface Item     { id: string; sku: string; name: string; uom: string; }
 interface Location { id: string; code: string; name: string; warehouse_id: string | null; }
 interface POOption { id: string; po_no: string; supplier_name: string; }
-interface StockBal { item_id: string; qty_on_hand: number; warehouse_id: string; }
+interface StockBal { item_id: string; qty_on_hand: number; warehouse_id: string; avg_cost: number; }
 
 interface ConversionSeed {
   tally_sheet_id: string;
@@ -32,8 +32,10 @@ interface SourceLine {
 interface OutputLine {
   output_item_id: string; item_sku: string; item_name: string;
   category: string; uom: string; heads: number; kgs: number;
-  unit_cost: number; delivery_ref_no: string;
+  price_per_kg: number; dressing_fee: number; delivery_ref_no: string;
 }
+// amount       = kgs × price_per_kg
+// total_amount = amount + dressing_fee
 
 const inp = 'w-full border-0 border-b border-slate-300 bg-transparent px-0 py-1 text-sm text-slate-900 dark:text-slate-100 focus:border-brand-500 focus:outline-none';
 const sel = 'w-full border-0 border-b border-slate-300 bg-transparent px-0 py-1 text-sm text-slate-900 dark:text-slate-100 focus:border-brand-500 focus:outline-none';
@@ -80,7 +82,7 @@ function NewConversionForm() {
   );
 
   // Output item form (one at a time → added to table)
-  const [outForm, setOutForm] = useState({ output_item_id: '', category: '', heads: '', kgs: '', unit_cost: '', delivery_ref_no: '' });
+  const [outForm, setOutForm] = useState({ output_item_id: '', category: '', heads: '', kgs: '', price_per_kg: '', dressing_fee: '', delivery_ref_no: '' });
   const [outputLines, setOutputLines] = useState<OutputLine[]>([]);
 
   // Load reference data; patch UOM into pre-populated lines once items arrive
@@ -120,15 +122,25 @@ function NewConversionForm() {
     return stock.filter(s => s.item_id === itemId).reduce((t, s) => t + Number(s.qty_on_hand), 0);
   }
 
+  function getAvgCost(itemId: string) {
+    const rows = stock.filter(s => s.item_id === itemId);
+    const totalQty = rows.reduce((t, s) => t + Number(s.qty_on_hand), 0);
+    if (totalQty <= 0) return 0;
+    return rows.reduce((t, s) => t + Number(s.qty_on_hand) * Number(s.avg_cost), 0) / totalQty;
+  }
+
   function addSourceLine() {
     if (!srcForm.item_id) return;
     const item = items.find(i => i.id === srcForm.item_id);
     if (!item) return;
+    const avgCost = getAvgCost(srcForm.item_id);
     setSourceLines(prev => [...prev, {
       item_id: srcForm.item_id, item_sku: item.sku, item_name: item.name,
       uom: item.uom, available: getAvailable(srcForm.item_id),
       heads: parseFloat(srcForm.heads) || 0, kgs: parseFloat(srcForm.kgs) || 0,
     }]);
+    // Auto-fill price_per_kg for output lines from source item avg cost
+    setOutForm(f => ({ ...f, price_per_kg: avgCost > 0 ? avgCost.toFixed(4) : f.price_per_kg }));
     setSrcForm({ item_id: '', heads: '', kgs: '' });
   }
 
@@ -140,16 +152,21 @@ function NewConversionForm() {
       output_item_id: outForm.output_item_id, item_sku: item.sku, item_name: item.name,
       category: outForm.category, uom: item.uom,
       heads: parseFloat(outForm.heads) || 0, kgs: parseFloat(outForm.kgs) || 0,
-      unit_cost: parseFloat(outForm.unit_cost) || 0,
+      price_per_kg: parseFloat(outForm.price_per_kg) || 0,
+      dressing_fee: parseFloat(outForm.dressing_fee) || 0,
       delivery_ref_no: outForm.delivery_ref_no,
     }]);
-    setOutForm({ output_item_id: '', category: '', heads: '', kgs: '', unit_cost: '', delivery_ref_no: '' });
+    // Keep price_per_kg for next line; clear the rest
+    setOutForm(f => ({ output_item_id: '', category: '', heads: '', kgs: '', price_per_kg: f.price_per_kg, dressing_fee: '', delivery_ref_no: '' }));
   }
 
-  const totalSrcKgs   = sourceLines.reduce((s, l) => s + l.kgs, 0);
-  const totalSrcHeads = sourceLines.reduce((s, l) => s + l.heads, 0);
-  const totalOutKgs   = outputLines.reduce((s, l) => s + l.kgs, 0);
-  const totalOutHeads = outputLines.reduce((s, l) => s + l.heads, 0);
+  const totalSrcKgs      = sourceLines.reduce((s, l) => s + l.kgs, 0);
+  const totalSrcHeads    = sourceLines.reduce((s, l) => s + l.heads, 0);
+  const totalOutKgs      = outputLines.reduce((s, l) => s + l.kgs, 0);
+  const totalOutHeads    = outputLines.reduce((s, l) => s + l.heads, 0);
+  const totalOutAmount   = outputLines.reduce((s, l) => s + l.kgs * l.price_per_kg, 0);
+  const totalDressingFee = outputLines.reduce((s, l) => s + l.dressing_fee, 0);
+  const totalOutTotal    = totalOutAmount + totalDressingFee;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setError(null);
@@ -177,11 +194,12 @@ function NewConversionForm() {
         short_over_heads:  parseFloat(form.short_over_heads) || 0,
         short_over_kgs:    parseFloat(form.short_over_kgs) || 0,
         outputs: outputLines.map(o => ({
-          output_item_id: o.output_item_id,
-          category:       o.category || null,
-          heads:          o.heads,
-          kgs:            o.kgs,
-          unit_cost:      o.unit_cost,
+          output_item_id:  o.output_item_id,
+          category:        o.category || null,
+          heads:           o.heads,
+          kgs:             o.kgs,
+          unit_cost:       o.price_per_kg,
+          dressing_fee:    o.dressing_fee,
           delivery_ref_no: o.delivery_ref_no || null,
         })),
       });
@@ -365,85 +383,125 @@ function NewConversionForm() {
           </div>
           <div className="px-6 py-4">
             {/* Add-one-at-a-time inputs */}
-            <div className="mb-3 flex items-end gap-3">
-              <div className="w-24">
+            <div className="mb-3 grid grid-cols-12 items-end gap-2">
+              <div className="col-span-1">
                 <label className={lbl}>Category</label>
                 <input className={inp} value={outForm.category}
                   onChange={e => setOutForm(f => ({ ...f, category: e.target.value }))} placeholder="e.g. A" />
               </div>
-              <div className="flex-1">
+              <div className="col-span-3">
                 <label className={lbl}>Output Item *</label>
                 <select className={sel} value={outForm.output_item_id} onChange={e => setOutForm(f => ({ ...f, output_item_id: e.target.value }))}>
                   <option value="">Select item…</option>
                   {items.map(i => <option key={i.id} value={i.id}>{i.sku} — {i.name}</option>)}
                 </select>
               </div>
-              <div className="w-20">
+              <div className="col-span-1">
                 <label className={lbl}>Unit</label>
                 <div className="border-b border-slate-200 py-1 text-sm text-slate-500">
                   {items.find(i => i.id === outForm.output_item_id)?.uom ?? '—'}
                 </div>
               </div>
-              <div className="w-28">
-                <label className={lbl}>Quantity (KGS)</label>
+              <div className="col-span-1">
+                <label className={lbl}>KGS</label>
                 <input type="number" min={0} step="any" className={inp} value={outForm.kgs}
                   onChange={e => setOutForm(f => ({ ...f, kgs: e.target.value }))} />
               </div>
-              <div className="w-24">
+              <div className="col-span-1">
                 <label className={lbl}>Heads</label>
                 <input type="number" min={0} className={inp} value={outForm.heads}
                   onChange={e => setOutForm(f => ({ ...f, heads: e.target.value }))} />
               </div>
-              <div className="w-36">
-                <label className={lbl}>Delivery Ref No.</label>
+              <div className="col-span-1">
+                <label className={lbl}>Price/kg</label>
+                <input type="number" min={0} step="any" className={inp} value={outForm.price_per_kg}
+                  onChange={e => setOutForm(f => ({ ...f, price_per_kg: e.target.value }))} />
+              </div>
+              <div className="col-span-1">
+                <label className={lbl}>Amount</label>
+                <div className="border-b border-slate-200 py-1 text-sm text-slate-500 text-right font-mono">
+                  {((parseFloat(outForm.kgs) || 0) * (parseFloat(outForm.price_per_kg) || 0)).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div className="col-span-1">
+                <label className={lbl}>Dressing Fee</label>
+                <input type="number" min={0} step="any" className={inp} value={outForm.dressing_fee}
+                  onChange={e => setOutForm(f => ({ ...f, dressing_fee: e.target.value }))} placeholder="0.00" />
+              </div>
+              <div className="col-span-1">
+                <label className={lbl}>Total</label>
+                <div className="border-b border-slate-200 py-1 text-sm text-slate-700 dark:text-slate-200 text-right font-mono font-semibold">
+                  {((parseFloat(outForm.kgs) || 0) * (parseFloat(outForm.price_per_kg) || 0) + (parseFloat(outForm.dressing_fee) || 0)).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div className="col-span-1">
+                <label className={lbl}>Delivery Ref</label>
                 <input className={inp} value={outForm.delivery_ref_no}
                   onChange={e => setOutForm(f => ({ ...f, delivery_ref_no: e.target.value }))} />
               </div>
-              <button type="button" onClick={addOutputLine}
-                className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-brand-400 text-brand-500 hover:bg-brand-50 text-lg font-light">
-                +
-              </button>
+              <div className="col-span-1 flex items-end justify-center">
+                <button type="button" onClick={addOutputLine}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-brand-400 text-brand-500 hover:bg-brand-50 text-lg font-light">
+                  +
+                </button>
+              </div>
             </div>
 
             <table className="min-w-full text-xs">
               <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500">
                 <tr>
-                  <th className="px-3 py-2 text-left font-medium">Line No.</th>
+                  <th className="px-3 py-2 text-left font-medium">#</th>
                   <th className="px-3 py-2 text-left font-medium">Item</th>
                   <th className="px-3 py-2 text-left font-medium">Unit</th>
                   <th className="px-3 py-2 text-right font-medium">Heads</th>
-                  <th className="px-3 py-2 text-right font-medium">Quantity (KGS)</th>
-                  <th className="px-3 py-2 text-left font-medium">Delivery Ref No.</th>
+                  <th className="px-3 py-2 text-right font-medium">KGS</th>
+                  <th className="px-3 py-2 text-right font-medium">Price/kg</th>
+                  <th className="px-3 py-2 text-right font-medium">Amount</th>
+                  <th className="px-3 py-2 text-right font-medium">Dressing Fee</th>
+                  <th className="px-3 py-2 text-right font-medium">Total Amount</th>
+                  <th className="px-3 py-2 text-left font-medium">Delivery Ref</th>
                   <th className="px-3 py-2 text-left font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {outputLines.length === 0 ? (
-                  <tr><td colSpan={7} className="px-3 py-4 text-center text-slate-400">No data available in table</td></tr>
-                ) : outputLines.map((o, i) => (
-                  <tr key={i} className="border-b border-slate-50 dark:border-slate-700 last:border-0">
-                    <td className="px-3 py-2 text-slate-400">{i + 1}</td>
-                    <td className="px-3 py-2 font-medium dark:text-slate-200">
-                      {o.category && <span className="mr-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{o.category}</span>}
-                      {o.item_sku} — {o.item_name}
-                    </td>
-                    <td className="px-3 py-2 text-slate-500">{o.uom}</td>
-                    <td className="px-3 py-2 text-right font-mono">{o.heads.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right font-mono">{o.kgs.toFixed(6)}</td>
-                    <td className="px-3 py-2 text-slate-500">{o.delivery_ref_no || '—'}</td>
-                    <td className="px-3 py-2">
-                      <button type="button" onClick={() => setOutputLines(prev => prev.filter((_, j) => j !== i))}
-                        className="text-xs text-red-500 hover:text-red-700">Remove</button>
-                    </td>
-                  </tr>
-                ))}
+                  <tr><td colSpan={11} className="px-3 py-4 text-center text-slate-400">No data available in table</td></tr>
+                ) : outputLines.map((o, i) => {
+                  const amount = o.kgs * o.price_per_kg;
+                  const total  = amount + o.dressing_fee;
+                  return (
+                    <tr key={i} className="border-b border-slate-50 dark:border-slate-700 last:border-0">
+                      <td className="px-3 py-2 text-slate-400">{i + 1}</td>
+                      <td className="px-3 py-2 font-medium dark:text-slate-200">
+                        {o.category && <span className="mr-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{o.category}</span>}
+                        {o.item_sku} — {o.item_name}
+                      </td>
+                      <td className="px-3 py-2 text-slate-500">{o.uom}</td>
+                      <td className="px-3 py-2 text-right font-mono">{o.heads.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right font-mono">{o.kgs.toFixed(6)}</td>
+                      <td className="px-3 py-2 text-right font-mono">{o.price_per_kg.toLocaleString('en-PH', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</td>
+                      <td className="px-3 py-2 text-right font-mono">{amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2 text-right font-mono">{o.dressing_fee.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2 text-right font-mono font-semibold">{total.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2 text-slate-500">{o.delivery_ref_no || '—'}</td>
+                      <td className="px-3 py-2">
+                        <button type="button" onClick={() => setOutputLines(prev => prev.filter((_, j) => j !== i))}
+                          className="text-xs text-red-500 hover:text-red-700">Remove</button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
               {outputLines.length > 0 && (
                 <tfoot>
-                  <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                  <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold">
                     <td colSpan={3} className="px-3 py-2 text-right text-xs font-medium text-slate-500">Total</td>
-                    <td className="px-3 py-2 text-right font-mono font-semibold">{totalOutHeads.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right font-mono font-semibold">{totalOutKgs.toFixed(6)}</td>
+                    <td className="px-3 py-2 text-right font-mono">{totalOutHeads.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right font-mono">{totalOutKgs.toFixed(6)}</td>
+                    <td />
+                    <td className="px-3 py-2 text-right font-mono">{totalOutAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2 text-right font-mono">{totalDressingFee.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2 text-right font-mono">{totalOutTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td colSpan={2} />
                   </tr>
                 </tfoot>

@@ -32,19 +32,28 @@ export async function GET(
     growRefId = gr?.id ?? null;
   }
 
-  // Items received via GRNs whose PO lines are tagged with this branch, building, or grow reference.
+  // Items received via GRNs whose PO lines are tagged with this branch AND building AND grow reference.
   // Also include items received into inventory_ins for this branch.
+  // stock_balances is aggregated per item to avoid duplicate rows from multiple warehouses.
   const rows = await query(
-    `SELECT DISTINCT i.id, i.sku, i.name, i.uom,
+    `SELECT i.id, i.sku, i.name, i.uom,
             COALESCE(sb.qty_on_hand, 0)::numeric AS qty_on_hand,
             COALESCE(sb.avg_cost, i.standard_cost, 0)::numeric AS avg_cost
        FROM items i
-       LEFT JOIN stock_balances sb ON sb.item_id = i.id
+       LEFT JOIN (
+         SELECT item_id,
+                SUM(qty_on_hand) AS qty_on_hand,
+                CASE WHEN SUM(qty_on_hand) > 0
+                     THEN SUM(qty_on_hand * avg_cost) / SUM(qty_on_hand)
+                     ELSE MAX(avg_cost) END AS avg_cost
+           FROM stock_balances
+          GROUP BY item_id
+       ) sb ON sb.item_id = i.id
       WHERE i.company_id = $1
         AND i.is_active = true
         AND COALESCE(sb.qty_on_hand, 0) > 0
         AND i.id IN (
-          -- items received on PO lines tagged with this branch / building / grow ref
+          -- items received on GRN/PO lines matching ALL set tags (AND logic)
           SELECT DISTINCT pol.item_id
             FROM purchase_order_lines pol
             JOIN goods_receipt_lines grl ON grl.po_line_id = pol.id
@@ -52,21 +61,16 @@ export async function GET(
            WHERE gr.company_id = $1
              AND grl.qty_received > 0
              AND pol.item_id IS NOT NULL
-             AND (
-               ($2::uuid IS NOT NULL AND pol.branch_id   = $2)
-               OR ($3::uuid IS NOT NULL AND pol.building_id = $3)
-               OR ($4::uuid IS NOT NULL AND pol.grow_reference_id = $4)
-               OR ($2::uuid IS NOT NULL AND gr.branch_id   = $2)
-               OR ($3::uuid IS NOT NULL AND gr.building_id = $3)
-               OR ($4::uuid IS NOT NULL AND gr.grow_reference_id = $4)
-             )
+             AND ($2::uuid IS NULL OR pol.branch_id        = $2 OR gr.branch_id        = $2)
+             AND ($3::uuid IS NULL OR pol.building_id      = $3 OR gr.building_id      = $3)
+             AND ($4::uuid IS NULL OR pol.grow_reference_id = $4 OR gr.grow_reference_id = $4)
           UNION
-          -- items received via inventory_ins for this branch
+          -- items received via inventory_ins for this branch (table has no building/grow tag)
           SELECT DISTINCT iil.item_id
             FROM inventory_in_lines iil
             JOIN inventory_ins ii ON ii.id = iil.inventory_in_id
            WHERE ii.company_id = $1
-             AND ($2::uuid IS NOT NULL AND ii.branch_id = $2)
+             AND ($2::uuid IS NULL OR ii.branch_id = $2)
              AND iil.net_quantity > 0
         )
       ORDER BY i.sku`,

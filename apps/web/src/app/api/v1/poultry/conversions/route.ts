@@ -66,14 +66,18 @@ export async function POST(request: NextRequest) {
        dto.short_over_heads ?? 0, dto.short_over_kgs ?? 0,
        orNull(dto.remarks), totalOut, yieldPct, auth.userId],
     );
+    // Ensure dressing_fee column exists (non-fatal DDL outside transaction)
+    await query(`ALTER TABLE conversion_outputs ADD COLUMN IF NOT EXISTS dressing_fee numeric(15,4) NOT NULL DEFAULT 0`).catch(() => {});
+
     for (let i = 0; i < outputs.length; i++) {
       const o = outputs[i];
+      const dressingFee = Number(o.dressing_fee ?? 0);
       await client.query(
-        `INSERT INTO conversion_outputs (conversion_id, line_no, output_item_id, category, heads, kgs, unit_cost, total_cost, delivery_ref_no, remarks)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        `INSERT INTO conversion_outputs (conversion_id, line_no, output_item_id, category, heads, kgs, unit_cost, dressing_fee, total_cost, delivery_ref_no, remarks)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
         [hdr.id, i + 1, o.output_item_id, o.category ?? null,
-         o.heads ?? 0, o.kgs ?? 0, o.unit_cost ?? 0,
-         Number(o.kgs ?? 0) * Number(o.unit_cost ?? 0),
+         o.heads ?? 0, o.kgs ?? 0, o.unit_cost ?? 0, dressingFee,
+         Number(o.kgs ?? 0) * Number(o.unit_cost ?? 0) + dressingFee,
          o.delivery_ref_no ?? null, o.remarks ?? null],
       );
     }
