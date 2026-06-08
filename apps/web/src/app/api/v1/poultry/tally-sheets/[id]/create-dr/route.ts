@@ -68,16 +68,19 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       ? new Date(tally.transfer_date as string | Date).toISOString().split('T')[0]
       : new Date().toISOString().split('T')[0];
 
-    // Insert DR — try with tally_sheet_id first; fall back without if FK/column not ready
+    // Insert DR — use savepoint so a FK failure doesn't abort the whole transaction
     let drId: string;
+    await client.query('SAVEPOINT before_dr_insert');
     try {
       const r = await client.query(
         `INSERT INTO delivery_receipts (company_id, branch_id, dr_no, so_id, customer_id, warehouse_id, delivery_date, status, tally_sheet_id, created_by)
          VALUES ($1,$2,$3,$4,$5,$6,$7,'draft',$8,$9) RETURNING id`,
         [so.company_id, branchId, drNo, soId, so.customer_id, warehouseId, deliveryDate, params.id, auth.userId]);
       drId = r.rows[0].id as string;
+      await client.query('RELEASE SAVEPOINT before_dr_insert');
     } catch {
-      // tally_sheet_id column missing or FK not yet migrated — insert without it
+      // FK/column not yet migrated — rollback to savepoint and insert without tally_sheet_id
+      await client.query('ROLLBACK TO SAVEPOINT before_dr_insert');
       const r = await client.query(
         `INSERT INTO delivery_receipts (company_id, branch_id, dr_no, so_id, customer_id, warehouse_id, delivery_date, status, created_by)
          VALUES ($1,$2,$3,$4,$5,$6,$7,'draft',$8) RETURNING id`,
