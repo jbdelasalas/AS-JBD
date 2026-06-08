@@ -58,7 +58,7 @@ export async function PATCH(
       tallySheetId = (dto.tally_sheet_id as string | null) || null;
     } else if (dto.tally_sheet_no) {
       const tsRow = await client.query(
-        `SELECT id FROM tally_sheets WHERE ts_no = $1 LIMIT 1`, [dto.tally_sheet_no]);
+        `SELECT id FROM tally_sheets WHERE doc_no = $1 LIMIT 1`, [dto.tally_sheet_no]);
       tallySheetId = tsRow.rows[0]?.id ?? null;
     }
 
