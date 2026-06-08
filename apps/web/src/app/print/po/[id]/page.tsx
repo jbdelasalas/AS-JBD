@@ -239,7 +239,7 @@ export default function POPrintPage() {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
                     <tr>
-                      <td style={{ fontWeight: 700, paddingRight: '6px', verticalAlign: 'top', whiteSpace: 'nowrap', paddingBottom: '4px' }}>
+                      <td style={{ fontWeight: 700, paddingRight: '6px', verticalAlign: 'top', whiteSpace: 'nowrap', paddingBottom: '4px', width: '1px' }}>
                         Supplier:
                       </td>
                       <td style={{ borderBottom: '1px solid #555', paddingBottom: '2px', paddingLeft: '4px', verticalAlign: 'top' }}>
@@ -247,7 +247,7 @@ export default function POPrintPage() {
                       </td>
                     </tr>
                     <tr>
-                      <td style={{ fontWeight: 700, paddingRight: '6px', verticalAlign: 'top', whiteSpace: 'nowrap', paddingBottom: '4px' }}>
+                      <td style={{ fontWeight: 700, paddingRight: '6px', verticalAlign: 'top', whiteSpace: 'nowrap', paddingBottom: '4px', width: '1px' }}>
                         Address:
                       </td>
                       <td style={{ borderBottom: '1px solid #555', paddingBottom: '2px', paddingLeft: '4px', verticalAlign: 'top' }}>
@@ -255,7 +255,7 @@ export default function POPrintPage() {
                       </td>
                     </tr>
                     <tr>
-                      <td style={{ fontWeight: 700, paddingRight: '6px', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                      <td style={{ fontWeight: 700, paddingRight: '6px', verticalAlign: 'top', whiteSpace: 'nowrap', width: '1px' }}>
                         TIN:
                       </td>
                       <td style={{ borderBottom: '1px solid #555', paddingBottom: '2px', paddingLeft: '4px', verticalAlign: 'top' }}>

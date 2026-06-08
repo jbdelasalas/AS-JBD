@@ -361,7 +361,7 @@ export default function BillDetailPage() {
         {['draft', 'pending_approval'].includes(bill.status) && (
           <button onClick={() => setShowJEPreview(true)} disabled={busy}
             className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
-            Approve
+            Post
           </button>
         )}
         {bill.je_id && (
@@ -442,7 +442,7 @@ export default function BillDetailPage() {
       {showJEPreview && (
         <JournalPreviewModal
           previewUrl={`/ap/bills/${id}/journal-preview`}
-          confirmLabel="Confirm Approve Bill"
+          confirmLabel="Confirm Post Bill"
           busy={busy}
           onConfirm={async () => { await doAction('approve'); setShowJEPreview(false); }}
           onCancel={() => setShowJEPreview(false)}
