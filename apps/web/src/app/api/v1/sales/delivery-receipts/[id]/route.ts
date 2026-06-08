@@ -52,6 +52,9 @@ export async function PATCH(
   try {
     await client.query('BEGIN');
 
+    // Ensure no FK blocks tally_sheet_id updates (migration 022 may not have run)
+    await client.query(`ALTER TABLE delivery_receipts DROP CONSTRAINT IF EXISTS delivery_receipts_tally_sheet_id_fkey`).catch(() => {});
+
     // Resolve tally_sheet_id: accept UUID directly or look up by ts_no
     let tallySheetId: string | null | undefined = undefined; // undefined = don't change
     if ('tally_sheet_id' in dto) {

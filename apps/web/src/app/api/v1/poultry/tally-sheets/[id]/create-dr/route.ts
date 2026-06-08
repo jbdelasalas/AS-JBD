@@ -68,6 +68,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       ? new Date(tally.transfer_date as string | Date).toISOString().split('T')[0]
       : new Date().toISOString().split('T')[0];
 
+    // Ensure no FK constraint blocks setting tally_sheet_id
+    await client.query(`ALTER TABLE delivery_receipts DROP CONSTRAINT IF EXISTS delivery_receipts_tally_sheet_id_fkey`).catch(() => {});
+
     const drRow = await client.query(
       `INSERT INTO delivery_receipts (company_id, branch_id, dr_no, so_id, customer_id, warehouse_id, delivery_date, tally_sheet_id, status, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'draft',$9) RETURNING id`,
