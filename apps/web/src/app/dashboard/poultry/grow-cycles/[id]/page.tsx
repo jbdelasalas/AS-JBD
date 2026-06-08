@@ -220,6 +220,7 @@ export default function GrowCycleDetailPage() {
           remarks:           headerForm.remarks || null,
         } : {}),
         culling_qty: parseFloat(culling) || 0,
+        approx_chick_price_per_head: approxChickPricePerHead,
         daily_mortality: dm,
         weekly_weights: ww,
         item_consumption: cons,
@@ -244,6 +245,10 @@ export default function GrowCycleDetailPage() {
   const isEditable = doc.status === 'active' || doc.status === 'harvesting';
   const totalDailyMortality = DAYS.reduce((s, d) => s + (parseFloat(dailyMortality[d] || '0') || 0), 0);
   const totalMortalityWithCulling = totalDailyMortality + (parseFloat(culling) || 0);
+  const totalConsumptionCost = consumption.reduce((s, c) => s + (parseFloat(c.quantity) || 0) * (parseFloat(c.unit_cost) || 0), 0);
+  const approxChickPricePerHead = doc.heads_available > 0
+    ? doc.chick_price_per_head + totalConsumptionCost / doc.heads_available
+    : doc.chick_price_per_head;
 
   return (
     <div className="space-y-0">
@@ -307,7 +312,7 @@ export default function GrowCycleDetailPage() {
           <Field label="Heads" value={<span className="font-semibold">{Number(doc.heads_in).toLocaleString()}</span>} />
           <Field label="Available / Harvested" value={<span className="text-emerald-600 font-semibold">{Number(doc.heads_available).toLocaleString()} / {Number(doc.heads_harvested).toLocaleString()}</span>} />
           <Field label="Chick Price/Head" value={Number(doc.chick_price_per_head).toFixed(6)} />
-          <Field label="Approx Chick Price/Head" value={Number(doc.approx_chick_price_per_head).toFixed(6)} />
+          <Field label="Approx Chick Price/Head" value={approxChickPricePerHead.toFixed(6)} />
           <Field label="Est. Harvest Recovery" value={doc.est_harvest_recovery != null ? Number(doc.est_harvest_recovery).toFixed(2) : <span className="text-red-500">—</span>} />
 
           {/* Editable fields */}
