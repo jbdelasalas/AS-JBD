@@ -2667,6 +2667,12 @@ export async function POST(request: NextRequest) {
     results.push('038 inventory control accounts: ok');
   } catch (e) { results.push(`038 inventory control accounts: ${(e as Error).message}`); }
 
+  // 040 — transfer_je_id on tally_sheets (for live chicken transfer JE)
+  try {
+    await query(`ALTER TABLE tally_sheets ADD COLUMN IF NOT EXISTS transfer_je_id uuid REFERENCES journal_entries(id)`);
+    results.push('040 tally_sheets.transfer_je_id: ok');
+  } catch (e) { results.push(`040 tally_sheets.transfer_je_id: ${(e as Error).message}`); }
+
   // 037 — branch/building/cost_center on sales_order_lines and sales_invoice_lines
   const lineTags037: [string, string][] = [
     ['sales_order_lines.branch_id',       `ALTER TABLE sales_order_lines    ADD COLUMN IF NOT EXISTS branch_id       uuid REFERENCES branches(id)`],

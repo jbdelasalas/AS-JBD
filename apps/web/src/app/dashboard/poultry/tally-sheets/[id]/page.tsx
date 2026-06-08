@@ -35,6 +35,7 @@ interface TallySheet {
   start_time: string | null; end_time: string | null; remarks: string | null;
   live_item_id: string | null;
   je_id: string | null;
+  transfer_je_id: string | null;
   lines: Line[];
 }
 
@@ -66,6 +67,11 @@ export default function TallySheetDetailPage() {
   const [drOrders, setDrOrders] = useState<{ id: string; order_no: string; customer_name: string }[]>([]);
   const [creatingDR, setCreatingDR] = useState(false);
   const [drMsg, setDrMsg] = useState<string | null>(null);
+
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferPrice, setTransferPrice] = useState('');
+  const [transferBusy, setTransferBusy] = useState(false);
+  const [transferMsg, setTransferMsg] = useState<string | null>(null);
 
   // Reference data
   const [suppliers, setSuppliers]   = useState<Supplier[]>([]);
@@ -172,6 +178,36 @@ export default function TallySheetDetailPage() {
       router.push(`/dashboard/sales/delivery-receipts/${res.dr_id}`);
     } catch (e: unknown) { setDrMsg((e as Error).message ?? 'Failed to create DR'); }
     finally { setCreatingDR(false); }
+  }
+
+  function openTransferModal() {
+    setTransferMsg(null);
+    setTransferPrice('');
+    setShowTransferModal(true);
+  }
+
+  async function postTransferJE() {
+    const price = parseFloat(transferPrice);
+    if (!price || price <= 0) { setTransferMsg('Enter a valid transfer price'); return; }
+    setTransferBusy(true); setTransferMsg(null);
+    try {
+      await api.post(`/poultry/tally-sheets/${id}/create-transfer-je`, { transfer_price: price });
+      setShowTransferModal(false);
+      sessionStorage.setItem('pending_conversion', JSON.stringify({
+        tally_sheet_id: doc!.id,
+        transaction_date: (doc!.transfer_date ?? '').split('T')[0],
+        branch_id: doc!.destination_id ?? doc!.branch_id ?? '',
+        lines: lines.map(l => ({
+          item_id: l.item_id,
+          item_name: l.item_name ?? '',
+          sku: l.sku ?? '',
+          heads: Number(l.heads),
+          net_kgs: Number(l.net_kgs),
+        })),
+      }));
+      router.push('/dashboard/poultry/conversions/new');
+    } catch (e: unknown) { setTransferMsg((e as Error).message ?? 'Failed'); }
+    finally { setTransferBusy(false); }
   }
 
   const netKgs      = lines.reduce((s, l) => s + Number(l.net_kgs), 0);
@@ -590,25 +626,16 @@ export default function TallySheetDetailPage() {
           )}
           {doc.status === 'posted' && (
             <>
-              <button type="button"
-                onClick={() => {
-                  sessionStorage.setItem('pending_conversion', JSON.stringify({
-                    tally_sheet_id: doc.id,
-                    transaction_date: (doc.transfer_date ?? '').split('T')[0],
-                    branch_id: doc.destination_id ?? doc.branch_id ?? '',
-                    lines: lines.map(l => ({
-                      item_id: l.item_id,
-                      item_name: l.item_name ?? '',
-                      sku: l.sku ?? '',
-                      heads: Number(l.heads),
-                      net_kgs: Number(l.net_kgs),
-                    })),
-                  }));
-                  router.push('/dashboard/poultry/conversions/new');
-                }}
+              <button type="button" onClick={openTransferModal}
                 className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
                 Create Conversion
               </button>
+              {doc.transfer_je_id && (
+                <Link href={`/dashboard/gl/journal-entries/${doc.transfer_je_id}`}
+                  className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
+                  View Transfer JE
+                </Link>
+              )}
               <button type="button" onClick={openDRModal}
                 className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700">
                 Create DR
@@ -621,6 +648,78 @@ export default function TallySheetDetailPage() {
           <span>Net KGS: <strong className="text-slate-800 dark:text-slate-200">{netKgs.toFixed(2)}</strong></span>
         </div>
       </div>
+
+      {/* Transfer JE modal */}
+      {showTransferModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-[500px] rounded-lg bg-white dark:bg-slate-900 p-6 shadow-xl">
+            <h2 className="mb-1 text-base font-semibold text-slate-900 dark:text-slate-100">Post Transfer Journal Entry</h2>
+            <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
+              A transfer JE will be posted to record the movement of live chickens to the trading location before creating the item conversion.
+            </p>
+
+            <div className="mb-4 overflow-hidden rounded border border-slate-200 dark:border-slate-700">
+              <table className="min-w-full text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">Account</th>
+                    <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">Debit</th>
+                    <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">Credit</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                  <tr>
+                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">Cos - Live</td>
+                    <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">Live cost</td>
+                    <td className="px-3 py-2 text-right"></td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">Invty Live</td>
+                    <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">Transfer price</td>
+                    <td className="px-3 py-2 text-right"></td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">Invty Live</td>
+                    <td className="px-3 py-2 text-right"></td>
+                    <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">Live cost</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">Sales - Live</td>
+                    <td className="px-3 py-2 text-right"></td>
+                    <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">Transfer price</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mb-4">
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Transfer Price (₱) *</label>
+              <input
+                type="number" min="0" step="0.01"
+                value={transferPrice}
+                onChange={e => setTransferPrice(e.target.value)}
+                placeholder="0.00"
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              />
+            </div>
+
+            {transferMsg && (
+              <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">{transferMsg}</div>
+            )}
+
+            <div className="flex gap-3">
+              <button onClick={postTransferJE} disabled={transferBusy || !transferPrice}
+                className="flex-1 rounded bg-brand-600 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                {transferBusy ? 'Posting…' : 'Post JE & Create Conversion'}
+              </button>
+              <button onClick={() => setShowTransferModal(false)} disabled={transferBusy}
+                className="flex-1 rounded border border-slate-300 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create DR modal */}
       {showDRModal && (
