@@ -262,7 +262,16 @@ export default function TallySheetDetailPage() {
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">View Tally Sheet</h1>
-        <button onClick={() => router.back()} className="text-slate-400 hover:text-slate-600 text-xl leading-none">←</button>
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/dashboard/poultry/tally-sheets/${id}/print`}
+            target="_blank"
+            className="rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            🖨 Print
+          </Link>
+          <button onClick={() => router.back()} className="text-slate-400 hover:text-slate-600 text-xl leading-none">←</button>
+        </div>
       </div>
 
       {msg && (
