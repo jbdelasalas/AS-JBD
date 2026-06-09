@@ -122,6 +122,9 @@ export async function POST(request: NextRequest) {
     if (dup.length) return err(`SKU ${sku} already exists`, 409);
   }
 
+  // Ensure the column added in a later migration exists before inserting
+  await query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS dr_revenue_account_id uuid`, []).catch(() => {});
+
   const rows = await query(
     `INSERT INTO items
        (company_id, sku, name, uom, item_type, costing_method,
