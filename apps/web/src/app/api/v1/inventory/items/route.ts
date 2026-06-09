@@ -53,7 +53,6 @@ export async function GET(request: NextRequest) {
               i.cogs_account_id,      a2.code||' - '||a2.name AS cogs_account_name,
               i.revenue_account_id,   a3.code||' - '||a3.name AS revenue_account_name,
               i.purchase_variance_account_id, a4.code||' - '||a4.name AS purchase_variance_account_name,
-              i.dr_revenue_account_id, a5.code||' - '||a5.name AS dr_revenue_account_name,
               i.default_warehouse_id, w.name AS default_warehouse_name
          FROM items i
          LEFT JOIN item_categories ic ON ic.id = i.category_id
@@ -61,7 +60,6 @@ export async function GET(request: NextRequest) {
          LEFT JOIN accounts a2 ON a2.id = i.cogs_account_id
          LEFT JOIN accounts a3 ON a3.id = i.revenue_account_id
          LEFT JOIN accounts a4 ON a4.id = i.purchase_variance_account_id
-         LEFT JOIN accounts a5 ON a5.id = i.dr_revenue_account_id
          LEFT JOIN warehouses w ON w.id = i.default_warehouse_id
         WHERE ${where}
         ORDER BY i.sku
@@ -69,12 +67,31 @@ export async function GET(request: NextRequest) {
       params,
     );
 
-    return ok(rows.map((r) => ({
-      ...r,
-      standard_cost: Number(r.standard_cost),
-      selling_price: Number(r.selling_price),
-      reorder_point: Number(r.reorder_point),
-    })));
+    // Fetch dr_revenue_account_id separately — column may not exist before migration runs
+    const drRevAcctMap = new Map<string, { id: string | null; name: string | null }>();
+    try {
+      const drRevRows = await query(
+        `SELECT i.id, i.dr_revenue_account_id, a.code||' - '||a.name AS dr_revenue_account_name
+           FROM items i LEFT JOIN accounts a ON a.id = i.dr_revenue_account_id
+          WHERE i.company_id = $1`,
+        [companyId],
+      );
+      for (const r of drRevRows as Array<Record<string, unknown>>) {
+        drRevAcctMap.set(r.id as string, { id: r.dr_revenue_account_id as string | null, name: r.dr_revenue_account_name as string | null });
+      }
+    } catch { /* column not yet added — skip */ }
+
+    return ok(rows.map((r) => {
+      const drRev = drRevAcctMap.get((r as Record<string, unknown>).id as string);
+      return {
+        ...r,
+        standard_cost: Number(r.standard_cost),
+        selling_price: Number(r.selling_price),
+        reorder_point: Number(r.reorder_point),
+        dr_revenue_account_id: drRev?.id ?? null,
+        dr_revenue_account_name: drRev?.name ?? null,
+      };
+    }));
   } catch (e: unknown) {
     return err((e as Error).message, 500);
   }

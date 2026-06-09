@@ -17,7 +17,6 @@ export async function GET(request: NextRequest, { params }: Ctx) {
             i.cogs_account_id,               a2.code||' - '||a2.name AS cogs_account_name,
             i.revenue_account_id,            a3.code||' - '||a3.name AS revenue_account_name,
             i.purchase_variance_account_id,  a4.code||' - '||a4.name AS purchase_variance_account_name,
-            i.dr_revenue_account_id,         a5.code||' - '||a5.name AS dr_revenue_account_name,
             i.default_warehouse_id,          w.name AS default_warehouse_name
        FROM items i
        LEFT JOIN item_categories ic ON ic.id = i.category_id
@@ -25,18 +24,37 @@ export async function GET(request: NextRequest, { params }: Ctx) {
        LEFT JOIN accounts a2 ON a2.id = i.cogs_account_id
        LEFT JOIN accounts a3 ON a3.id = i.revenue_account_id
        LEFT JOIN accounts a4 ON a4.id = i.purchase_variance_account_id
-       LEFT JOIN accounts a5 ON a5.id = i.dr_revenue_account_id
        LEFT JOIN warehouses w ON w.id = i.default_warehouse_id
       WHERE i.id = $1 LIMIT 1`,
     [params.id],
   );
   if (!rows[0]) return err(`Item ${params.id} not found`, 404);
   const r = rows[0] as Record<string, unknown>;
+
+  // Fetch dr_revenue_account_id separately — column may not exist before migration runs
+  let drRevenueAccountId: string | null = null;
+  let drRevenueAccountName: string | null = null;
+  try {
+    const drRevRows = await query(
+      `SELECT i.dr_revenue_account_id, a.code||' - '||a.name AS dr_revenue_account_name
+         FROM items i LEFT JOIN accounts a ON a.id = i.dr_revenue_account_id
+        WHERE i.id = $1 LIMIT 1`,
+      [params.id],
+    );
+    if (drRevRows[0]) {
+      const dr = drRevRows[0] as Record<string, unknown>;
+      drRevenueAccountId = dr.dr_revenue_account_id as string | null;
+      drRevenueAccountName = dr.dr_revenue_account_name as string | null;
+    }
+  } catch { /* column not yet added — skip */ }
+
   return ok({
     ...r,
     standard_cost: Number(r.standard_cost),
     selling_price: Number(r.selling_price),
     reorder_point: Number(r.reorder_point),
+    dr_revenue_account_id: drRevenueAccountId,
+    dr_revenue_account_name: drRevenueAccountName,
   });
 }
 
