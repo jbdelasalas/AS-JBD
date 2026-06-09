@@ -12,10 +12,9 @@ export async function GET(request: NextRequest) {
   if (!companyId) return err('company_id is required', 400);
 
   try {
-    // Show one row per tally sheet × item.
-    // qty_heads / qty_kgs come from the tally sheet lines (what that tally sheet brought in).
-    // avg_cost comes from poultry_inventory_balance (company-wide weighted average).
-    const rows = await query(
+    // One row per tally sheet × item using the line quantities (not pib aggregate).
+    // avg_cost fetched separately to avoid join-multiplication from pib.
+    const rows = await query<Record<string, unknown>>(
       `SELECT
          t.id          AS tally_id,
          t.doc_no      AS tally_no,
@@ -24,29 +23,39 @@ export async function GET(request: NextRequest) {
          i.name        AS item_name,
          i.uom,
          SUM(tsl.heads)   AS qty_heads,
-         SUM(tsl.net_kgs) AS qty_kgs,
-         COALESCE((
-           SELECT avg_cost FROM poultry_inventory_balance
-            WHERE item_id   = tsl.item_id
-              AND company_id = t.company_id
-            LIMIT 1
-         ), 0) AS avg_cost
+         SUM(tsl.net_kgs) AS qty_kgs
        FROM tally_sheets t
        JOIN tally_sheet_lines tsl ON tsl.tally_sheet_id = t.id
        JOIN items i ON i.id = tsl.item_id
        WHERE t.company_id = $1
          AND t.status     = 'posted'
        GROUP BY t.id, t.doc_no, t.transfer_date, tsl.item_id, i.sku, i.name, i.uom
-       HAVING SUM(tsl.net_kgs) > 0
+       HAVING SUM(tsl.heads) > 0 OR SUM(tsl.net_kgs) > 0
        ORDER BY t.transfer_date DESC, i.sku`,
       [companyId],
     );
 
+    // Get avg_cost per item from pib in one query to avoid N+1 or join multiplication
+    const itemIds = [...new Set(rows.map(r => r.item_id as string))];
+    const avgCostMap = new Map<string, number>();
+    if (itemIds.length > 0) {
+      try {
+        const pibRows = await query<{ item_id: string; avg_cost: number }>(
+          `SELECT item_id, AVG(avg_cost) AS avg_cost
+             FROM poultry_inventory_balance
+            WHERE company_id = $1
+            GROUP BY item_id`,
+          [companyId],
+        );
+        for (const r of pibRows) avgCostMap.set(r.item_id, Number(r.avg_cost ?? 0));
+      } catch { /* pib may be empty — skip */ }
+    }
+
     return ok(rows.map(r => ({
       ...r,
-      qty_heads: Number((r as Record<string, unknown>).qty_heads ?? 0),
-      qty_kgs:   Number((r as Record<string, unknown>).qty_kgs ?? 0),
-      avg_cost:  Number((r as Record<string, unknown>).avg_cost ?? 0),
+      qty_heads: Number(r.qty_heads ?? 0),
+      qty_kgs:   Number(r.qty_kgs ?? 0),
+      avg_cost:  avgCostMap.get(r.item_id as string) ?? 0,
     })));
   } catch (e: unknown) {
     return err((e as Error).message, 500);
