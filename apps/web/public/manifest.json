@@ -13,19 +13,13 @@
     {
       "src": "/api/v1/company-icon",
       "sizes": "any",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any"
     },
     {
       "src": "/api/v1/company-icon",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "/api/v1/company-icon",
-      "sizes": "512x512",
-      "type": "image/png",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "maskable"
     }
   ],

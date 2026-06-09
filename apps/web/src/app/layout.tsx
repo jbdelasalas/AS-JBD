@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   },
   formatDetection: { telephone: false },
   icons: {
-    icon: [{ url: '/api/v1/company-icon' }],
+    icon: [{ url: '/api/v1/company-icon', type: 'image/svg+xml' }],
     shortcut: '/api/v1/company-icon',
     apple: [{ url: '/api/v1/company-icon', sizes: '180x180' }],
   },

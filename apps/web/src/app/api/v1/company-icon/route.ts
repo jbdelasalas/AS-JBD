@@ -13,13 +13,21 @@ export async function GET() {
       return new NextResponse(null, { status: 404 });
     }
 
-    const [header, data] = logo.split(',');
-    const contentType = header.match(/data:(.*?);/)?.[1] ?? 'image/jpeg';
-    const buffer = Buffer.from(data, 'base64');
+    // Browsers draw favicons into a square slot and stretch non-square images,
+    // distorting the logo. Wrap the stored logo in a square SVG with a white
+    // background and let preserveAspectRatio center it ("contain"), so the logo
+    // keeps its proportions on the browser tab and the installed app icon.
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">` +
+      `<rect width="512" height="512" fill="#ffffff"/>` +
+      // Inset the logo into the maskable "safe zone" (~80% of the canvas) so the
+      // OS can crop the corners of the installed icon without clipping the logo.
+      `<image href="${logo}" x="51" y="51" width="410" height="410" preserveAspectRatio="xMidYMid meet"/>` +
+      `</svg>`;
 
-    return new NextResponse(buffer, {
+    return new NextResponse(svg, {
       headers: {
-        'Content-Type': contentType,
+        'Content-Type': 'image/svg+xml',
         'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
       },
     });
