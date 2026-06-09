@@ -2687,5 +2687,15 @@ export async function POST(request: NextRequest) {
     catch (e) { results.push(`037 ${label}: ${(e as Error).message}`); }
   }
 
+  // 038 — cost center + branch tagging on journal_entry_lines
+  const jeLinesTag038: [string, string][] = [
+    ['journal_entry_lines.branch_id',      `ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS branch_id      uuid REFERENCES branches(id)`],
+    ['journal_entry_lines.cost_center_id', `ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS cost_center_id uuid REFERENCES cost_centers(id)`],
+  ];
+  for (const [label, sql] of jeLinesTag038) {
+    try { await query(sql); results.push(`038 ${label}: ok`); }
+    catch (e) { results.push(`038 ${label}: ${(e as Error).message}`); }
+  }
+
   return ok({ results });
 }

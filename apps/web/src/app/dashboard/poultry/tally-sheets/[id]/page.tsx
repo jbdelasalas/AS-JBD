@@ -48,7 +48,9 @@ interface TransferPreview {
   live_cost: number;
   net_kgs: number;
   net_heads: number;
-  accounts: { cos_live: TransferAccount | null; invty_live: TransferAccount | null; sales_live: TransferAccount | null };
+  accounts: { live_buying: TransferAccount | null; live_inventory: TransferAccount | null; sales_live: TransferAccount | null };
+  chicken_trading_cc: TransferAccount | null;
+  destination: TransferAccount | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -745,8 +747,27 @@ export default function TallySheetDetailPage() {
                 const transferAmt  = parseFloat((pricePerKg * (preview?.net_kgs ?? 0)).toFixed(2));
                 const fmt = (n: number) => n > 0 ? `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
                 const accts = preview?.accounts;
+                const cc = preview?.chicken_trading_cc;
+                const dest = preview?.destination;
                 return (
                   <div className="mb-4 overflow-hidden rounded border border-slate-200 dark:border-slate-700">
+                    {/* Location + Cost Center info */}
+                    {preview && (
+                      <div className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 py-2 grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <span className="text-slate-400 dark:text-slate-500">Location (Destination)</span>
+                          <div className="font-medium text-slate-700 dark:text-slate-200">
+                            {dest ? `${dest.code} — ${dest.name}` : <span className="italic text-amber-600">Not set on tally sheet</span>}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 dark:text-slate-500">Cost Center</span>
+                          <div className="font-medium text-slate-700 dark:text-slate-200">
+                            {cc ? `${cc.code} — ${cc.name}` : <span className="italic text-amber-600">Chicken Trading CC not found</span>}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <table className="min-w-full text-xs">
                       <thead className="bg-slate-50 dark:bg-slate-800">
                         <tr>
@@ -756,30 +777,38 @@ export default function TallySheetDetailPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                        {/* Line 1 — DR Live Buying = live cost */}
                         <tr>
                           <td className="px-3 py-2">
-                            <div className="font-medium text-slate-800 dark:text-slate-200">{accts?.cos_live?.name ?? 'Cos - Live'}</div>
-                            {accts?.cos_live?.code && <div className="text-slate-400">{accts.cos_live.code}</div>}
+                            <div className="font-medium text-slate-800 dark:text-slate-200">{accts?.live_buying?.name ?? 'Live Buying'}</div>
+                            {accts?.live_buying?.code && <div className="text-slate-400">{accts.live_buying.code}</div>}
                           </td>
                           <td className="px-3 py-2 text-right font-mono font-semibold text-slate-800 dark:text-slate-200">{fmt(liveCostAmt)}</td>
                           <td className="px-3 py-2 text-right"></td>
                         </tr>
-                        <tr>
+                        {/* Line 2 — DR Live Inventory = transfer total (tagged with CC + location) */}
+                        <tr className="bg-emerald-50/40 dark:bg-emerald-900/10">
                           <td className="px-3 py-2">
-                            <div className="font-medium text-slate-800 dark:text-slate-200">{accts?.invty_live?.name ?? 'Invty - Live'}</div>
-                            {accts?.invty_live?.code && <div className="text-slate-400">{accts.invty_live.code}</div>}
+                            <div className="font-medium text-slate-800 dark:text-slate-200">{accts?.live_inventory?.name ?? 'Live Inventory'}</div>
+                            {accts?.live_inventory?.code && <div className="text-slate-400">{accts.live_inventory.code}</div>}
+                            <div className="mt-0.5 flex flex-wrap gap-1">
+                              {dest && <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">📍 {dest.name}</span>}
+                              {cc   && <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">⬡ {cc.name}</span>}
+                            </div>
                           </td>
                           <td className="px-3 py-2 text-right font-mono font-semibold text-slate-800 dark:text-slate-200">{fmt(transferAmt)}</td>
                           <td className="px-3 py-2 text-right"></td>
                         </tr>
+                        {/* Line 3 — CR Live Inventory = live cost */}
                         <tr>
                           <td className="px-3 py-2">
-                            <div className="font-medium text-slate-800 dark:text-slate-200">{accts?.invty_live?.name ?? 'Invty - Live'}</div>
-                            {accts?.invty_live?.code && <div className="text-slate-400">{accts.invty_live.code}</div>}
+                            <div className="font-medium text-slate-800 dark:text-slate-200">{accts?.live_inventory?.name ?? 'Live Inventory'}</div>
+                            {accts?.live_inventory?.code && <div className="text-slate-400">{accts.live_inventory.code}</div>}
                           </td>
                           <td className="px-3 py-2 text-right"></td>
                           <td className="px-3 py-2 text-right font-mono font-semibold text-slate-800 dark:text-slate-200">{fmt(liveCostAmt)}</td>
                         </tr>
+                        {/* Line 4 — CR Sales DR - Live Chicken = transfer total */}
                         <tr className="bg-slate-50/50 dark:bg-slate-800/50">
                           <td className="px-3 py-2">
                             <div className="font-medium text-slate-800 dark:text-slate-200">{accts?.sales_live?.name ?? 'Sales DR - Live Chicken'}</div>
@@ -788,7 +817,7 @@ export default function TallySheetDetailPage() {
                           <td className="px-3 py-2 text-right"></td>
                           <td className="px-3 py-2 text-right font-mono font-semibold text-slate-800 dark:text-slate-200">{fmt(transferAmt)}</td>
                         </tr>
-                        {/* Totals row */}
+                        {/* Totals */}
                         <tr className="border-t-2 border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800">
                           <td className="px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300">Total</td>
                           <td className="px-3 py-1.5 text-right font-mono font-bold text-slate-800 dark:text-slate-200">
@@ -801,11 +830,11 @@ export default function TallySheetDetailPage() {
                       </tbody>
                     </table>
                     {preview && (
-                      <div className="border-t border-slate-200 dark:border-slate-700 px-3 py-2 text-xs text-slate-400 flex gap-4">
+                      <div className="border-t border-slate-200 dark:border-slate-700 px-3 py-2 text-xs text-slate-400 flex flex-wrap gap-4">
                         <span>Live cost: <strong className="text-slate-600 dark:text-slate-300">₱{liveCostAmt.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</strong></span>
                         <span>KGS: <strong className="text-slate-600 dark:text-slate-300">{preview.net_kgs.toFixed(4)}</strong></span>
-                        {pricePerKg > 0 && <span>Transfer total: <strong className="text-slate-600 dark:text-slate-300">₱{transferAmt.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</strong></span>}
                         <span>Heads: <strong className="text-slate-600 dark:text-slate-300">{preview.net_heads.toLocaleString()}</strong></span>
+                        {pricePerKg > 0 && <span>Transfer total: <strong className="text-slate-600 dark:text-slate-300">₱{transferAmt.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</strong></span>}
                       </div>
                     )}
                   </div>

@@ -18,8 +18,9 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   try { auth = await requireAuth(_req); } catch (e) { return e as Response; }
 
   const body = await _req.json().catch(() => ({}));
-  const transferPrice = parseFloat(String(body.transfer_price ?? '0'));
-  if (!transferPrice || transferPrice <= 0) return err('Transfer price must be greater than zero', 400);
+  // transfer_price is per KG; total = price_per_kg × net_kgs
+  const pricePerKg = parseFloat(String(body.transfer_price ?? '0'));
+  if (!pricePerKg || pricePerKg <= 0) return err('Transfer price must be greater than zero', 400);
 
   try {
     const [rec] = await query<Record<string, unknown>>(`SELECT * FROM tally_sheets WHERE id = $1`, [params.id]);
@@ -66,25 +67,28 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     }
     if (liveCost <= 0) return err('Could not determine live cost. Ensure the harvest journal entry exists or the grow cycle has cost data.', 400);
 
-    // Invty-Live account: from live_item_id
+    // Live Inventory account: from live item's inventory account
     if (!rec.live_item_id) return err('No live item set on this tally sheet', 400);
     const [liveItem] = await query<Record<string, unknown>>(
       `SELECT inventory_account_id, name FROM items WHERE id = $1`, [rec.live_item_id]);
     if (!liveItem?.inventory_account_id) return err('Live item has no inventory account set. Set it in Item Setup → Inventory Account.', 400);
-    const invtyLiveAcctId = String(liveItem.inventory_account_id);
+    const liveInvAcctId = String(liveItem.inventory_account_id);
 
-    // Cos-Live account: expense account with "cos" and "live" in name
-    const cosRows = await query<Record<string, unknown>>(
-      `SELECT id, code, name FROM accounts
+    // Live Buying account: expense account matching "live buying" / fallback cos+live
+    const buyingRows = await query<Record<string, unknown>>(
+      `SELECT id FROM accounts
         WHERE company_id = $1 AND is_active = true
-          AND (name ILIKE '%cos%live%' OR name ILIKE '%cogs%live%' OR name ILIKE '%cost%live%')
-        ORDER BY code LIMIT 1`, [rec.company_id]);
-    if (!cosRows[0]) return err('Cannot find "Cos - Live" account. Create an expense account with "Cos" and "Live" in the name.', 400);
-    const cosLiveAcctId = String(cosRows[0].id);
+          AND (name ILIKE '%live%buying%' OR name ILIKE '%buying%live%'
+               OR name ILIKE '%cos%live%' OR name ILIKE '%cogs%live%' OR name ILIKE '%cost%live%')
+        ORDER BY
+          CASE WHEN name ILIKE '%live%buying%' OR name ILIKE '%buying%live%' THEN 0 ELSE 1 END, code
+        LIMIT 1`, [rec.company_id]);
+    if (!buyingRows[0]) return err('Cannot find "Live Buying" account. Create an expense account with "Live" and "Buying" in the name.', 400);
+    const liveBuyingAcctId = String(buyingRows[0].id);
 
-    // Sales-Live account: prioritise "Sales DR - Live" accounts (e.g. "Sales DR - Live Chicken")
+    // Sales DR - Live Chicken: revenue account
     const salesRows = await query<Record<string, unknown>>(
-      `SELECT id, code, name FROM accounts
+      `SELECT id FROM accounts
         WHERE company_id = $1 AND is_active = true
           AND (name ILIKE '%sales%dr%live%' OR name ILIKE '%sales%live%'
                OR name ILIKE '%revenue%live%' OR name ILIKE '%income%live%')
@@ -94,8 +98,20 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     if (!salesRows[0]) return err('Cannot find "Sales DR - Live" account. Create a revenue account with "Sales DR" and "Live" in the name.', 400);
     const salesLiveAcctId = String(salesRows[0].id);
 
+    // Chicken Trading cost center (for the DR Live Inventory line)
+    const ccRows = await query<Record<string, unknown>>(
+      `SELECT id FROM cost_centers
+        WHERE company_id = $1 AND is_active = true
+          AND (name ILIKE '%chicken%trading%' OR name ILIKE '%trading%chicken%'
+               OR name ILIKE '%live%trading%' OR name ILIKE '%trading%live%')
+        ORDER BY code LIMIT 1`, [rec.company_id]);
+    const chickenTradingCcId = ccRows[0] ? String(ccRows[0].id) : null;
+
+    // Destination branch (location for the DR Live Inventory line)
+    const destinationBranchId = rec.destination_id ? String(rec.destination_id) : null;
+
     const liveCostAmt = parseFloat(liveCost.toFixed(2));
-    const transferPriceAmt = parseFloat((transferPrice * Number(rec.net_kgs ?? 0)).toFixed(2));
+    const transferPriceAmt = parseFloat((pricePerKg * Number(rec.net_kgs ?? 0)).toFixed(2));
 
     // Post transfer JE in transaction
     const client = await getPool().connect();
@@ -117,26 +133,35 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
          rec.doc_no, `Transfer JE — ${rec.doc_no}`, params.id, auth.userId]);
       const jeId = jeInsert.rows[0].id as string;
 
-      // DR: Cos-Live = live cost
+      // Line 1 — DR: Live Buying = live cost (farm's cost of sales)
       await client.query(
-        `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
+        `INSERT INTO journal_entry_lines
+           (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
          VALUES ($1,1,$2,$3,$4,0,'PHP',1,$4,0)`,
-        [jeId, cosLiveAcctId, `Transfer — Cos-Live (${rec.doc_no})`, liveCostAmt]);
-      // DR: Invty-Live = transfer price
+        [jeId, liveBuyingAcctId, `Live Buying — ${rec.doc_no}`, liveCostAmt]);
+
+      // Line 2 — DR: Live Inventory = transfer price total (tagged with Chicken Trading CC + destination)
       await client.query(
-        `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
-         VALUES ($1,2,$2,$3,$4,0,'PHP',1,$4,0)`,
-        [jeId, invtyLiveAcctId, `Transfer — Invty-Live IN (${rec.doc_no})`, transferPriceAmt]);
-      // CR: Invty-Live = live cost
+        `INSERT INTO journal_entry_lines
+           (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit,
+            branch_id, cost_center_id)
+         VALUES ($1,2,$2,$3,$4,0,'PHP',1,$4,0, $5,$6)`,
+        [jeId, liveInvAcctId, `Live Inventory IN — ${rec.doc_no}`, transferPriceAmt,
+         destinationBranchId, chickenTradingCcId]);
+
+      // Line 3 — CR: Live Inventory = live cost (reducing farm stock)
       await client.query(
-        `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
+        `INSERT INTO journal_entry_lines
+           (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
          VALUES ($1,3,$2,$3,0,$4,'PHP',1,0,$4)`,
-        [jeId, invtyLiveAcctId, `Transfer — Invty-Live OUT (${rec.doc_no})`, liveCostAmt]);
-      // CR: Sales-Live = transfer price
+        [jeId, liveInvAcctId, `Live Inventory OUT — ${rec.doc_no}`, liveCostAmt]);
+
+      // Line 4 — CR: Sales DR - Live Chicken = transfer price total
       await client.query(
-        `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
+        `INSERT INTO journal_entry_lines
+           (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
          VALUES ($1,4,$2,$3,0,$4,'PHP',1,0,$4)`,
-        [jeId, salesLiveAcctId, `Transfer — Sales-Live (${rec.doc_no})`, transferPriceAmt]);
+        [jeId, salesLiveAcctId, `Sales DR - Live Chicken — ${rec.doc_no}`, transferPriceAmt]);
 
       await client.query(
         `INSERT INTO account_balances (account_id, fiscal_period_id, debit_total, credit_total)
