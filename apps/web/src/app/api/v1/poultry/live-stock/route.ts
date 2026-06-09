@@ -12,31 +12,31 @@ export async function GET(request: NextRequest) {
   if (!companyId) return err('company_id is required', 400);
 
   try {
+    // One row per tally sheet × item, using the pib balance for that tally sheet's warehouse only
     const rows = await query(
       `SELECT
-         pib.item_id,
-         SUM(pib.qty_heads) AS qty_heads,
-         SUM(pib.qty_kgs)   AS qty_kgs,
-         AVG(pib.avg_cost)  AS avg_cost,
-         i.sku, i.name AS item_name, i.uom,
-         latest.doc_no  AS tally_no,
-         latest.id      AS tally_id
-       FROM poultry_inventory_balance pib
-       JOIN items i ON i.id = pib.item_id
-       LEFT JOIN LATERAL (
-         SELECT t.id, t.doc_no
-           FROM tally_sheet_lines tsl
-           JOIN tally_sheets t ON t.id = tsl.tally_sheet_id
-          WHERE tsl.item_id = pib.item_id
-            AND t.company_id = $1
-            AND t.status = 'posted'
-          ORDER BY t.transfer_date DESC, t.created_at DESC
-          LIMIT 1
-       ) latest ON true
-       WHERE pib.company_id = $1 AND pib.qty_kgs > 0
-       GROUP BY pib.item_id, i.sku, i.name, i.uom, latest.doc_no, latest.id
-       HAVING SUM(pib.qty_kgs) > 0
-       ORDER BY i.sku`,
+         t.id          AS tally_id,
+         t.doc_no      AS tally_no,
+         tsl.item_id,
+         i.sku,
+         i.name        AS item_name,
+         i.uom,
+         COALESCE(pib.qty_heads, 0) AS qty_heads,
+         COALESCE(pib.qty_kgs,   0) AS qty_kgs,
+         COALESCE(pib.avg_cost,  0) AS avg_cost
+       FROM tally_sheets t
+       JOIN tally_sheet_lines tsl ON tsl.tally_sheet_id = t.id
+       JOIN items i ON i.id = tsl.item_id
+       LEFT JOIN poultry_inventory_balance pib
+         ON  pib.item_id     = tsl.item_id
+         AND pib.warehouse_id = t.warehouse_id
+         AND pib.company_id   = t.company_id
+       WHERE t.company_id = $1
+         AND t.status     = 'posted'
+         AND COALESCE(pib.qty_kgs, 0) > 0
+       GROUP BY t.id, t.doc_no, tsl.item_id, i.sku, i.name, i.uom,
+                pib.qty_heads, pib.qty_kgs, pib.avg_cost
+       ORDER BY t.transfer_date DESC, i.sku`,
       [companyId],
     );
 
