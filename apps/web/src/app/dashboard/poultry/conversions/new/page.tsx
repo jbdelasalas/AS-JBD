@@ -29,6 +29,8 @@ function readSeed(): ConversionSeed | null {
 interface SourceLine {
   item_id: string; item_sku: string; item_name: string;
   uom: string; available: number; heads: number; kgs: number;
+  doa_heads: number; doa_kgs: number;
+  short_over_heads: number; short_over_kgs: number;
 }
 interface OutputLine {
   output_item_id: string; item_sku: string; item_name: string;
@@ -68,18 +70,17 @@ function NewConversionForm() {
     target_branch_id: '',
     remarks: '',
     tally_sheet_id: seed?.tally_sheet_id ?? '',
-    doa_heads: '',  doa_kgs: '',
-    short_over_heads: '', short_over_kgs: '',
   });
 
   // Source item form (one at a time → added to table)
-  const [srcForm, setSrcForm] = useState({ item_id: '', heads: '', kgs: '' });
+  const [srcForm, setSrcForm] = useState({ item_id: '', heads: '', kgs: '', doa_heads: '', doa_kgs: '', short_over_heads: '', short_over_kgs: '' });
 
   // Pre-populate source lines from seed immediately (UOM filled in once items load)
   const [sourceLines, setSourceLines] = useState<SourceLine[]>(
     seed?.lines.map(l => ({
       item_id: l.item_id, item_sku: l.sku, item_name: l.item_name,
       uom: '', available: 0, heads: Number(l.heads), kgs: Number(l.net_kgs),
+      doa_heads: 0, doa_kgs: 0, short_over_heads: 0, short_over_kgs: 0,
     })) ?? []
   );
 
@@ -154,9 +155,13 @@ function NewConversionForm() {
       item_id: srcForm.item_id, item_sku: sku, item_name: name,
       uom, available: getAvailable(srcForm.item_id),
       heads: parseFloat(srcForm.heads) || 0, kgs: parseFloat(srcForm.kgs) || 0,
+      doa_heads: parseFloat(srcForm.doa_heads) || 0,
+      doa_kgs: parseFloat(srcForm.doa_kgs) || 0,
+      short_over_heads: parseFloat(srcForm.short_over_heads) || 0,
+      short_over_kgs: parseFloat(srcForm.short_over_kgs) || 0,
     }]);
     setOutForm(f => ({ ...f, price_per_kg: avgCost > 0 ? avgCost.toFixed(4) : f.price_per_kg }));
-    setSrcForm({ item_id: '', heads: '', kgs: '' });
+    setSrcForm({ item_id: '', heads: '', kgs: '', doa_heads: '', doa_kgs: '', short_over_heads: '', short_over_kgs: '' });
   }
 
   function addOutputLine() {
@@ -175,8 +180,12 @@ function NewConversionForm() {
     setOutForm(f => ({ output_item_id: '', category: '', heads: '', kgs: '', price_per_kg: f.price_per_kg, dressing_fee: '', delivery_ref_no: '' }));
   }
 
-  const totalSrcKgs      = sourceLines.reduce((s, l) => s + l.kgs, 0);
-  const totalSrcHeads    = sourceLines.reduce((s, l) => s + l.heads, 0);
+  const totalSrcKgs        = sourceLines.reduce((s, l) => s + l.kgs, 0);
+  const totalSrcHeads      = sourceLines.reduce((s, l) => s + l.heads, 0);
+  const totalDoaHeads      = sourceLines.reduce((s, l) => s + l.doa_heads, 0);
+  const totalDoaKgs        = sourceLines.reduce((s, l) => s + l.doa_kgs, 0);
+  const totalShortOvrHeads = sourceLines.reduce((s, l) => s + l.short_over_heads, 0);
+  const totalShortOvrKgs   = sourceLines.reduce((s, l) => s + l.short_over_kgs, 0);
   const totalOutKgs      = outputLines.reduce((s, l) => s + l.kgs, 0);
   const totalOutHeads    = outputLines.reduce((s, l) => s + l.heads, 0);
   const totalOutAmount   = outputLines.reduce((s, l) => s + l.kgs * l.price_per_kg, 0);
@@ -204,10 +213,10 @@ function NewConversionForm() {
         source_item_id:    primary.item_id,
         source_heads:      totalSrcHeads,
         source_kgs:        totalSrcKgs,
-        doa_heads:         parseFloat(form.doa_heads) || 0,
-        doa_kgs:           parseFloat(form.doa_kgs) || 0,
-        short_over_heads:  parseFloat(form.short_over_heads) || 0,
-        short_over_kgs:    parseFloat(form.short_over_kgs) || 0,
+        doa_heads:         totalDoaHeads,
+        doa_kgs:           totalDoaKgs,
+        short_over_heads:  totalShortOvrHeads,
+        short_over_kgs:    totalShortOvrKgs,
         outputs: outputLines.map(o => ({
           output_item_id:  o.output_item_id,
           category:        o.category || null,
@@ -324,15 +333,35 @@ function NewConversionForm() {
                   {srcForm.item_id ? getAvailable(srcForm.item_id).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                 </div>
               </div>
-              <div className="w-24">
+              <div className="w-20">
                 <label className={lbl}>Heads</label>
                 <input type="number" min={0} className={inp} value={srcForm.heads}
                   onChange={e => setSrcForm(f => ({ ...f, heads: e.target.value }))} />
               </div>
-              <div className="w-28">
-                <label className={lbl}>Quantity (KGS)</label>
+              <div className="w-24">
+                <label className={lbl}>KGS</label>
                 <input type="number" min={0} step="any" className={inp} value={srcForm.kgs}
                   onChange={e => setSrcForm(f => ({ ...f, kgs: e.target.value }))} />
+              </div>
+              <div className="w-20">
+                <label className={lbl}>DOA Heads</label>
+                <input type="number" min={0} className={inp} value={srcForm.doa_heads}
+                  onChange={e => setSrcForm(f => ({ ...f, doa_heads: e.target.value }))} placeholder="0" />
+              </div>
+              <div className="w-20">
+                <label className={lbl}>DOA KGS</label>
+                <input type="number" min={0} step="any" className={inp} value={srcForm.doa_kgs}
+                  onChange={e => setSrcForm(f => ({ ...f, doa_kgs: e.target.value }))} placeholder="0" />
+              </div>
+              <div className="w-24">
+                <label className={lbl}>S/O Heads</label>
+                <input type="number" step="any" className={inp} value={srcForm.short_over_heads}
+                  onChange={e => setSrcForm(f => ({ ...f, short_over_heads: e.target.value }))} placeholder="0" />
+              </div>
+              <div className="w-24">
+                <label className={lbl}>S/O KGS</label>
+                <input type="number" step="any" className={inp} value={srcForm.short_over_kgs}
+                  onChange={e => setSrcForm(f => ({ ...f, short_over_kgs: e.target.value }))} placeholder="0" />
               </div>
               <button type="button" onClick={addSourceLine}
                 className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-brand-400 text-brand-500 hover:bg-brand-50 text-lg font-light">
@@ -343,17 +372,21 @@ function NewConversionForm() {
             <table className="min-w-full text-xs">
               <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500">
                 <tr>
-                  <th className="px-3 py-2 text-left font-medium">Line No.</th>
+                  <th className="px-3 py-2 text-left font-medium">#</th>
                   <th className="px-3 py-2 text-left font-medium">Item</th>
                   <th className="px-3 py-2 text-left font-medium">Unit</th>
                   <th className="px-3 py-2 text-right font-medium">Heads</th>
-                  <th className="px-3 py-2 text-right font-medium">Quantity (KGS)</th>
+                  <th className="px-3 py-2 text-right font-medium">KGS</th>
+                  <th className="px-3 py-2 text-right font-medium">DOA Heads</th>
+                  <th className="px-3 py-2 text-right font-medium">DOA KGS</th>
+                  <th className="px-3 py-2 text-right font-medium">S/O Heads</th>
+                  <th className="px-3 py-2 text-right font-medium">S/O KGS</th>
                   <th className="px-3 py-2 text-left font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {sourceLines.length === 0 ? (
-                  <tr><td colSpan={6} className="px-3 py-4 text-center text-slate-400">No data available in table</td></tr>
+                  <tr><td colSpan={10} className="px-3 py-4 text-center text-slate-400">No data available in table</td></tr>
                 ) : sourceLines.map((l, i) => (
                   <tr key={i} className="border-b border-slate-50 dark:border-slate-700 last:border-0">
                     <td className="px-3 py-2 text-slate-400">{i + 1}</td>
@@ -361,6 +394,10 @@ function NewConversionForm() {
                     <td className="px-3 py-2 text-slate-500">{l.uom}</td>
                     <td className="px-3 py-2 text-right font-mono">{l.heads.toLocaleString()}</td>
                     <td className="px-3 py-2 text-right font-mono">{l.kgs.toFixed(6)}</td>
+                    <td className="px-3 py-2 text-right font-mono">{l.doa_heads || '—'}</td>
+                    <td className="px-3 py-2 text-right font-mono">{l.doa_kgs ? l.doa_kgs.toFixed(4) : '—'}</td>
+                    <td className="px-3 py-2 text-right font-mono">{l.short_over_heads || '—'}</td>
+                    <td className="px-3 py-2 text-right font-mono">{l.short_over_kgs ? l.short_over_kgs.toFixed(4) : '—'}</td>
                     <td className="px-3 py-2">
                       <button type="button" onClick={() => setSourceLines(prev => prev.filter((_, j) => j !== i))}
                         className="text-xs text-red-500 hover:text-red-700">Remove</button>
@@ -374,36 +411,16 @@ function NewConversionForm() {
                     <td colSpan={3} className="px-3 py-2 text-right text-xs font-medium text-slate-500">Total</td>
                     <td className="px-3 py-2 text-right font-mono font-semibold">{totalSrcHeads.toLocaleString()}</td>
                     <td className="px-3 py-2 text-right font-mono font-semibold">{totalSrcKgs.toFixed(6)}</td>
+                    <td className="px-3 py-2 text-right font-mono font-semibold">{totalDoaHeads || ''}</td>
+                    <td className="px-3 py-2 text-right font-mono font-semibold">{totalDoaKgs ? totalDoaKgs.toFixed(4) : ''}</td>
+                    <td className="px-3 py-2 text-right font-mono font-semibold">{totalShortOvrHeads || ''}</td>
+                    <td className="px-3 py-2 text-right font-mono font-semibold">{totalShortOvrKgs ? totalShortOvrKgs.toFixed(4) : ''}</td>
                     <td />
                   </tr>
                 </tfoot>
               )}
             </table>
 
-            {/* DOA + Short/Over */}
-            <div className="mt-5 grid grid-cols-4 gap-x-8 gap-y-4 border-t border-slate-100 dark:border-slate-700 pt-5">
-              <div className="col-span-4 text-xs font-semibold uppercase tracking-wider text-slate-400">DOA &amp; Variance</div>
-              <div>
-                <label className={lbl}>DOA Heads</label>
-                <input type="number" min={0} className={inp} value={form.doa_heads}
-                  onChange={e => setForm(f => ({ ...f, doa_heads: e.target.value }))} placeholder="0" />
-              </div>
-              <div>
-                <label className={lbl}>DOA KGS</label>
-                <input type="number" min={0} step="any" className={inp} value={form.doa_kgs}
-                  onChange={e => setForm(f => ({ ...f, doa_kgs: e.target.value }))} placeholder="0" />
-              </div>
-              <div>
-                <label className={lbl}>Short / Over Heads</label>
-                <input type="number" step="any" className={inp} value={form.short_over_heads}
-                  onChange={e => setForm(f => ({ ...f, short_over_heads: e.target.value }))} placeholder="0 (− short, + over)" />
-              </div>
-              <div>
-                <label className={lbl}>Short / Over KGS</label>
-                <input type="number" step="any" className={inp} value={form.short_over_kgs}
-                  onChange={e => setForm(f => ({ ...f, short_over_kgs: e.target.value }))} placeholder="0 (− short, + over)" />
-              </div>
-            </div>
           </div>
         </div>
 
