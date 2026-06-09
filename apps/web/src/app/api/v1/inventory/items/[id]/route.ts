@@ -69,6 +69,16 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
   let body: Record<string, unknown>;
   try { body = await request.json(); } catch { return err('Invalid request body', 400); }
 
+  // Ensure dr_revenue_account_id column exists (added in a later migration)
+  await query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS dr_revenue_account_id uuid`, []).catch(() => {});
+
+  // Check which columns exist (dr_revenue_account_id may not be migrated yet)
+  const colRows = await query<{ column_name: string }>(
+    `SELECT column_name FROM information_schema.columns WHERE table_name = 'items'`,
+    [],
+  );
+  const existingCols = new Set(colRows.map(c => c.column_name));
+
   const allowed = ['sku', 'name', 'uom', 'item_type', 'costing_method',
     'standard_cost', 'selling_price', 'reorder_point', 'category_id', 'is_active',
     'inventory_account_id', 'cogs_account_id', 'revenue_account_id', 'purchase_variance_account_id',
@@ -77,7 +87,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
   const vals: unknown[] = [];
 
   for (const col of allowed) {
-    if (col in body) {
+    if (col in body && existingCols.has(col)) {
       sets.push(`${col} = $${vals.length + 1}`);
       vals.push(body[col]);
     }
