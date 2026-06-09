@@ -15,6 +15,10 @@ interface CompanyForm {
 const EMPTY: CompanyForm = { name: '', legal_name: '', tin: '', rdo_code: '', address: '', phone: '', email: '', website: '', logo: null };
 
 export default function AdminHomePage() {
+  const isSuperadmin = typeof window !== 'undefined'
+    ? (() => { try { return JSON.parse(localStorage.getItem('user') ?? 'null')?.is_superadmin === true; } catch { return false; } })()
+    : false;
+
   const [theme, setTheme] = useState<ThemeKey>("blue");
   const [bgPreview, setBgPreview] = useState<string | null>(null);
   const [brandSaved, setBrandSaved] = useState(false);
@@ -28,6 +32,32 @@ export default function AdminHomePage() {
   const [companySaving, setCompanySaving] = useState(false);
   const [companyLoading, setCompanyLoading] = useState(true);
   const [companyError, setCompanyError] = useState<string | null>(null);
+
+  const [wiping, setWiping] = useState(false);
+  const [wipeResult, setWipeResult] = useState<string | null>(null);
+
+  async function handleWipe() {
+    const compId = localStorage.getItem('company_id');
+    if (!compId) { setWipeResult('No company_id found.'); return; }
+    if (!confirm('PERMANENT: Delete ALL transactional data for this company?\n\nPO, GR, Bills, Payments, SO, SI, DR, Allocations, Grow Cycles, Tally Sheets, Journal Entries, Conversions and all related records will be permanently deleted. Master data will be kept.\n\nThis cannot be undone.')) return;
+    setWiping(true);
+    setWipeResult(null);
+    try {
+      const token = localStorage.getItem('access_token');
+      const res = await fetch('/api/v1/admin/wipe-transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ company_id: compId }),
+      });
+      const data = await res.json() as { data?: { message: string }; error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setWipeResult(data.data?.message ?? 'Done.');
+    } catch (e: unknown) {
+      setWipeResult(`Error: ${(e as Error).message}`);
+    } finally {
+      setWiping(false);
+    }
+  }
 
   useEffect(() => {
     setTheme(getBrandingTheme());
@@ -278,6 +308,31 @@ export default function AdminHomePage() {
           {brandSaved ? 'Saved!' : 'Save branding'}
         </button>
       </div>
+
+      {/* ── Danger Zone (superadmin only) ── */}
+      {isSuperadmin && (
+        <div className="rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950 p-6">
+          <h2 className="mb-1 text-sm font-semibold text-red-700 dark:text-red-400">Danger Zone</h2>
+          <p className="mb-4 text-xs text-red-600 dark:text-red-400">These actions are permanent and cannot be undone.</p>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleWipe}
+              disabled={wiping}
+              className="rounded border border-red-500 bg-white dark:bg-red-900 px-4 py-2 text-sm font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-800 disabled:opacity-60"
+            >
+              {wiping ? 'Wiping…' : 'Wipe all transaction data'}
+            </button>
+            {wipeResult && (
+              <span className={`text-xs ${wipeResult.startsWith('Error') ? 'text-red-600' : 'text-green-600 dark:text-green-400'}`}>
+                {wipeResult}
+              </span>
+            )}
+          </div>
+          <p className="mt-2 text-[11px] text-red-500 dark:text-red-500">
+            Deletes PO, GR, Bills, Payments, SO, SI, DR, Allocations, Grow Cycles, Tally Sheets, Journal Entries, Conversions. Master data (items, suppliers, customers, accounts, etc.) is preserved.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
