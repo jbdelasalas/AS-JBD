@@ -317,8 +317,8 @@ function NewConversionForm() {
                 }}>
                   <option value="">{liveStock.length ? 'Select item…' : 'No live inventory available'}</option>
                   {liveStock.map(s => {
-                    const ref = s.tally_no ? ` · ${s.tally_no}` : '';
-                    return <option key={s.item_id} value={s.item_id}>{s.sku} — {s.item_name} ({s.qty_kgs.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KGS avail.{ref})</option>;
+                    const ref = s.tally_no ? `[${s.tally_no}] ` : '';
+                    return <option key={s.item_id} value={s.item_id}>{ref}{s.sku} — {s.item_name} ({s.qty_heads.toLocaleString('en-PH')} heads · {s.qty_kgs.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KGS avail.)</option>;
                   })}
                 </select>
               </div>
