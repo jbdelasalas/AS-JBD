@@ -95,7 +95,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     const salesLiveAcctId = String(salesRows[0].id);
 
     const liveCostAmt = parseFloat(liveCost.toFixed(2));
-    const transferPriceAmt = parseFloat(transferPrice.toFixed(2));
+    const transferPriceAmt = parseFloat((transferPrice * Number(rec.net_kgs ?? 0)).toFixed(2));
 
     // Post transfer JE in transaction
     const client = await getPool().connect();

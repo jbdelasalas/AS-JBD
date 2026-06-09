@@ -722,7 +722,7 @@ export default function TallySheetDetailPage() {
 
             {/* Transfer price input — above table so amounts update live */}
             <div className="mb-4">
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Transfer Price — Total Amount (₱) *</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Transfer Price per KG (₱/kg) *</label>
               <input
                 type="number" min="0" step="0.01"
                 value={transferPrice}
@@ -741,7 +741,8 @@ export default function TallySheetDetailPage() {
             ) : (
               (() => {
                 const liveCostAmt  = preview?.live_cost ?? 0;
-                const transferAmt  = parseFloat(transferPrice) || 0;
+                const pricePerKg   = parseFloat(transferPrice) || 0;
+                const transferAmt  = parseFloat((pricePerKg * (preview?.net_kgs ?? 0)).toFixed(2));
                 const fmt = (n: number) => n > 0 ? `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
                 const accts = preview?.accounts;
                 return (
@@ -803,6 +804,7 @@ export default function TallySheetDetailPage() {
                       <div className="border-t border-slate-200 dark:border-slate-700 px-3 py-2 text-xs text-slate-400 flex gap-4">
                         <span>Live cost: <strong className="text-slate-600 dark:text-slate-300">₱{liveCostAmt.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</strong></span>
                         <span>KGS: <strong className="text-slate-600 dark:text-slate-300">{preview.net_kgs.toFixed(4)}</strong></span>
+                        {pricePerKg > 0 && <span>Transfer total: <strong className="text-slate-600 dark:text-slate-300">₱{transferAmt.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</strong></span>}
                         <span>Heads: <strong className="text-slate-600 dark:text-slate-300">{preview.net_heads.toLocaleString()}</strong></span>
                       </div>
                     )}
