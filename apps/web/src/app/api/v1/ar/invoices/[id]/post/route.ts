@@ -126,12 +126,25 @@ export async function POST(
     const vatAccountId = vatAccountRows.rows[0]?.id;
 
     const invoiceLines = await client.query(
-      `SELECT sil.*, i.revenue_account_id AS item_revenue_acct,
-              i.dr_revenue_account_id AS item_dr_revenue_acct
+      `SELECT sil.*, i.revenue_account_id AS item_revenue_acct
          FROM sales_invoice_lines sil LEFT JOIN items i ON i.id = sil.item_id
         WHERE sil.invoice_id = $1`,
       [id],
     );
+
+    // Fetch dr_revenue_account_id separately — column may not exist yet if migration hasn't run
+    const drRevMap = new Map<string, string>();
+    try {
+      const drRevRows = await client.query(
+        `SELECT sil.id, i.dr_revenue_account_id
+           FROM sales_invoice_lines sil LEFT JOIN items i ON i.id = sil.item_id
+          WHERE sil.invoice_id = $1`,
+        [id],
+      );
+      for (const r of drRevRows.rows as Array<{ id: string; dr_revenue_account_id: string | null }>) {
+        if (r.dr_revenue_account_id) drRevMap.set(r.id, r.dr_revenue_account_id);
+      }
+    } catch { /* column doesn't exist yet — fall back to no DR revenue reclassification */ }
 
     const total = Number(inv.total);
     const vatAmount = Number(inv.vat_amount);
@@ -172,7 +185,7 @@ export async function POST(
       if (!revenueAcct) continue;
       const lineSubtotal = Number(l.line_subtotal);
       if (isFromDR) {
-        const drRevenueAcct = l.item_dr_revenue_acct as string | null;
+        const drRevenueAcct = drRevMap.get(l.id as string) ?? null;
         if (drRevenueAcct) {
           // Dr Sales DR Revenue Account (reverse interim revenue booked at DR posting)
           await client.query(
