@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useTaggingData } from '@/hooks/useTaggingData';
 import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
@@ -33,8 +33,34 @@ const EMPTY_LINE: Line = {
   branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '',
 };
 
+interface SOLine {
+  item_id: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  vat_rate: number;
+  item_uom?: string | null;
+  branch_id?: string | null;
+  building_id?: string | null;
+  cost_center_id?: string | null;
+  grow_reference_id?: string | null;
+}
+interface SO {
+  id: string;
+  delivery_date: string | null;
+  notes: string | null;
+  reference: string | null;
+  branch_id?: string | null;
+  building_id?: string | null;
+  cost_center_id?: string | null;
+  grow_reference_id?: string | null;
+  lines?: SOLine[];
+}
+
 export default function NewPurchaseOrderPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromSoId = searchParams.get('from_so');
   const tagData = useTaggingData();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [items, setItems]         = useState<Item[]>([]);
@@ -58,6 +84,41 @@ export default function NewPurchaseOrderPage() {
     api.get<Item[]>(`/inventory/items?company_id=${cid}&limit=500&minimal=true`).then(r => setItems(Array.isArray(r) ? r : [])).catch(() => {});
     api.get<{ data: Account[] }>(`/gl/accounts?company_id=${cid}&limit=500`).then(r => setAccounts(r.data ?? [])).catch(() => {});
   }, []);
+
+  // Pre-fill from Sales Order
+  useEffect(() => {
+    if (!fromSoId) return;
+    api.get<SO>(`/sales/orders/${fromSoId}`).then(so => {
+      const soTags: TaggingValues = {
+        branch_id: so.branch_id ?? '',
+        building_id: so.building_id ?? '',
+        cost_center_id: so.cost_center_id ?? '',
+        grow_reference_id: so.grow_reference_id ?? '',
+      };
+      setTags(soTags);
+      setForm(f => ({
+        ...f,
+        expected_date: so.delivery_date ?? '',
+        remarks: [so.reference, so.notes].filter(Boolean).join(' — ') || '',
+      }));
+      if (so.lines?.length) {
+        setLines(so.lines.map(l => ({
+          ...EMPTY_LINE,
+          line_type: 'item' as const,
+          item_id: l.item_id ?? '',
+          description: l.description,
+          quantity: Number(l.quantity),
+          unit_price: Number(l.unit_price),
+          vat_rate: Number(l.vat_rate),
+          uom: l.item_uom ?? '',
+          branch_id: l.branch_id ?? soTags.branch_id,
+          building_id: l.building_id ?? soTags.building_id,
+          cost_center_id: l.cost_center_id ?? soTags.cost_center_id,
+          grow_reference_id: l.grow_reference_id ?? soTags.grow_reference_id,
+        })));
+      }
+    }).catch(() => {});
+  }, [fromSoId]);
 
   // When a header tag changes, propagate to all lines
   function handleTagChange(field: keyof TaggingValues, val: string) {
@@ -125,7 +186,9 @@ export default function NewPurchaseOrderPage() {
   return (
     <div>
       <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">New Purchase Order</h1>
-      <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">Create a draft PO — submit for approval when ready.</p>
+      <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">
+        {fromSoId ? 'Pre-filled from Sales Order — select a supplier to complete.' : 'Create a draft PO — submit for approval when ready.'}
+      </p>
       {error && <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">{error}</div>}
 
       <form onSubmit={handleSubmit} className="space-y-5">

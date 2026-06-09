@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useTaggingData } from '@/hooks/useTaggingData';
 import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
@@ -37,8 +37,34 @@ const EMPTY_LINE: Line = {
   branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '',
 };
 
+interface POLineRef {
+  item_id: string | null;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  vat_rate: number;
+  item_uom?: string | null;
+  branch_id?: string | null;
+  building_id?: string | null;
+  cost_center_id?: string | null;
+  grow_reference_id?: string | null;
+}
+interface PORef {
+  id: string;
+  expected_date: string | null;
+  remarks: string | null;
+  supplier_terms?: number | null;
+  branch_id?: string | null;
+  building_id?: string | null;
+  cost_center_id?: string | null;
+  grow_reference_id?: string | null;
+  lines?: POLineRef[];
+}
+
 export default function NewSalesOrderPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromPoId = searchParams.get('from_po');
   const tagData = useTaggingData();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [items, setItems]         = useState<Item[]>([]);
@@ -66,6 +92,45 @@ export default function NewSalesOrderPage() {
     api.get<Item[]>(`/inventory/items?company_id=${cid}&limit=200`).then(i => setItems(i)).catch(() => {});
     api.get<{ data: Account[] }>(`/gl/accounts?company_id=${cid}&limit=500`).then(r => setAccounts(r.data ?? [])).catch(() => {});
   }, []);
+
+  // Pre-fill from Purchase Order
+  useEffect(() => {
+    if (!fromPoId) return;
+    api.get<PORef>(`/purchasing/purchase-orders/${fromPoId}`).then(po => {
+      const poTags: TaggingValues = {
+        branch_id: po.branch_id ?? '',
+        building_id: po.building_id ?? '',
+        cost_center_id: po.cost_center_id ?? '',
+        grow_reference_id: po.grow_reference_id ?? '',
+      };
+      setTags(poTags);
+      setForm(f => ({
+        ...f,
+        delivery_date: po.expected_date ?? '',
+        payment_terms_days: po.supplier_terms ?? 30,
+        notes: po.remarks ?? '',
+      }));
+      if (po.lines?.length) {
+        setLines(po.lines
+          .filter(l => l.item_id)
+          .map(l => ({
+            ...EMPTY_LINE,
+            line_type: 'item' as const,
+            item_id: l.item_id ?? '',
+            description: l.description,
+            quantity: Number(l.quantity),
+            unit_price: Number(l.unit_price),
+            vat_rate: Number(l.vat_rate),
+            discount_pct: 0,
+            uom: l.item_uom ?? '',
+            branch_id: l.branch_id ?? poTags.branch_id,
+            building_id: l.building_id ?? poTags.building_id,
+            cost_center_id: l.cost_center_id ?? poTags.cost_center_id,
+            grow_reference_id: l.grow_reference_id ?? poTags.grow_reference_id,
+          })));
+      }
+    }).catch(() => {});
+  }, [fromPoId]);
 
   function handleTagChange(field: keyof TaggingValues, val: string) {
     setTags(t => ({ ...t, [field]: val }));
@@ -155,7 +220,9 @@ export default function NewSalesOrderPage() {
   return (
     <div>
       <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">New Sales Order</h1>
-      <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">Fill in the order details and line items.</p>
+      <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">
+        {fromPoId ? 'Pre-filled from Purchase Order — select a customer to complete.' : 'Fill in the order details and line items.'}
+      </p>
 
       {error && <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 

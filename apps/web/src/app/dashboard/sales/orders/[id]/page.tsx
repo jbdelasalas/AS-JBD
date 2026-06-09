@@ -313,6 +313,10 @@ export default function SalesOrderDetailPage() {
                   </button>
                 </>
               )}
+              <Link href={`/dashboard/purchasing/purchase-orders/new?from_so=${id}`}
+                className="rounded border border-brand-500 px-5 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 dark:border-brand-500 dark:text-brand-400 dark:hover:bg-brand-900/20">
+                Create PO
+              </Link>
               <button onClick={() => setShowCancel(true)} disabled={busy}
                 className="rounded border border-red-300 px-5 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950">
                 Cancel Order
