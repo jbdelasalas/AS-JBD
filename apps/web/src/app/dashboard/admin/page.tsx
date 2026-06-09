@@ -75,7 +75,7 @@ export default function AdminHomePage() {
       .finally(() => setCompanyLoading(false));
   }, []);
 
-  function compressImage(dataUrl: string, maxPx = 400): Promise<string> {
+  function compressImage(dataUrl: string, maxPx = 1024): Promise<string> {
     return new Promise((resolve) => {
       const img = new Image();
       img.onerror = () => resolve(dataUrl);
@@ -83,13 +83,17 @@ export default function AdminHomePage() {
         // If it fits within maxPx, return as-is — PNG transparency is preserved
         if (img.width <= maxPx && img.height <= maxPx) { resolve(dataUrl); return; }
         try {
+          // Scale down keeping the original aspect ratio (longest side -> maxPx)
           let w = img.width, h = img.height;
           if (w >= h) { h = Math.round(h * maxPx / w); w = maxPx; }
           else { w = Math.round(w * maxPx / h); h = maxPx; }
           const canvas = document.createElement('canvas');
           canvas.width = w;
           canvas.height = h;
-          canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+          const ctx = canvas.getContext('2d')!;
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, w, h);
           resolve(canvas.toDataURL('image/png')); // PNG preserves transparency
         } catch {
           resolve(dataUrl);
