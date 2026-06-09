@@ -3,10 +3,11 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 
-interface Item     { id: string; sku: string; name: string; uom: string; }
-interface Location { id: string; code: string; name: string; warehouse_id: string | null; }
-interface POOption { id: string; po_no: string; supplier_name: string; }
-interface StockBal { item_id: string; qty_on_hand: number; warehouse_id: string; avg_cost: number; }
+interface Item      { id: string; sku: string; name: string; uom: string; }
+interface Location  { id: string; code: string; name: string; warehouse_id: string | null; }
+interface POOption  { id: string; po_no: string; supplier_name: string; }
+interface StockBal  { item_id: string; qty_on_hand: number; warehouse_id: string; avg_cost: number; }
+interface LiveStock { item_id: string; qty_heads: number; qty_kgs: number; avg_cost: number; sku: string; item_name: string; uom: string; tally_no: string | null; tally_id: string | null; }
 
 interface ConversionSeed {
   tally_sheet_id: string;
@@ -51,6 +52,7 @@ function NewConversionForm() {
   const [seed] = useState<ConversionSeed | null>(readSeed);
 
   const [items, setItems]         = useState<Item[]>([]);
+  const [liveStock, setLiveStock] = useState<LiveStock[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [pos, setPos]             = useState<POOption[]>([]);
   const [stock, setStock]         = useState<StockBal[]>([]);
@@ -85,7 +87,7 @@ function NewConversionForm() {
   const [outForm, setOutForm] = useState({ output_item_id: '', category: '', heads: '', kgs: '', price_per_kg: '', dressing_fee: '', delivery_ref_no: '' });
   const [outputLines, setOutputLines] = useState<OutputLine[]>([]);
 
-  // Load reference data; patch UOM into pre-populated lines once items arrive
+  // Load reference data
   useEffect(() => {
     const cid = localStorage.getItem('company_id'); if (!cid) return;
     api.get<Item[]>(`/inventory/items?company_id=${cid}&minimal=true`)
@@ -98,7 +100,15 @@ function NewConversionForm() {
           })));
         }
       }).catch(() => {});
-    api.get<Location[]>(`/inventory/locations?company_id=${cid}`).then(r => setLocations(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<LiveStock[]>(`/poultry/live-stock?company_id=${cid}`)
+      .then(r => setLiveStock(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<Location[]>(`/inventory/locations?company_id=${cid}`).then(r => {
+      const locs = Array.isArray(r) ? r : [];
+      setLocations(locs);
+      // Auto-set target to Chicken Trading location
+      const ct = locs.find(l => l.name.toLowerCase().includes('chicken trading') || l.code.toLowerCase().includes('ct'));
+      if (ct) setForm(f => ({ ...f, target_branch_id: ct.id }));
+    }).catch(() => {});
     api.get<{ data: POOption[] }>(`/purchasing/purchase-orders?company_id=${cid}&status=approved&limit=200`).then(r => setPos(r.data ?? [])).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -115,31 +125,36 @@ function NewConversionForm() {
       .catch(() => {});
   }, [form.branch_id, locations]);
 
-  const sourceItemIds = new Set(stock.filter(s => s.qty_on_hand > 0).map(s => s.item_id));
-  const sourceItems = form.branch_id ? items.filter(i => sourceItemIds.has(i.id)) : [];
-
   function getAvailable(itemId: string) {
-    return stock.filter(s => s.item_id === itemId).reduce((t, s) => t + Number(s.qty_on_hand), 0);
+    return liveStock.filter(s => s.item_id === itemId).reduce((t, s) => t + s.qty_kgs, 0);
   }
 
   function getAvgCost(itemId: string) {
-    const rows = stock.filter(s => s.item_id === itemId);
-    const totalQty = rows.reduce((t, s) => t + Number(s.qty_on_hand), 0);
+    const rows = liveStock.filter(s => s.item_id === itemId);
+    const totalQty = rows.reduce((t, s) => t + s.qty_kgs, 0);
     if (totalQty <= 0) return 0;
-    return rows.reduce((t, s) => t + Number(s.qty_on_hand) * Number(s.avg_cost), 0) / totalQty;
+    return rows.reduce((t, s) => t + s.qty_kgs * s.avg_cost, 0) / totalQty;
+  }
+
+  function getLiveRef(itemId: string) {
+    const row = liveStock.find(s => s.item_id === itemId);
+    return row?.tally_no ?? null;
   }
 
   function addSourceLine() {
     if (!srcForm.item_id) return;
-    const item = items.find(i => i.id === srcForm.item_id);
+    const live = liveStock.find(s => s.item_id === srcForm.item_id);
+    const item = live ?? items.find(i => i.id === srcForm.item_id);
     if (!item) return;
+    const sku  = live ? live.sku       : (item as Item).sku;
+    const name = live ? live.item_name : (item as Item).name;
+    const uom  = live ? live.uom       : (item as Item).uom;
     const avgCost = getAvgCost(srcForm.item_id);
     setSourceLines(prev => [...prev, {
-      item_id: srcForm.item_id, item_sku: item.sku, item_name: item.name,
-      uom: item.uom, available: getAvailable(srcForm.item_id),
+      item_id: srcForm.item_id, item_sku: sku, item_name: name,
+      uom, available: getAvailable(srcForm.item_id),
       heads: parseFloat(srcForm.heads) || 0, kgs: parseFloat(srcForm.kgs) || 0,
     }]);
-    // Auto-fill price_per_kg for output lines from source item avg cost
     setOutForm(f => ({ ...f, price_per_kg: avgCost > 0 ? avgCost.toFixed(4) : f.price_per_kg }));
     setSrcForm({ item_id: '', heads: '', kgs: '' });
   }
@@ -275,22 +290,38 @@ function NewConversionForm() {
             <div className="mb-3 flex items-end gap-4">
               <div className="flex-1">
                 <label className={lbl}>Item *</label>
-                <select className={sel} value={srcForm.item_id} onChange={e => setSrcForm(f => ({ ...f, item_id: e.target.value }))}
-                  disabled={!form.branch_id}>
-                  <option value="">{form.branch_id ? (sourceItems.length ? 'Select item…' : 'No stock at this location') : 'Select source location first…'}</option>
-                  {sourceItems.map(i => <option key={i.id} value={i.id}>{i.sku} — {i.name} ({getAvailable(i.id).toLocaleString()} avail.)</option>)}
+                <select className={sel} value={srcForm.item_id} onChange={e => {
+                  const itemId = e.target.value;
+                  setSrcForm(f => ({ ...f, item_id: itemId }));
+                  // Auto-fill source branch from the tally sheet that sourced this stock
+                  if (itemId) {
+                    const live = liveStock.find(s => s.item_id === itemId);
+                    if (live?.tally_id) {
+                      api.get<Record<string, unknown>>(`/poultry/tally-sheets/${live.tally_id}`)
+                        .then(t => {
+                          const src = (t.destination_id ?? t.branch_id) as string | null;
+                          if (src) setForm(f => ({ ...f, branch_id: src, tally_sheet_id: live.tally_id ?? f.tally_sheet_id }));
+                        }).catch(() => {});
+                    }
+                  }
+                }}>
+                  <option value="">{liveStock.length ? 'Select item…' : 'No live inventory available'}</option>
+                  {liveStock.map(s => {
+                    const ref = s.tally_no ? ` · ${s.tally_no}` : '';
+                    return <option key={s.item_id} value={s.item_id}>{s.sku} — {s.item_name} ({s.qty_kgs.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KGS avail.{ref})</option>;
+                  })}
                 </select>
               </div>
               <div className="w-20">
                 <label className={lbl}>Unit</label>
                 <div className="border-b border-slate-200 py-1 text-sm text-slate-500">
-                  {items.find(i => i.id === srcForm.item_id)?.uom ?? '—'}
+                  {liveStock.find(s => s.item_id === srcForm.item_id)?.uom ?? '—'}
                 </div>
               </div>
               <div className="w-24">
                 <label className={lbl}>Available</label>
                 <div className="border-b border-slate-200 py-1 text-sm text-slate-500">
-                  {srcForm.item_id ? getAvailable(srcForm.item_id).toLocaleString() : '—'}
+                  {srcForm.item_id ? getAvailable(srcForm.item_id).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                 </div>
               </div>
               <div className="w-24">
