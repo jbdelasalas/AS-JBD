@@ -73,6 +73,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       `SELECT inventory_account_id, name FROM items WHERE id = $1`, [rec.live_item_id]);
     if (!liveItem?.inventory_account_id) return err('Live item has no inventory account set. Set it in Item Setup → Inventory Account.', 400);
     const liveInvAcctId = String(liveItem.inventory_account_id);
+    const liveItemId = String(rec.live_item_id);
 
     // Live Buying account: expense account matching "live buying" / fallback cos+live
     const buyingRows = await query<Record<string, unknown>>(
@@ -107,13 +108,38 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         ORDER BY code LIMIT 1`, [rec.company_id]);
     const chickenTradingCcId = ccRows[0] ? String(ccRows[0].id) : null;
 
-    // Destination branch (location for the DR Live Inventory line)
-    const destinationBranchId = rec.destination_id ? String(rec.destination_id) : null;
+    // Chicken Trading location (branch + warehouse) — destination for the live stock
+    const locRows = await query<Record<string, unknown>>(
+      `SELECT b.id AS branch_id, w.id AS warehouse_id
+         FROM branches b
+         LEFT JOIN warehouses w ON w.branch_id = b.id
+        WHERE b.company_id = $1 AND b.is_active = true
+          AND (b.name ILIKE '%chicken%trading%' OR b.name ILIKE '%trading%chicken%'
+               OR b.name ILIKE '%live%trading%' OR b.name ILIKE '%trading%live%')
+        ORDER BY b.code LIMIT 1`, [rec.company_id]);
+    if (!locRows[0]) return err('Cannot find "Chicken Trading" location. Create a Location named "Chicken Trading" under Inventory → Locations.', 400);
+    const tradingBranchId = String(locRows[0].branch_id);
+    const tradingWarehouseId = locRows[0].warehouse_id ? String(locRows[0].warehouse_id) : null;
+    if (!tradingWarehouseId) return err('"Chicken Trading" location has no warehouse. Re-create it under Inventory → Locations so a warehouse is generated.', 400);
+
+    // Resolve SOURCE warehouses, mirroring how the post route wrote the stock:
+    //  • poultry_inventory_balance was written at rec.warehouse_id
+    //  • stock_balances was mirrored to the warehouse of (destination_id ?? branch_id)
+    const sourcePoultryWhId: string | null = (rec.warehouse_id as string | null) ?? null;
+    const srcBranchId = (rec.destination_id ?? rec.branch_id) as string | null;
+    const srcWhRow = srcBranchId
+      ? await query<Record<string, unknown>>(`SELECT id FROM warehouses WHERE branch_id = $1 LIMIT 1`, [srcBranchId])
+      : [];
+    const sourceStockWhId: string | null = (srcWhRow[0]?.id as string | null) ?? sourcePoultryWhId;
 
     const liveCostAmt = parseFloat(liveCost.toFixed(2));
-    const transferPriceAmt = parseFloat((pricePerKg * Number(rec.net_kgs ?? 0)).toFixed(2));
+    const netKgs = Number(rec.net_kgs ?? 0);
+    const netHeads = Number(rec.net_heads ?? 0);
+    const transferPriceAmt = parseFloat((pricePerKg * netKgs).toFixed(2));
+    // New cost basis at the trading location (per kg = price per kg)
+    const tradingAvgCostPerKg = netKgs > 0 ? parseFloat((transferPriceAmt / netKgs).toFixed(4)) : pricePerKg;
 
-    // Post transfer JE in transaction
+    // Post transfer JE + stock transfer in one transaction
     const client = await getPool().connect();
     try {
       await client.query('BEGIN');
@@ -140,14 +166,14 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
          VALUES ($1,1,$2,$3,$4,0,'PHP',1,$4,0)`,
         [jeId, liveBuyingAcctId, `Live Buying — ${rec.doc_no}`, liveCostAmt]);
 
-      // Line 2 — DR: Live Inventory = transfer price total (tagged with Chicken Trading CC + destination)
+      // Line 2 — DR: Live Inventory = transfer total (tagged with Chicken Trading location + CC)
       await client.query(
         `INSERT INTO journal_entry_lines
            (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit,
             branch_id, cost_center_id)
          VALUES ($1,2,$2,$3,$4,0,'PHP',1,$4,0, $5,$6)`,
         [jeId, liveInvAcctId, `Live Inventory IN — ${rec.doc_no}`, transferPriceAmt,
-         destinationBranchId, chickenTradingCcId]);
+         tradingBranchId, chickenTradingCcId]);
 
       // Line 3 — CR: Live Inventory = live cost (reducing farm stock)
       await client.query(
@@ -156,7 +182,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
          VALUES ($1,3,$2,$3,0,$4,'PHP',1,0,$4)`,
         [jeId, liveInvAcctId, `Live Inventory OUT — ${rec.doc_no}`, liveCostAmt]);
 
-      // Line 4 — CR: Sales DR - Live Chicken = transfer price total
+      // Line 4 — CR: Sales DR - Live Chicken = transfer total
       await client.query(
         `INSERT INTO journal_entry_lines
            (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
@@ -172,6 +198,93 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
            credit_total = account_balances.credit_total + EXCLUDED.credit_total`,
         [jeId, period.id]);
       await client.query(`UPDATE journal_entries SET posted_at = now(), posted_by = $2 WHERE id = $1`, [jeId, auth.userId]);
+
+      // ── Physical stock transfer: farm/source → Chicken Trading ─────────────
+      if (netKgs > 0 || netHeads > 0) {
+        // 1) poultry_inventory_balance — move OUT of source warehouse
+        const srcBalRow = await client.query(
+          `SELECT qty_heads, qty_kgs, avg_cost FROM poultry_inventory_balance
+            WHERE company_id=$1 AND warehouse_id IS NOT DISTINCT FROM $2 AND item_id=$3 FOR UPDATE`,
+          [rec.company_id, sourcePoultryWhId, liveItemId]);
+        const srcBal = srcBalRow.rows[0] ?? { qty_heads: 0, qty_kgs: 0, avg_cost: 0 };
+        const srcNewHeads = Number(srcBal.qty_heads) - netHeads;
+        const srcNewKgs = Number(srcBal.qty_kgs) - netKgs;
+        await client.query(
+          `INSERT INTO poultry_inventory_ledger
+             (company_id, warehouse_id, item_id, movement_type, source_type, source_id, source_doc_no, transaction_date, heads_out, kgs_out, balance_heads, balance_kgs)
+           VALUES ($1,$2,$3,'transfer_out','tally_sheet',$4,$5,$6,$7,$8,$9,$10)`,
+          [rec.company_id, sourcePoultryWhId, liveItemId, params.id, rec.doc_no, jeDate,
+           netHeads, netKgs, srcNewHeads, srcNewKgs]);
+        await client.query(
+          `INSERT INTO poultry_inventory_balance (company_id, warehouse_id, item_id, qty_heads, qty_kgs, avg_cost, last_updated)
+           VALUES ($1,$2,$3,$4,$5,$6,now())
+           ON CONFLICT (company_id, warehouse_id, item_id) DO UPDATE SET qty_heads=$4, qty_kgs=$5, last_updated=now()`,
+          [rec.company_id, sourcePoultryWhId, liveItemId, srcNewHeads, srcNewKgs, Number(srcBal.avg_cost ?? 0)]);
+
+        // 2) poultry_inventory_balance — move IN to Chicken Trading warehouse (new cost basis = transfer price)
+        const dstBalRow = await client.query(
+          `SELECT qty_heads, qty_kgs, avg_cost FROM poultry_inventory_balance
+            WHERE company_id=$1 AND warehouse_id IS NOT DISTINCT FROM $2 AND item_id=$3 FOR UPDATE`,
+          [rec.company_id, tradingWarehouseId, liveItemId]);
+        const dstBal = dstBalRow.rows[0] ?? { qty_heads: 0, qty_kgs: 0, avg_cost: 0 };
+        const dstNewHeads = Number(dstBal.qty_heads) + netHeads;
+        const dstNewKgs = Number(dstBal.qty_kgs) + netKgs;
+        // weighted average cost (per kg) at the trading location
+        const dstNewAvg = dstNewKgs > 0
+          ? parseFloat(((Number(dstBal.qty_kgs) * Number(dstBal.avg_cost ?? 0) + netKgs * tradingAvgCostPerKg) / dstNewKgs).toFixed(4))
+          : tradingAvgCostPerKg;
+        await client.query(
+          `INSERT INTO poultry_inventory_ledger
+             (company_id, warehouse_id, item_id, movement_type, source_type, source_id, source_doc_no, transaction_date, heads_in, kgs_in, unit_cost, total_cost, balance_heads, balance_kgs)
+           VALUES ($1,$2,$3,'transfer_in','tally_sheet',$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          [rec.company_id, tradingWarehouseId, liveItemId, params.id, rec.doc_no, jeDate,
+           netHeads, netKgs, tradingAvgCostPerKg, transferPriceAmt, dstNewHeads, dstNewKgs]);
+        await client.query(
+          `INSERT INTO poultry_inventory_balance (company_id, warehouse_id, item_id, qty_heads, qty_kgs, avg_cost, last_updated)
+           VALUES ($1,$2,$3,$4,$5,$6,now())
+           ON CONFLICT (company_id, warehouse_id, item_id) DO UPDATE SET qty_heads=$4, qty_kgs=$5, avg_cost=$6, last_updated=now()`,
+          [rec.company_id, tradingWarehouseId, liveItemId, dstNewHeads, dstNewKgs, dstNewAvg]);
+
+        // 3) stock_balances + stock_movements mirror (kgs only)
+        if (netKgs > 0) {
+          // OUT of source
+          if (sourceStockWhId) {
+            await client.query(
+              `INSERT INTO stock_balances (item_id, warehouse_id, qty_on_hand, avg_cost, last_movement_at)
+               VALUES ($1,$2,$3,$4,now())
+               ON CONFLICT (item_id, warehouse_id) DO UPDATE SET
+                 qty_on_hand = GREATEST(0, stock_balances.qty_on_hand - $3),
+                 last_movement_at = now()`,
+              [liveItemId, sourceStockWhId, netKgs, tradingAvgCostPerKg]);
+            await client.query(
+              `INSERT INTO stock_movements
+                 (company_id, item_id, warehouse_id, movement_type, quantity, unit_cost, total_cost,
+                  reference_type, reference_id, reference_no, created_by)
+               VALUES ($1,$2,$3,'transfer_out',$4,$5,$6,'tally_sheet',$7,$8,$9)`,
+              [rec.company_id, liveItemId, sourceStockWhId, netKgs, tradingAvgCostPerKg, transferPriceAmt,
+               params.id, rec.doc_no, auth.userId]);
+          }
+          // IN to Chicken Trading
+          await client.query(
+            `INSERT INTO stock_balances (item_id, warehouse_id, qty_on_hand, avg_cost, last_movement_at)
+             VALUES ($1,$2,$3,$4,now())
+             ON CONFLICT (item_id, warehouse_id) DO UPDATE SET
+               qty_on_hand = stock_balances.qty_on_hand + $3,
+               avg_cost = CASE WHEN stock_balances.qty_on_hand + $3 > 0
+                          THEN (stock_balances.qty_on_hand * stock_balances.avg_cost + $3 * $4) / (stock_balances.qty_on_hand + $3)
+                          ELSE $4 END,
+               last_movement_at = now()`,
+            [liveItemId, tradingWarehouseId, netKgs, tradingAvgCostPerKg]);
+          await client.query(
+            `INSERT INTO stock_movements
+               (company_id, item_id, warehouse_id, movement_type, quantity, unit_cost, total_cost,
+                reference_type, reference_id, reference_no, created_by)
+             VALUES ($1,$2,$3,'transfer_in',$4,$5,$6,'tally_sheet',$7,$8,$9)`,
+            [rec.company_id, liveItemId, tradingWarehouseId, netKgs, tradingAvgCostPerKg, transferPriceAmt,
+             params.id, rec.doc_no, auth.userId]);
+        }
+      }
+
       await client.query(`UPDATE tally_sheets SET transfer_je_id = $2 WHERE id = $1`, [params.id, jeId]);
       await client.query('COMMIT');
 

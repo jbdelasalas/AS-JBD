@@ -66,9 +66,6 @@ interface Bill {
   ewt_code_rate: number | null;
   ewt_atc_code: string | null;
   je_id: string | null;
-  remarks: string | null;
-  created_by_name: string | null;
-  approved_by_name: string | null;
   lines: BillLine[];
 }
 
@@ -362,7 +359,9 @@ export default function PrintBillPage() {
         <div style={{ marginBottom: '5mm' }}>
           <span style={{ fontWeight: 'bold' }}>Remarks: </span>
           <span style={{ fontSize: '9pt' }}>
-            {bill.remarks || (bill.po_no ? `Payment for ${bill.po_no}` : `Bill ${bill.internal_no} — ${bill.supplier_name}`)}
+            {bill.po_no
+              ? `PAYMENT FOR PURCHASE OF ${bill.lines.map(l => l.description).join(', ')} (${bill.po_no})`
+              : `Bill ${bill.internal_no} - ${bill.supplier_name}`}
           </span>
         </div>
 
@@ -377,7 +376,7 @@ export default function PrintBillPage() {
               <td style={{ padding: '0 20px 0 0', verticalAlign: 'bottom' }}>
                 <div style={{ fontSize: '9pt', marginBottom: '2mm' }}>Prepared by:</div>
                 <div style={{ border: B, padding: '3px 8px', minHeight: '24px', fontWeight: 'bold' }}>
-                  {bill.created_by_name ?? ' '}
+                  &nbsp;
                 </div>
               </td>
               <td style={{ padding: '0 0 0 20px', verticalAlign: 'bottom' }}>
@@ -391,13 +390,13 @@ export default function PrintBillPage() {
               <td style={{ padding: '6px 20px 0 0', verticalAlign: 'bottom' }}>
                 <div style={{ fontSize: '9pt', marginBottom: '2mm' }}>Approved by:</div>
                 <div style={{ border: B, padding: '3px 8px', minHeight: '24px', fontWeight: 'bold' }}>
-                  {bill.approved_by_name ?? ' '}
+                  &nbsp;
                 </div>
               </td>
               <td style={{ padding: '6px 0 0 20px', verticalAlign: 'bottom' }}>
                 <div style={{ fontSize: '9pt', marginBottom: '2mm' }}>Date:</div>
                 <div style={{ border: B, padding: '3px 8px', minHeight: '24px', fontWeight: 'bold' }}>
-                  {bill.approved_by_name ? fmtDate(bill.bill_date) : ' '}
+                  {bill.status === 'approved' ? fmtDate(bill.bill_date) : ' '}
                 </div>
               </td>
             </tr>

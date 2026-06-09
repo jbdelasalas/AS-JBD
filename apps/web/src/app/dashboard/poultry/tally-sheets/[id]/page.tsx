@@ -44,13 +44,14 @@ interface TallySheet {
 }
 
 interface TransferAccount { id: string; code: string; name: string; }
+interface TradingLocation { id: string; code: string; name: string; has_warehouse: boolean; }
 interface TransferPreview {
   live_cost: number;
   net_kgs: number;
   net_heads: number;
   accounts: { live_buying: TransferAccount | null; live_inventory: TransferAccount | null; sales_live: TransferAccount | null };
   chicken_trading_cc: TransferAccount | null;
-  destination: TransferAccount | null;
+  trading_location: TradingLocation | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -233,7 +234,8 @@ export default function TallySheetDetailPage() {
       sessionStorage.setItem('pending_conversion', JSON.stringify({
         tally_sheet_id: doc!.id,
         transaction_date: (doc!.transfer_date ?? '').split('T')[0],
-        branch_id: doc!.destination_id ?? doc!.branch_id ?? '',
+        // Source the conversion from Chicken Trading — that's where the live stock now sits
+        branch_id: preview?.trading_location?.id ?? doc!.destination_id ?? doc!.branch_id ?? '',
         lines: lines.map(l => ({
           item_id: l.item_id,
           item_name: l.item_name ?? '',
@@ -748,16 +750,18 @@ export default function TallySheetDetailPage() {
                 const fmt = (n: number) => n > 0 ? `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
                 const accts = preview?.accounts;
                 const cc = preview?.chicken_trading_cc;
-                const dest = preview?.destination;
+                const loc = preview?.trading_location;
                 return (
                   <div className="mb-4 overflow-hidden rounded border border-slate-200 dark:border-slate-700">
-                    {/* Location + Cost Center info */}
+                    {/* Location + Cost Center info — live stock moves to Chicken Trading */}
                     {preview && (
                       <div className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 py-2 grid grid-cols-2 gap-3 text-xs">
                         <div>
-                          <span className="text-slate-400 dark:text-slate-500">Location (Destination)</span>
+                          <span className="text-slate-400 dark:text-slate-500">Location (stock destination)</span>
                           <div className="font-medium text-slate-700 dark:text-slate-200">
-                            {dest ? `${dest.code} — ${dest.name}` : <span className="italic text-amber-600">Not set on tally sheet</span>}
+                            {loc
+                              ? <>{loc.code} — {loc.name}{!loc.has_warehouse && <span className="ml-1 italic text-amber-600">(no warehouse!)</span>}</>
+                              : <span className="italic text-amber-600">Chicken Trading location not found</span>}
                           </div>
                         </div>
                         <div>
@@ -792,8 +796,8 @@ export default function TallySheetDetailPage() {
                             <div className="font-medium text-slate-800 dark:text-slate-200">{accts?.live_inventory?.name ?? 'Live Inventory'}</div>
                             {accts?.live_inventory?.code && <div className="text-slate-400">{accts.live_inventory.code}</div>}
                             <div className="mt-0.5 flex flex-wrap gap-1">
-                              {dest && <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">📍 {dest.name}</span>}
-                              {cc   && <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">⬡ {cc.name}</span>}
+                              {loc && <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">📍 {loc.name}</span>}
+                              {cc  && <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">⬡ {cc.name}</span>}
                             </div>
                           </td>
                           <td className="px-3 py-2 text-right font-mono font-semibold text-slate-800 dark:text-slate-200">{fmt(transferAmt)}</td>
@@ -846,8 +850,17 @@ export default function TallySheetDetailPage() {
               <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">{transferMsg}</div>
             )}
 
+            {preview && (!preview.trading_location || !preview.trading_location.has_warehouse) && (
+              <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                {!preview.trading_location
+                  ? 'No "Chicken Trading" location found. Create a Location named "Chicken Trading" under Inventory → Locations before posting.'
+                  : 'The "Chicken Trading" location has no warehouse. Re-create it under Inventory → Locations so stock can land there.'}
+              </div>
+            )}
+
             <div className="flex gap-3">
-              <button onClick={postTransferJE} disabled={transferBusy || !transferPrice || previewLoading}
+              <button onClick={postTransferJE}
+                disabled={transferBusy || !transferPrice || previewLoading || !preview?.trading_location?.has_warehouse}
                 className="flex-1 rounded bg-brand-600 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
                 {transferBusy ? 'Posting…' : 'Post JE & Create Conversion'}
               </button>

@@ -9,10 +9,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   try {
     const [rec] = await query<Record<string, unknown>>(
-      `SELECT ts.*, b.name AS destination_name, b.code AS destination_code
-         FROM tally_sheets ts
-         LEFT JOIN branches b ON b.id = ts.destination_id
-        WHERE ts.id = $1`, [params.id]);
+      `SELECT * FROM tally_sheets WHERE id = $1`, [params.id]);
     if (!rec) return err('Not found', 404);
 
     // ── Live cost ──────────────────────────────────────────────────────────
@@ -53,7 +50,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       if (item) liveInventory = { id: String(item.id), code: String(item.code), name: String(item.name) };
     }
 
-    // Live Buying: expense account matching "live buying" / "buying live" / fallback cos+live
+    // Live Buying: expense account matching "live buying" / fallback cos+live
     const buyingRows = await query<Record<string, unknown>>(
       `SELECT id, code, name FROM accounts
         WHERE company_id = $1 AND is_active = true
@@ -90,9 +87,22 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       ? { id: String(ccRows[0].id), code: String(ccRows[0].code), name: String(ccRows[0].name) }
       : null;
 
-    // ── Destination (location for the DR Live Inventory line) ─────────────
-    const destination = rec.destination_id
-      ? { id: String(rec.destination_id), code: String(rec.destination_code ?? ''), name: String(rec.destination_name ?? '') }
+    // ── Chicken Trading location (branch + warehouse) — destination for the stock ─
+    const locRows = await query<Record<string, unknown>>(
+      `SELECT b.id, b.code, b.name, w.id AS warehouse_id
+         FROM branches b
+         LEFT JOIN warehouses w ON w.branch_id = b.id
+        WHERE b.company_id = $1 AND b.is_active = true
+          AND (b.name ILIKE '%chicken%trading%' OR b.name ILIKE '%trading%chicken%'
+               OR b.name ILIKE '%live%trading%' OR b.name ILIKE '%trading%live%')
+        ORDER BY b.code LIMIT 1`, [rec.company_id]);
+    const tradingLocation = locRows[0]
+      ? {
+          id: String(locRows[0].id),
+          code: String(locRows[0].code),
+          name: String(locRows[0].name),
+          has_warehouse: !!locRows[0].warehouse_id,
+        }
       : null;
 
     return ok({
@@ -102,7 +112,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       already_posted: !!rec.transfer_je_id,
       accounts: { live_buying: liveBuying, live_inventory: liveInventory, sales_live: salesLive },
       chicken_trading_cc: chickenTradingCC,
-      destination,
+      trading_location: tradingLocation,
     });
   } catch (e) {
     return err((e as Error).message || 'Unexpected error', 500);
