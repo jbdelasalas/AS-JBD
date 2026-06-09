@@ -11,6 +11,8 @@ function mapRow(r: Record<string, unknown>) {
     vat_amount: Number(r.vat_amount),
     total: Number(r.total),
     discount_pct: Number(r.discount_pct ?? 0),
+    total_qty_ordered: Number(r.total_qty_ordered ?? 0),
+    total_qty_delivered: Number(r.total_qty_delivered ?? 0),
   };
 }
 
@@ -55,7 +57,9 @@ export async function GET(request: NextRequest) {
     `SELECT so.id, so.order_no, so.order_date, so.delivery_date,
             so.subtotal, so.vat_amount, so.total, so.status,
             so.credit_checked, so.approved_at, so.created_at,
-            c.name AS customer_name, c.code AS customer_code
+            c.name AS customer_name, c.code AS customer_code,
+            COALESCE((SELECT SUM(sol.quantity)     FROM sales_order_lines sol WHERE sol.order_id = so.id), 0) AS total_qty_ordered,
+            COALESCE((SELECT SUM(sol.qty_delivered) FROM sales_order_lines sol WHERE sol.order_id = so.id), 0) AS total_qty_delivered
        FROM sales_orders so
        JOIN customers c ON c.id = so.customer_id
       WHERE ${where}

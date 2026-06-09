@@ -16,6 +16,8 @@ interface SORow {
   customer_code: string;
   total: number;
   status: string;
+  total_qty_ordered: number;
+  total_qty_delivered: number;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -36,6 +38,18 @@ const COLUMNS: ColDef<SORow>[] = [
   { key: 'delivery_date',  header: 'Delivery',    render: r => <span className="text-xs text-slate-600 dark:text-slate-400">{r.delivery_date ? formatDate(r.delivery_date) : '—'}</span>, exportValue: r => r.delivery_date ? formatDate(r.delivery_date) : '' },
   { key: 'customer_name',  header: 'Customer',    render: r => <><div className="font-medium text-slate-900 dark:text-slate-100">{r.customer_name}</div><div className="text-xs text-slate-500">{r.customer_code}</div></>, exportValue: r => r.customer_name },
   { key: 'total',          header: 'Total',       align: 'right', render: r => <span className="font-mono text-xs dark:text-slate-300">{formatPHP(r.total)}</span>, exportValue: r => String(r.total) },
+  { key: 'total_qty_delivered', header: 'Heads', align: 'right', render: r => {
+      const ordered = r.total_qty_ordered ?? 0;
+      const delivered = r.total_qty_delivered ?? 0;
+      const pct = ordered > 0 ? Math.round((delivered / ordered) * 100) : 0;
+      const color = pct >= 100 ? 'text-emerald-600 dark:text-emerald-400' : pct > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400';
+      return (
+        <div className="text-right">
+          <span className="font-mono text-xs dark:text-slate-300">{delivered.toLocaleString()} / {ordered.toLocaleString()}</span>
+          <div className={`text-[11px] font-medium ${color}`}>{pct}%</div>
+        </div>
+      );
+    }, exportValue: r => `${r.total_qty_delivered}/${r.total_qty_ordered}` },
   { key: 'status',         header: 'Status',      render: r => <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[r.status] ?? STATUS_STYLES.draft}`}>{r.status.replace(/_/g,' ')}</span>, exportValue: r => r.status },
 ];
 
