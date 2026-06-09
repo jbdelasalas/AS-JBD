@@ -229,7 +229,7 @@ function NewConversionForm() {
               <input required type="date" className={inp} value={form.transaction_date}
                 onChange={e => setForm(f => ({ ...f, transaction_date: e.target.value }))} />
             </div>
-            <div>
+            <div className="hidden">
               <label className={lbl}>Purchase Order</label>
               <select className={sel} value={form.po_id} onChange={e => setForm(f => ({ ...f, po_id: e.target.value }))}>
                 <option value="">— none —</option>
@@ -241,9 +241,9 @@ function NewConversionForm() {
               <div className="border-b border-slate-200 py-1 text-sm text-slate-400">NEW</div>
             </div>
 
-            <div>
+            <div className="hidden">
               <label className={lbl}>Source Location *</label>
-              <select required className={sel} value={form.branch_id}
+              <select className={sel} value={form.branch_id}
                 onChange={e => { setForm(f => ({ ...f, branch_id: e.target.value })); setSrcForm({ item_id: '', heads: '', kgs: '' }); setSourceLines([]); }}>
                 <option value="">— select —</option>
                 {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -255,9 +255,9 @@ function NewConversionForm() {
             </div>
             <div />
 
-            <div>
+            <div className="hidden">
               <label className={lbl}>Target Location *</label>
-              <select required className={sel} value={form.target_branch_id} onChange={e => setForm(f => ({ ...f, target_branch_id: e.target.value }))}>
+              <select className={sel} value={form.target_branch_id} onChange={e => setForm(f => ({ ...f, target_branch_id: e.target.value }))}>
                 <option value="">— select —</option>
                 {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
