@@ -28,9 +28,9 @@ export async function GET(request: NextRequest) {
        JOIN tally_sheet_lines tsl ON tsl.tally_sheet_id = t.id
        JOIN items i ON i.id = tsl.item_id
        LEFT JOIN poultry_inventory_balance pib
-         ON  pib.item_id     = tsl.item_id
-         AND pib.warehouse_id = t.warehouse_id
-         AND pib.company_id   = t.company_id
+         ON  pib.item_id              = tsl.item_id
+         AND pib.warehouse_id IS NOT DISTINCT FROM t.warehouse_id
+         AND pib.company_id           = t.company_id
        WHERE t.company_id = $1
          AND t.status     = 'posted'
          AND COALESCE(pib.qty_kgs, 0) > 0
