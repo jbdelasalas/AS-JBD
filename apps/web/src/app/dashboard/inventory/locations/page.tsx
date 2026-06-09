@@ -57,6 +57,17 @@ export default function LocationsPage() {
     setFormMsg(null);
   }
 
+  async function remove(loc: Location) {
+    if (!confirm(`Delete location "${loc.name}"? This cannot be undone.`)) return;
+    setError(null);
+    try {
+      await api.delete(`/inventory/locations/${loc.id}`);
+      load();
+    } catch (e: unknown) {
+      setError((e as Error).message ?? 'Failed to delete location');
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -94,7 +105,7 @@ export default function LocationsPage() {
     { key: 'address',   header: 'Address', render: r => <span className="text-xs text-slate-500 dark:text-slate-400">{r.address ?? '—'}</span>, exportValue: r => r.address ?? '' },
     { key: 'item_count',header: 'Items',   align: 'right', render: r => <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{r.item_count}</span>, exportValue: r => String(r.item_count) },
     { key: 'is_active', header: 'Status',  render: r => <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{r.is_active ? 'active' : 'inactive'}</span>, exportValue: r => r.is_active ? 'active' : 'inactive' },
-    { key: 'actions',   header: '',        render: r => <button onClick={() => startEdit(r)} className="text-xs text-brand-700 hover:underline dark:text-brand-400">Edit</button>, exportValue: () => '' },
+    { key: 'actions',   header: '',        render: r => <div className="flex justify-end gap-3"><button onClick={() => startEdit(r)} className="text-xs text-brand-700 hover:underline dark:text-brand-400">Edit</button><button onClick={() => remove(r)} className="text-xs text-red-600 hover:underline dark:text-red-400">Delete</button></div>, exportValue: () => '' },
   ];
 
   return (

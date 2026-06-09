@@ -27,6 +27,7 @@ export default function SuppliersPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const PAGE_SIZE = 15;
 
   useEffect(() => {
@@ -52,6 +53,20 @@ export default function SuppliersPage() {
       setError((e as Error).message ?? 'Failed to update supplier');
     } finally {
       setToggling(null);
+    }
+  }
+
+  async function remove(row: SupplierRow) {
+    if (!confirm(`Delete supplier "${row.name}"? This cannot be undone.`)) return;
+    setError(null);
+    setDeleting(row.id);
+    try {
+      await api.delete(`/ap/suppliers/${row.id}`);
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
+    } catch (e: unknown) {
+      setError((e as Error).message ?? 'Failed to delete supplier');
+    } finally {
+      setDeleting(null);
     }
   }
 
@@ -137,7 +152,7 @@ export default function SuppliersPage() {
           { key: 'payment_terms_days', header: 'Terms',   render: r => <span className="text-xs text-slate-600 dark:text-slate-400">{r.payment_terms_days}d</span>, exportValue: r => `${r.payment_terms_days}d` },
           { key: 'open_ap_balance',    header: 'Open AP', align: 'right', render: r => <span className={`font-mono text-xs ${r.open_ap_balance > 0 ? 'font-medium text-amber-700 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'}`}>{formatPHP(r.open_ap_balance)}</span>, exportValue: r => String(r.open_ap_balance) },
           { key: 'is_active',          header: 'Status',  render: r => <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{r.is_active ? 'active' : 'inactive'}</span>, exportValue: r => r.is_active ? 'active' : 'inactive' },
-          { key: 'action',             header: '',        render: r => <button disabled={toggling === r.id} onClick={() => toggleActive(r.id, r.is_active)} className={`rounded border px-2.5 py-1 text-xs font-medium disabled:opacity-50 ${r.is_active ? 'border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400' : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400'}`}>{toggling === r.id ? '…' : r.is_active ? 'Deactivate' : 'Activate'}</button> },
+          { key: 'action',             header: '',        render: r => <div className="flex justify-end gap-2"><button disabled={toggling === r.id} onClick={() => toggleActive(r.id, r.is_active)} className={`rounded border px-2.5 py-1 text-xs font-medium disabled:opacity-50 ${r.is_active ? 'border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400' : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400'}`}>{toggling === r.id ? '…' : r.is_active ? 'Deactivate' : 'Activate'}</button><button disabled={deleting === r.id} onClick={() => remove(r)} className="rounded border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">{deleting === r.id ? '…' : 'Delete'}</button></div> },
         ];
         return (
           <DataTable id="ap-suppliers" columns={COLS} rows={paged} exportRows={rows} loading={loading} filename="suppliers" showExport={false}>

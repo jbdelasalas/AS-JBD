@@ -65,3 +65,54 @@ export async function PATCH(
     return err((e as Error).message ?? 'Failed to update location', 500);
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try {
+    auth = await requireAuth(request);
+  } catch (e) {
+    return e as Response;
+  }
+
+  const existing = await query(
+    `SELECT id, company_id FROM warehouses WHERE id = $1 LIMIT 1`,
+    [params.id],
+  );
+  if (!existing[0]) return err('Location not found', 404);
+  const wh = existing[0] as Record<string, unknown>;
+
+  // Guard: refuse if the location holds stock or has any movement history.
+  // (stock_balances cascade-delete, so the FK error alone would not catch
+  // a location that has on-hand stock — check explicitly.)
+  const blocking = await query<{ on_hand: string; movements: string }>(
+    `SELECT
+        (SELECT COUNT(*) FROM stock_balances WHERE warehouse_id = $1 AND qty_on_hand <> 0) AS on_hand,
+        (SELECT COUNT(*) FROM stock_movements WHERE warehouse_id = $1) AS movements`,
+    [params.id],
+  );
+  const b = blocking[0];
+  if (b && (Number(b.on_hand) > 0 || Number(b.movements) > 0)) {
+    return err('This location has stock or movement history and cannot be deleted. Deactivate it instead.', 409);
+  }
+
+  try {
+    await query(`DELETE FROM warehouses WHERE id = $1`, [params.id]);
+  } catch (e: unknown) {
+    // Foreign-key violation: location is referenced by other transactions.
+    if ((e as { code?: string }).code === '23503') {
+      return err('This location has linked transactions and cannot be deleted. Deactivate it instead.', 409);
+    }
+    return err((e as Error).message ?? 'Failed to delete location', 500);
+  }
+
+  await query(
+    `INSERT INTO audit_log (user_id, company_id, action, entity_type, entity_id)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [auth.userId, wh.company_id, 'delete', 'location', params.id],
+  ).catch(() => {/* non-fatal */});
+
+  return ok({ id: params.id, deleted: true });
+}

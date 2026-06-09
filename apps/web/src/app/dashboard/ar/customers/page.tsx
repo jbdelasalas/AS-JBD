@@ -27,6 +27,7 @@ export default function CustomersPage() {
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const PAGE_SIZE = 15;
 
   useEffect(() => {
@@ -42,6 +43,20 @@ export default function CustomersPage() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [search]);
+
+  async function remove(row: CustomerRow) {
+    if (!confirm(`Delete customer "${row.name}"? This cannot be undone.`)) return;
+    setError(null);
+    setDeleting(row.id);
+    try {
+      await api.delete(`/ar/customers/${row.id}`);
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
+    } catch (e: unknown) {
+      setError((e as Error).message ?? 'Failed to delete customer');
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   const paged = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -129,6 +144,7 @@ export default function CustomersPage() {
           { key: 'credit_limit',       header: 'Credit Limit', align: 'right', render: r => <span className="font-mono text-xs">{r.credit_limit > 0 ? formatPHP(r.credit_limit) : '—'}</span>, exportValue: r => String(r.credit_limit) },
           { key: 'open_ar_balance',    header: 'Open AR',      align: 'right', render: r => <span className={`font-mono text-xs ${r.open_ar_balance > 0 ? 'text-amber-700 font-medium' : 'text-slate-600 dark:text-slate-400'}`}>{formatPHP(r.open_ar_balance)}</span>, exportValue: r => String(r.open_ar_balance) },
           { key: 'is_active',          header: 'Status',       render: r => <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{r.is_active ? 'active' : 'inactive'}</span>, exportValue: r => r.is_active ? 'active' : 'inactive' },
+          { key: 'action',             header: '',             render: r => <button disabled={deleting === r.id} onClick={() => remove(r)} className="rounded border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">{deleting === r.id ? '…' : 'Delete'}</button>, exportValue: () => '' },
         ];
         return (
           <DataTable id="ar-customers" columns={COLS} rows={paged} exportRows={rows} loading={loading} filename="customers" showExport={false}>

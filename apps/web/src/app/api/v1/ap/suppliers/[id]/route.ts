@@ -82,3 +82,40 @@ export async function PATCH(
 
   return ok(rows[0]);
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try {
+    auth = await requireAuth(request);
+  } catch (e) {
+    return e as Response;
+  }
+
+  const existing = await query(
+    `SELECT id, company_id FROM suppliers WHERE id = $1 LIMIT 1`,
+    [params.id],
+  );
+  if (!existing[0]) return err(`Supplier ${params.id} not found`, 404);
+  const sup = existing[0] as Record<string, unknown>;
+
+  try {
+    await query(`DELETE FROM suppliers WHERE id = $1`, [params.id]);
+  } catch (e: unknown) {
+    // Foreign-key violation: supplier is referenced by bills, POs, etc.
+    if ((e as { code?: string }).code === '23503') {
+      return err('This supplier has linked transactions and cannot be deleted. Deactivate it instead.', 409);
+    }
+    return err((e as Error).message ?? 'Failed to delete supplier', 500);
+  }
+
+  await query(
+    `INSERT INTO audit_log (user_id, company_id, action, entity_type, entity_id)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [auth.userId, sup.company_id, 'delete', 'supplier', params.id],
+  ).catch(() => {/* non-fatal */});
+
+  return ok({ id: params.id, deleted: true });
+}
