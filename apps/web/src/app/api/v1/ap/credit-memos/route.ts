@@ -172,19 +172,18 @@ export async function POST(request: NextRequest) {
     const header = headerRows.rows[0];
 
     for (const l of mappedLines) {
+      const lx = l as Record<string, unknown>;
       await client.query(
         `INSERT INTO bill_credit_memo_lines
            (memo_id, line_no, description, expense_account_id,
             quantity, unit_price, vat_rate, line_subtotal, line_vat, line_total,
             branch_id, building_id, cost_center_id, grow_reference_id)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
-        [header.id, l.line_no, l.description, l.expense_account_id ?? null,
+        [header.id, l.line_no, lx.description ?? null, lx.expense_account_id ?? null,
          l.qty, l.price, l.vatRate,
          l.lineSubtotal.toFixed(2), l.lineVat.toFixed(2), l.lineTotal.toFixed(2),
-         (l as Record<string, unknown>).branch_id ?? null,
-         (l as Record<string, unknown>).building_id ?? null,
-         (l as Record<string, unknown>).cost_center_id ?? null,
-         (l as Record<string, unknown>).grow_reference_id ?? null],
+         lx.branch_id ?? null, lx.building_id ?? null,
+         lx.cost_center_id ?? null, lx.grow_reference_id ?? null],
       );
     }
 
