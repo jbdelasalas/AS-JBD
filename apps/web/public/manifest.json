@@ -11,15 +11,27 @@
   "lang": "en",
   "icons": [
     {
-      "src": "/api/v1/company-icon",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/api/v1/company-icon?size=192",
+      "sizes": "192x192",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/api/v1/company-icon",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/api/v1/company-icon?size=512",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/api/v1/company-icon?size=192",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/api/v1/company-icon?size=512",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "maskable"
     }
   ],

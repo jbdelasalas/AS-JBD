@@ -29,9 +29,9 @@ export const metadata: Metadata = {
   },
   formatDetection: { telephone: false },
   icons: {
-    icon: [{ url: '/api/v1/company-icon', type: 'image/svg+xml' }],
+    icon: [{ url: '/api/v1/company-icon', type: 'image/png' }],
     shortcut: '/api/v1/company-icon',
-    apple: [{ url: '/api/v1/company-icon', sizes: '180x180' }],
+    apple: [{ url: '/api/v1/company-icon?size=180', sizes: '180x180' }],
   },
 };
 
