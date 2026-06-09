@@ -44,6 +44,14 @@ interface TallySheet {
   lines: Line[];
 }
 
+interface Company {
+  id: string;
+  name: string | null;
+  legal_name: string | null;
+  address: string | null;
+  logo: string | null;
+}
+
 const DATA_COLS = 12;
 const ROWS_PER_SECTION = 10;
 
@@ -52,6 +60,7 @@ export default function TallySheetPrintPage() {
   const router = useRouter();
   const [doc, setDoc] = useState<TallySheet | null>(null);
   const [buildings, setBuildings] = useState<Building[]>([]);
+  const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -64,6 +73,9 @@ export default function TallySheetPrintPage() {
     if (cid) {
       api.get<Building[]>(`/poultry/buildings?company_id=${cid}`)
         .then(r => setBuildings(Array.isArray(r) ? r : []))
+        .catch(() => {});
+      api.get<Company>(`/companies/${cid}`)
+        .then(co => setCompany(co))
         .catch(() => {});
     }
   }, [id]);
@@ -131,11 +143,16 @@ export default function TallySheetPrintPage() {
         {/* ── Company header ── */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4pt', borderBottom: '2px solid #000', paddingBottom: '4pt' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8pt' }}>
-            {/* Logo placeholder */}
-            <div style={{ width: '36pt', height: '36pt', border: '1px solid #aaa', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '6pt', color: '#aaa', flexShrink: 0 }}>LOGO</div>
+            {/* Company logo */}
+            {company?.logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={company.logo} alt="logo" style={{ height: '40pt', width: 'auto', objectFit: 'contain', flexShrink: 0 }} />
+            ) : (
+              <div style={{ width: '36pt', height: '36pt', border: '1px solid #aaa', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '6pt', color: '#aaa', flexShrink: 0 }}>LOGO</div>
+            )}
             <div>
-              <div style={{ fontWeight: 'bold', fontSize: '11pt', letterSpacing: '0.5pt' }}>ART FRESH CHICKEN CORP.</div>
-              <div style={{ fontSize: '6.5pt', color: '#555' }}>Permit &amp; Reg. Manapong, Victoria, Laguna</div>
+              <div style={{ fontWeight: 'bold', fontSize: '11pt', letterSpacing: '0.5pt', textTransform: 'uppercase' }}>{company?.legal_name || company?.name || 'ART FRESH CHICKEN CORP.'}</div>
+              <div style={{ fontSize: '6.5pt', color: '#555' }}>{company?.address || 'Permit & Reg. Manapong, Victoria, Laguna'}</div>
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
