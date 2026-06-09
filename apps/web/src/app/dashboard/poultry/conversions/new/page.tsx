@@ -269,7 +269,7 @@ function NewConversionForm() {
             <div className="hidden">
               <label className={lbl}>Source Location *</label>
               <select className={sel} value={form.branch_id}
-                onChange={e => { setForm(f => ({ ...f, branch_id: e.target.value })); setSrcForm({ item_id: '', heads: '', kgs: '' }); setSourceLines([]); }}>
+                onChange={e => { setForm(f => ({ ...f, branch_id: e.target.value })); setSrcForm({ item_id: '', heads: '', kgs: '', doa_heads: '', doa_kgs: '', short_over_heads: '', short_over_kgs: '' }); setSourceLines([]); }}>
                 <option value="">— select —</option>
                 {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
