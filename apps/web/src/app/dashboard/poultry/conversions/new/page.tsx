@@ -74,7 +74,7 @@ function NewConversionForm() {
   });
 
   // Source item form (one at a time → added to table)
-  const [srcForm, setSrcForm] = useState({ item_id: '', heads: '', kgs: '', doa_heads: '', doa_kgs: '', short_over_heads: '', short_over_kgs: '' });
+  const [srcForm, setSrcForm] = useState({ item_id: '', tally_id: '', heads: '', kgs: '', doa_heads: '', doa_kgs: '', short_over_heads: '', short_over_kgs: '' });
 
   // Pre-populate source lines from seed immediately (UOM filled in once items load)
   const [sourceLines, setSourceLines] = useState<SourceLine[]>(
@@ -127,34 +127,31 @@ function NewConversionForm() {
       .catch(() => {});
   }, [form.branch_id, locations]);
 
-  function getAvailable(itemId: string) {
-    return liveStock.filter(s => s.item_id === itemId).reduce((t, s) => t + s.qty_kgs, 0);
+  function getAvailable(tallyId: string) {
+    const row = liveStock.find(s => s.tally_id === tallyId);
+    return row?.qty_kgs ?? 0;
   }
 
-  function getAvgCost(itemId: string) {
-    const rows = liveStock.filter(s => s.item_id === itemId);
-    const totalQty = rows.reduce((t, s) => t + s.qty_kgs, 0);
-    if (totalQty <= 0) return 0;
-    return rows.reduce((t, s) => t + s.qty_kgs * s.avg_cost, 0) / totalQty;
+  function getAvgCost(tallyId: string) {
+    return liveStock.find(s => s.tally_id === tallyId)?.avg_cost ?? 0;
   }
 
-  function getLiveRef(itemId: string) {
-    const row = liveStock.find(s => s.item_id === itemId);
-    return row?.tally_no ?? null;
+  function getLiveRef(tallyId: string) {
+    return liveStock.find(s => s.tally_id === tallyId)?.tally_no ?? null;
   }
 
   function addSourceLine() {
     if (!srcForm.item_id) return;
-    const live = liveStock.find(s => s.item_id === srcForm.item_id);
+    const live = liveStock.find(s => s.tally_id === srcForm.tally_id);
     const item = live ?? items.find(i => i.id === srcForm.item_id);
     if (!item) return;
     const sku  = live ? live.sku       : (item as Item).sku;
     const name = live ? live.item_name : (item as Item).name;
     const uom  = live ? live.uom       : (item as Item).uom;
-    const avgCost = getAvgCost(srcForm.item_id);
+    const avgCost = getAvgCost(srcForm.tally_id);
     setSourceLines(prev => [...prev, {
       item_id: srcForm.item_id, item_sku: sku, item_name: name,
-      uom, available: getAvailable(srcForm.item_id),
+      uom, available: getAvailable(srcForm.tally_id),
       heads: parseFloat(srcForm.heads) || 0, kgs: parseFloat(srcForm.kgs) || 0,
       doa_heads: parseFloat(srcForm.doa_heads) || 0,
       doa_kgs: parseFloat(srcForm.doa_kgs) || 0,
@@ -162,7 +159,7 @@ function NewConversionForm() {
       short_over_kgs: parseFloat(srcForm.short_over_kgs) || 0,
     }]);
     setOutForm(f => ({ ...f, price_per_kg: avgCost > 0 ? avgCost.toFixed(4) : f.price_per_kg }));
-    setSrcForm({ item_id: '', heads: '', kgs: '', doa_heads: '', doa_kgs: '', short_over_heads: '', short_over_kgs: '' });
+    setSrcForm({ item_id: '', tally_id: '', heads: '', kgs: '', doa_heads: '', doa_kgs: '', short_over_heads: '', short_over_kgs: '' });
   }
 
   function addOutputLine() {
@@ -269,7 +266,7 @@ function NewConversionForm() {
             <div className="hidden">
               <label className={lbl}>Source Location *</label>
               <select className={sel} value={form.branch_id}
-                onChange={e => { setForm(f => ({ ...f, branch_id: e.target.value })); setSrcForm({ item_id: '', heads: '', kgs: '', doa_heads: '', doa_kgs: '', short_over_heads: '', short_over_kgs: '' }); setSourceLines([]); }}>
+                onChange={e => { setForm(f => ({ ...f, branch_id: e.target.value })); setSrcForm({ item_id: '', tally_id: '', heads: '', kgs: '', doa_heads: '', doa_kgs: '', short_over_heads: '', short_over_kgs: '' }); setSourceLines([]); }}>
                 <option value="">— select —</option>
                 {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
@@ -300,38 +297,35 @@ function NewConversionForm() {
             <div className="mb-3 flex items-end gap-4">
               <div className="flex-1">
                 <label className={lbl}>Item *</label>
-                <select className={sel} value={srcForm.item_id} onChange={e => {
-                  const itemId = e.target.value;
-                  setSrcForm(f => ({ ...f, item_id: itemId }));
-                  // Auto-fill source branch from the tally sheet that sourced this stock
-                  if (itemId) {
-                    const live = liveStock.find(s => s.item_id === itemId);
-                    if (live?.tally_id) {
-                      api.get<Record<string, unknown>>(`/poultry/tally-sheets/${live.tally_id}`)
-                        .then(t => {
-                          const src = (t.destination_id ?? t.branch_id) as string | null;
-                          if (src) setForm(f => ({ ...f, branch_id: src, tally_sheet_id: live.tally_id ?? f.tally_sheet_id }));
-                        }).catch(() => {});
-                    }
+                <select className={sel} value={srcForm.tally_id} onChange={e => {
+                  const tallyId = e.target.value;
+                  const live = liveStock.find(s => s.tally_id === tallyId);
+                  setSrcForm(f => ({ ...f, tally_id: tallyId, item_id: live?.item_id ?? '' }));
+                  if (tallyId) {
+                    api.get<Record<string, unknown>>(`/poultry/tally-sheets/${tallyId}`)
+                      .then(t => {
+                        const src = (t.destination_id ?? t.branch_id) as string | null;
+                        if (src) setForm(f => ({ ...f, branch_id: src, tally_sheet_id: tallyId }));
+                      }).catch(() => {});
                   }
                 }}>
                   <option value="">{liveStock.length ? 'Select item…' : 'No live inventory available'}</option>
                   {liveStock.map(s => {
                     const ref = s.tally_no ? `[${s.tally_no}] ` : '';
-                    return <option key={s.item_id} value={s.item_id}>{ref}{s.sku} — {s.item_name} ({s.qty_heads.toLocaleString('en-PH')} heads · {s.qty_kgs.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KGS avail.)</option>;
+                    return <option key={`${s.tally_id}_${s.item_id}`} value={s.tally_id ?? s.item_id}>{ref}{s.sku} — {s.item_name} ({s.qty_heads.toLocaleString('en-PH')} heads · {s.qty_kgs.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KGS avail.)</option>;
                   })}
                 </select>
               </div>
               <div className="w-20">
                 <label className={lbl}>Unit</label>
                 <div className="border-b border-slate-200 py-1 text-sm text-slate-500">
-                  {liveStock.find(s => s.item_id === srcForm.item_id)?.uom ?? '—'}
+                  {liveStock.find(s => s.tally_id === srcForm.tally_id)?.uom ?? '—'}
                 </div>
               </div>
               <div className="w-24">
                 <label className={lbl}>Available</label>
                 <div className="border-b border-slate-200 py-1 text-sm text-slate-500">
-                  {srcForm.item_id ? getAvailable(srcForm.item_id).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+                  {srcForm.tally_id ? getAvailable(srcForm.tally_id).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                 </div>
               </div>
               <div className="w-20">
