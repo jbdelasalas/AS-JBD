@@ -20,6 +20,7 @@ export default function LocationsPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ code: '', name: '', address: '', is_active: true });
   const [editSaving, setEditSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   function load() {
     const cid = localStorage.getItem('company_id') ?? '';
@@ -66,6 +67,19 @@ export default function LocationsPage() {
   function startEdit(r: Row) {
     setEditId(r.id);
     setEditForm({ code: r.code, name: r.name, address: r.address ?? '', is_active: r.is_active });
+  }
+
+  async function remove(r: Row) {
+    if (!confirm(`Delete location "${r.name}"? This cannot be undone.`)) return;
+    setError(null); setMsg(null); setDeletingId(r.id);
+    try {
+      await api.delete(`/admin/branches/${r.id}`);
+      load();
+    } catch (e: unknown) {
+      setError((e as Error).message ?? 'Failed to delete location');
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   async function saveEdit(e: React.FormEvent) {
@@ -136,7 +150,7 @@ export default function LocationsPage() {
               <th className="px-3 py-2 text-left font-medium">Address</th>
               <th className="px-3 py-2 text-left font-medium">Status</th>
               <th className="px-3 py-2 text-left font-medium">Warehouse</th>
-              <th className="w-16" />
+              <th className="w-28" />
             </tr>
           </thead>
           <tbody>
@@ -180,7 +194,10 @@ export default function LocationsPage() {
                     }
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <button onClick={() => startEdit(r)} className="text-xs text-slate-500 hover:text-brand-600 dark:text-slate-400">Edit</button>
+                    <div className="flex justify-end gap-3">
+                      <button onClick={() => startEdit(r)} className="text-xs text-slate-500 hover:text-brand-600 dark:text-slate-400">Edit</button>
+                      <button onClick={() => remove(r)} disabled={deletingId === r.id} className="text-xs text-red-600 hover:underline disabled:opacity-50 dark:text-red-400">{deletingId === r.id ? '…' : 'Delete'}</button>
+                    </div>
                   </td>
                 </tr>
               )

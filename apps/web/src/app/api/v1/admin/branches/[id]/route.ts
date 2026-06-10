@@ -57,3 +57,52 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     return err((e as Error).message, 500);
   }
 }
+
+export async function DELETE(req: NextRequest, { params }: Ctx) {
+  let auth: Awaited<ReturnType<typeof requireAuth>>;
+  try { auth = await requireAuth(req); } catch (e) { return e as Response; }
+
+  try {
+    const [branch] = await query<{ id: string; company_id: string }>(
+      `SELECT id, company_id FROM branches WHERE id = $1`,
+      [params.id],
+    );
+    if (!branch) return err('Location not found', 404);
+
+    // A location may have a linked warehouse. Refuse if that warehouse holds
+    // stock or has movement history (stock_balances cascade-delete, so the FK
+    // error alone would not catch a warehouse that still holds stock).
+    const [blocking] = await query<{ on_hand: string; movements: string }>(
+      `SELECT
+          (SELECT COUNT(*) FROM stock_balances sb
+             JOIN warehouses w ON w.id = sb.warehouse_id
+            WHERE w.branch_id = $1 AND sb.qty_on_hand <> 0) AS on_hand,
+          (SELECT COUNT(*) FROM stock_movements sm
+             JOIN warehouses w ON w.id = sm.warehouse_id
+            WHERE w.branch_id = $1) AS movements`,
+      [params.id],
+    );
+    if (blocking && (Number(blocking.on_hand) > 0 || Number(blocking.movements) > 0)) {
+      return err('This location has stock or movement history and cannot be deleted. Deactivate it instead.', 409);
+    }
+
+    // Remove the linked warehouse(s) first (empty balances cascade away),
+    // then the branch itself.
+    await query(`DELETE FROM warehouses WHERE branch_id = $1`, [params.id]);
+    await query(`DELETE FROM branches WHERE id = $1`, [params.id]);
+
+    await query(
+      `INSERT INTO audit_log (user_id, company_id, action, entity_type, entity_id)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [auth.userId, branch.company_id, 'delete', 'location', params.id],
+    ).catch(() => {/* non-fatal */});
+
+    return ok({ id: params.id, deleted: true });
+  } catch (e: unknown) {
+    // Foreign-key violation: branch/warehouse is referenced by transactions.
+    if ((e as { code?: string }).code === '23503') {
+      return err('This location has linked transactions and cannot be deleted. Deactivate it instead.', 409);
+    }
+    return err((e as Error).message ?? 'Failed to delete location', 500);
+  }
+}
