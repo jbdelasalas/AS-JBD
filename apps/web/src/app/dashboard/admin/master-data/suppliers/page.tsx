@@ -25,7 +25,21 @@ export default function MasterDataSuppliersPage() {
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const PAGE_SIZE = 15;
+
+  async function remove(r: SupplierRow) {
+    if (!confirm(`Delete supplier "${r.name}"? This cannot be undone.`)) return;
+    setError(null); setDeleting(r.id);
+    try {
+      await api.delete(`/ap/suppliers/${r.id}`);
+      setRows(prev => prev.filter(x => x.id !== r.id));
+    } catch (e: unknown) {
+      setError((e as Error).message ?? 'Failed to delete supplier');
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   useEffect(() => {
     const companyId = localStorage.getItem('company_id');
@@ -123,13 +137,14 @@ export default function MasterDataSuppliersPage() {
               <th className="px-3 py-2 text-left font-medium">Terms</th>
               <th className="px-3 py-2 text-right font-medium">Open AP</th>
               <th className="px-3 py-2 text-left font-medium">Status</th>
+              <th className="w-20" />
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-slate-500">Loading…</td></tr>
+              <tr><td colSpan={8} className="px-3 py-6 text-center text-xs text-slate-500">Loading…</td></tr>
             ) : !rows.length ? (
-              <tr><td colSpan={7} className="px-3 py-8 text-center text-xs text-slate-500">No suppliers found.</td></tr>
+              <tr><td colSpan={8} className="px-3 py-8 text-center text-xs text-slate-500">No suppliers found.</td></tr>
             ) : paged.map(r => (
               <tr key={r.id} className="border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800">
                 <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">{r.code}</td>
@@ -149,6 +164,9 @@ export default function MasterDataSuppliersPage() {
                   <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                     {r.is_active ? 'active' : 'inactive'}
                   </span>
+                </td>
+                <td className="px-3 py-2 text-right">
+                  <button onClick={() => remove(r)} disabled={deleting === r.id} className="text-xs text-red-600 hover:underline disabled:opacity-50 dark:text-red-400">{deleting === r.id ? '…' : 'Delete'}</button>
                 </td>
               </tr>
             ))}
