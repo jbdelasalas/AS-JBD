@@ -228,7 +228,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
           if (drByAcct.size > 0 && crByAcct.size > 0) {
             const seriesRows = await client.query(
-              `UPDATE document_series SET current_number = current_number + 1, updated_at = now()
+              `UPDATE document_series SET current_number = GREATEST(current_number, COALESCE((SELECT MAX(NULLIF(regexp_replace(substr(je.entry_no, length(document_series.prefix) + 1), '\\D', '', 'g'), '')::bigint) FROM journal_entries je WHERE je.company_id = document_series.company_id AND je.entry_no LIKE document_series.prefix || '%'), 0)) + 1, updated_at = now()
                 WHERE company_id = $1 AND doc_type = 'journal_voucher' AND is_active = true RETURNING prefix, current_number`,
               [rec.company_id],
             );
