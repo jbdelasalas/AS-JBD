@@ -261,9 +261,24 @@ export async function POST(request: NextRequest) {
       );
       const defaultAssetAccountId: string | null = defAssetRows.rows[0]?.id ?? defAsset2Rows?.rows[0]?.id ?? null;
 
-      const seriesRows = await client.query(
-        `UPDATE document_series SET current_number = current_number + 1, updated_at = now()
-          WHERE company_id = $1 AND doc_type = 'journal_voucher' AND is_active = true
+      // Resync the series past any existing entry_no before issuing, so we never
+      // collide with journal_entries.entry_no. The series counter can lag behind
+      // the real max (e.g. after seeds/migrations that insert JEs directly), which
+      // causes a duplicate-key error on journal_entries_company_id_entry_no_key.
+      // We take the numeric suffix that follows the prefix on existing entries.
+      const seriesRows = await client.query<{ prefix: string; current_number: string }>(
+        `UPDATE document_series ds
+            SET current_number = GREATEST(
+                  ds.current_number,
+                  COALESCE((
+                    SELECT MAX(NULLIF(regexp_replace(substr(je.entry_no, length(ds.prefix) + 1), '\\D', '', 'g'), '')::bigint)
+                      FROM journal_entries je
+                     WHERE je.company_id = ds.company_id
+                       AND je.entry_no LIKE ds.prefix || '%'
+                  ), 0)
+                ) + 1,
+                updated_at = now()
+          WHERE ds.company_id = $1 AND ds.doc_type = 'journal_voucher' AND ds.is_active = true
           RETURNING prefix, current_number`,
         [companyId],
       );
