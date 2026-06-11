@@ -75,8 +75,20 @@ export async function POST(request: NextRequest) {
       END $$;`],
 
     // ── sales_tally_lines: ensure expected columns exist ────────────────────
+    // The old shape used sales_tally_id as the FK; the code uses tally_id.
+    ['sales_tally_lines.tally_id',           `ALTER TABLE sales_tally_lines ADD COLUMN IF NOT EXISTS tally_id           uuid REFERENCES sales_tally_sheets(id) ON DELETE CASCADE`],
+    ['backfill tally_id from sales_tally_id', `
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name='sales_tally_lines' AND column_name='sales_tally_id') THEN
+          UPDATE sales_tally_lines SET tally_id = sales_tally_id WHERE tally_id IS NULL;
+          ALTER TABLE sales_tally_lines ALTER COLUMN sales_tally_id DROP NOT NULL;
+        END IF;
+      END $$;`],
     ['sales_tally_lines.allocation_line_id', `ALTER TABLE sales_tally_lines ADD COLUMN IF NOT EXISTS allocation_line_id uuid REFERENCES order_allocation_lines(id)`],
     ['sales_tally_lines.item_id',            `ALTER TABLE sales_tally_lines ADD COLUMN IF NOT EXISTS item_id            uuid REFERENCES items(id)`],
+    ['sales_tally_lines.item_id nullable',   `ALTER TABLE sales_tally_lines ALTER COLUMN item_id DROP NOT NULL`],
     ['sales_tally_lines.description',        `ALTER TABLE sales_tally_lines ADD COLUMN IF NOT EXISTS description        text NOT NULL DEFAULT ''`],
     ['sales_tally_lines.qty_allocated',      `ALTER TABLE sales_tally_lines ADD COLUMN IF NOT EXISTS qty_allocated      numeric(14,4) NOT NULL DEFAULT 0`],
     ['sales_tally_lines.allocation_unit',    `ALTER TABLE sales_tally_lines ADD COLUMN IF NOT EXISTS allocation_unit    varchar(20) NOT NULL DEFAULT 'Pcs'`],
