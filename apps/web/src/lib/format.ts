@@ -14,7 +14,9 @@ export function formatNumber(n: number, decimals = 2): string {
   });
 }
 
-export function formatDate(iso: string): string {
+export function formatDate(iso: string | null | undefined): string {
+  if (!iso) return '—';
   const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: '2-digit' });
 }
