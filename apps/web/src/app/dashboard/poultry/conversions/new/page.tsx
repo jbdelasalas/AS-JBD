@@ -32,6 +32,7 @@ interface SourceLine {
   uom: string; available: number; heads: number; kgs: number;
   doa_heads: number; doa_kgs: number;
   short_over_heads: number; short_over_kgs: number;
+  avg_cost: number;
 }
 interface OutputLine {
   output_item_id: string; item_sku: string; item_name: string;
@@ -82,6 +83,7 @@ function NewConversionForm() {
       item_id: l.item_id, item_sku: l.sku, item_name: l.item_name,
       uom: '', available: 0, heads: Number(l.heads), kgs: Number(l.net_kgs),
       doa_heads: 0, doa_kgs: 0, short_over_heads: 0, short_over_kgs: 0,
+      avg_cost: 0,
     })) ?? []
   );
 
@@ -103,7 +105,16 @@ function NewConversionForm() {
         }
       }).catch(() => {});
     api.get<LiveStock[]>(`/poultry/live-stock?company_id=${cid}`)
-      .then(r => setLiveStock(Array.isArray(r) ? r : [])).catch(() => {});
+      .then(r => {
+        const ls = Array.isArray(r) ? r : [];
+        setLiveStock(ls);
+        // Backfill avg_cost (and uom) on seed-populated source lines by item
+        setSourceLines(prev => prev.map(l => {
+          if (l.avg_cost > 0) return l;
+          const match = ls.find(s => s.item_id === l.item_id);
+          return match ? { ...l, avg_cost: match.avg_cost, uom: l.uom || match.uom } : l;
+        }));
+      }).catch(() => {});
     api.get<Location[]>(`/inventory/locations?company_id=${cid}`).then(r => {
       const locs = Array.isArray(r) ? r : [];
       setLocations(locs);
@@ -157,8 +168,8 @@ function NewConversionForm() {
       doa_kgs: parseFloat(srcForm.doa_kgs) || 0,
       short_over_heads: parseFloat(srcForm.short_over_heads) || 0,
       short_over_kgs: parseFloat(srcForm.short_over_kgs) || 0,
+      avg_cost: avgCost,
     }]);
-    setOutForm(f => ({ ...f, price_per_kg: avgCost > 0 ? avgCost.toFixed(4) : f.price_per_kg }));
     setSrcForm({ item_id: '', tally_id: '', heads: '', kgs: '', doa_heads: '', doa_kgs: '', short_over_heads: '', short_over_kgs: '' });
   }
 
@@ -174,8 +185,9 @@ function NewConversionForm() {
       dressing_fee: parseFloat(outForm.dressing_fee) || 0,
       delivery_ref_no: outForm.delivery_ref_no,
     }]);
-    // Keep price_per_kg for next line; clear the rest
-    setOutForm(f => ({ output_item_id: '', category: '', heads: '', kgs: '', price_per_kg: f.price_per_kg, dressing_fee: '', delivery_ref_no: '' }));
+    // Clear the line; let the next line re-default Price/kg from source avg cost
+    setOutForm({ output_item_id: '', category: '', heads: '', kgs: '', price_per_kg: '', dressing_fee: '', delivery_ref_no: '' });
+    setPriceTouched(false);
   }
 
   const totalSrcKgs        = sourceLines.reduce((s, l) => s + l.kgs, 0);
@@ -184,6 +196,21 @@ function NewConversionForm() {
   const totalDoaKgs        = sourceLines.reduce((s, l) => s + l.doa_kgs, 0);
   const totalShortOvrHeads = sourceLines.reduce((s, l) => s + l.short_over_heads, 0);
   const totalShortOvrKgs   = sourceLines.reduce((s, l) => s + l.short_over_kgs, 0);
+  // Weighted average cost per kilo across all source items:
+  //   Σ(kgs × avg_cost) / Σ(kgs)
+  const sourceCostValue = sourceLines.reduce((s, l) => s + l.kgs * l.avg_cost, 0);
+  const sourceAvgCostPerKg = totalSrcKgs > 0 ? sourceCostValue / totalSrcKgs : 0;
+
+  // Default the output Price/kg from the blended source cost/kg until the user
+  // edits it manually (tracked by priceTouched).
+  const [priceTouched, setPriceTouched] = useState(false);
+  useEffect(() => {
+    if (priceTouched) return;
+    if (sourceAvgCostPerKg > 0) {
+      setOutForm(f => ({ ...f, price_per_kg: sourceAvgCostPerKg.toFixed(4) }));
+    }
+  }, [sourceAvgCostPerKg, priceTouched]);
+
   const totalOutKgs      = outputLines.reduce((s, l) => s + l.kgs, 0);
   const totalOutHeads    = outputLines.reduce((s, l) => s + l.heads, 0);
   const totalOutAmount   = outputLines.reduce((s, l) => s + l.kgs * l.price_per_kg, 0);
@@ -458,7 +485,7 @@ function NewConversionForm() {
               <div className="col-span-1">
                 <label className={lbl}>Price/kg</label>
                 <input type="number" min={0} step="any" className={inp} value={outForm.price_per_kg}
-                  onChange={e => setOutForm(f => ({ ...f, price_per_kg: e.target.value }))} />
+                  onChange={e => { setPriceTouched(true); setOutForm(f => ({ ...f, price_per_kg: e.target.value })); }} />
               </div>
               <div className="col-span-1">
                 <label className={lbl}>Amount</label>
