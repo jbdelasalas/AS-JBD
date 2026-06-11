@@ -20,6 +20,7 @@ const MASTER_DATA = [
     group: 'Parties',
     items: [
       { href: '/dashboard/admin/master-data/customers', title: 'Customers', desc: 'Customer accounts, credit limits, and payment terms', icon: '👥' },
+      { href: '/dashboard/admin/master-data/price-list', title: 'Contracted Prices', desc: 'Per-customer pricing for the customer portal', icon: '🏷️' },
       { href: '/dashboard/admin/master-data/suppliers', title: 'Suppliers', desc: 'Supplier accounts, TIN, payment terms, and EWT rates', icon: '🏭' },
     ],
   },

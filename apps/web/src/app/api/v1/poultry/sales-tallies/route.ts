@@ -17,9 +17,16 @@ export async function GET(request: NextRequest) {
   if (status) { params.push(status); where += ` AND s.status = $${params.length}`; }
   params.push(limit, offset);
   try {
+    // sales_tally_sheets is shared by two subsystems with different column
+    // shapes: this dispatch flow (doc_no / transfer_date) and the allocation
+    // flow (tally_no / tally_date). COALESCE so rows from either flow render.
     const rows = await query(
-      `SELECT s.id, s.doc_no, s.transfer_date, s.status, s.ref_no, s.delivery_ref_no, s.plate_number, s.driver,
-              c.name AS customer_name, c.code AS customer_code
+      `SELECT s.id,
+              COALESCE(s.doc_no, s.tally_no)                AS doc_no,
+              COALESCE(s.transfer_date, s.tally_date)       AS transfer_date,
+              s.status, s.ref_no, s.delivery_ref_no, s.plate_number, s.driver,
+              COALESCE(c.name, s.customer_name)             AS customer_name,
+              c.code                                        AS customer_code
          FROM sales_tally_sheets s LEFT JOIN customers c ON c.id = s.customer_id
         WHERE ${where} ORDER BY s.created_at DESC
         LIMIT $${params.length - 1} OFFSET $${params.length}`,

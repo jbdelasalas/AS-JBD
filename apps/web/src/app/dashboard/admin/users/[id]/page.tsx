@@ -12,17 +12,23 @@ interface UserDetail {
   is_superadmin: boolean;
   twofa_enabled: boolean;
   created_at: string;
+  is_portal_user: boolean;
+  customer_id: string | null;
   roles: Array<{ company_id: string | null; role_id: string; role_name: string }>;
 }
 
 interface Role { id: string; name: string; }
+interface Customer { id: string; code: string; name: string; }
 
 export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [user, setUser] = useState<UserDetail | null>(null);
   const [allRoles, setAllRoles] = useState<Role[]>([]);
-  const [form, setForm] = useState({ full_name: '', is_active: true, is_superadmin: false, password: '' });
+  const [form, setForm] = useState({ full_name: '', is_active: true, is_superadmin: false, password: '', is_portal_user: false, customer_id: '' });
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [portalSaving, setPortalSaving] = useState(false);
+  const [portalSaved, setPortalSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -36,10 +42,12 @@ export default function UserDetailPage() {
     Promise.all([
       api.get<UserDetail>(`/admin/users/${id}`),
       api.get<Role[]>(`/admin/roles?company_id=${companyId ?? ''}`),
-    ]).then(([u, roles]) => {
+      api.get<{ data: Customer[] }>(`/ar/customers?company_id=${companyId ?? ''}&is_active=true&limit=500`),
+    ]).then(([u, roles, custs]) => {
       setUser(u);
       setAllRoles(roles);
-      setForm({ full_name: u.full_name, is_active: u.is_active, is_superadmin: u.is_superadmin, password: '' });
+      setCustomers(custs.data ?? []);
+      setForm({ full_name: u.full_name, is_active: u.is_active, is_superadmin: u.is_superadmin, password: '', is_portal_user: u.is_portal_user, customer_id: u.customer_id ?? '' });
     }).catch((e) => setError(e.message));
   }
 
@@ -90,6 +98,24 @@ export default function UserDetailPage() {
       setRoleError((e as Error).message);
     } finally {
       setRoleWorking(false);
+    }
+  }
+
+  async function savePortal() {
+    setPortalSaving(true);
+    setError(null);
+    try {
+      await api.patch(`/admin/users/${id}`, {
+        is_portal_user: form.is_portal_user,
+        customer_id: form.is_portal_user ? (form.customer_id || null) : null,
+      });
+      setPortalSaved(true);
+      setTimeout(() => setPortalSaved(false), 2000);
+      load();
+    } catch (e: unknown) {
+      setError((e as Error).message);
+    } finally {
+      setPortalSaving(false);
     }
   }
 
@@ -191,6 +217,49 @@ export default function UserDetailPage() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Customer portal access */}
+      <div className="mt-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+        <h2 className="mb-1 text-sm font-semibold text-slate-800 dark:text-slate-200">Customer Portal access</h2>
+        <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+          Link this user to a customer so they can log in to the customer portal and place / track orders for that account.
+        </p>
+
+        <label className="mb-3 flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+          <input
+            type="checkbox"
+            checked={form.is_portal_user}
+            onChange={(e) => setForm((f) => ({ ...f, is_portal_user: e.target.checked }))}
+          />
+          This is a portal customer user
+        </label>
+
+        {form.is_portal_user && (
+          <div className="mb-3">
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Linked customer</label>
+            <select
+              value={form.customer_id}
+              onChange={(e) => setForm((f) => ({ ...f, customer_id: e.target.value }))}
+              className="w-full rounded border border-slate-300 dark:border-slate-600 px-2 py-1.5 text-sm dark:bg-slate-800 dark:text-slate-100"
+            >
+              <option value="">Select customer…</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>{c.code} — {c.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <button
+            onClick={savePortal}
+            disabled={portalSaving || (form.is_portal_user && !form.customer_id)}
+            className="rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+          >
+            {portalSaved ? 'Saved!' : portalSaving ? 'Saving…' : 'Save portal access'}
+          </button>
+        </div>
       </div>
     </div>
   );

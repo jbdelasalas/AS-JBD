@@ -52,7 +52,7 @@ export default function SalesTalliesPage() {
               : rows.map(r => (
                 <tr key={r.id} className="border-b border-slate-50 dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800">
                   <td className="px-3 py-2"><Link href={`/dashboard/poultry/sales-tallies/${r.id}`} className="font-mono text-brand-600 hover:underline">{r.doc_no}</Link></td>
-                  <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{r.customer_code ? `${r.customer_code} — ${r.customer_name}` : '—'}</td>
+                  <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{r.customer_code ? `${r.customer_code} — ${r.customer_name}` : (r.customer_name ?? '—')}</td>
                   <td className="px-3 py-2 text-slate-500">{formatDate(r.transfer_date)}</td>
                   <td className="px-3 py-2 text-slate-500">{r.ref_no ?? '—'}</td>
                   <td className="px-3 py-2 text-slate-500">{r.driver ?? '—'}</td>
