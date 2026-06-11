@@ -47,6 +47,9 @@ export async function POST(request: NextRequest) {
   if (!companyId || !dto.transfer_date) return err('company_id and transfer_date are required', 400);
   const lines = (dto.lines as Record<string, unknown>[]) ?? [];
 
+  // Ensure live_item_id column exists (added post-initial schema)
+  await query(`ALTER TABLE tally_sheets ADD COLUMN IF NOT EXISTS live_item_id uuid REFERENCES items(id)`, []).catch(() => {});
+
   const client = await getPool().connect();
   try {
     await client.query('BEGIN');
@@ -62,12 +65,20 @@ export async function POST(request: NextRequest) {
     const netKgs = lines.reduce((s, l) => s + Number(l.net_kgs ?? 0), 0);
 
     const orNull = (v: unknown) => (v as string) || null;
+
+    // Pull live_item_id from the grow cycle so the transfer JE route can use it
+    let gcLiveItemId: string | null = orNull(dto.live_item_id);
+    if (!gcLiveItemId && dto.grow_cycle_id) {
+      const gcRow = await client.query<{ live_item_id: string | null }>(
+        `SELECT live_item_id FROM grow_cycles WHERE id = $1 LIMIT 1`, [dto.grow_cycle_id]);
+      gcLiveItemId = gcRow.rows[0]?.live_item_id ?? null;
+    }
     const { rows: [hdr] } = await client.query(
       `INSERT INTO tally_sheets (company_id, doc_no, tally_type, grow_cycle_id, supplier_id, destination_id,
          transfer_date, reference_id, harvested_heads, reject_kgs, reject_heads, replacement_kgs, replacement_heads,
          net_heads, net_kgs, received_by, issued_by, checked_by, delivery_method, plate_number, driver, helper,
-         start_time, end_time, remarks, branch_id, building_id, cost_center_id, grow_reference_id, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,'saved',$30) RETURNING *`,
+         start_time, end_time, remarks, branch_id, building_id, cost_center_id, grow_reference_id, live_item_id, status, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,'saved',$31) RETURNING *`,
       [companyId, docNo, dto.tally_type ?? 'harvest', orNull(dto.grow_cycle_id), orNull(dto.supplier_id),
        orNull(dto.destination_id), dto.transfer_date, orNull(dto.reference_id),
        dto.harvested_heads ?? netHeads, dto.reject_kgs ?? 0, dto.reject_heads ?? 0,
@@ -76,7 +87,7 @@ export async function POST(request: NextRequest) {
        orNull(dto.delivery_method), orNull(dto.plate_number), orNull(dto.driver), orNull(dto.helper),
        orNull(dto.start_time), orNull(dto.end_time), orNull(dto.remarks),
        orNull(dto.branch_id), orNull(dto.building_id), orNull(dto.cost_center_id), orNull(dto.grow_reference_id),
-       auth.userId],
+       gcLiveItemId, auth.userId],
     );
     for (let i = 0; i < lines.length; i++) {
       const l = lines[i];

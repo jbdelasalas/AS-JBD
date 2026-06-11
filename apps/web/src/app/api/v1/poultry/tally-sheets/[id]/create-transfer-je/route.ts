@@ -67,13 +67,19 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     }
     if (liveCost <= 0) return err('Could not determine live cost. Ensure the harvest journal entry exists or the grow cycle has cost data.', 400);
 
-    // Live Inventory account: from live item's inventory account
-    if (!rec.live_item_id) return err('No live item set on this tally sheet', 400);
+    // Live Inventory account: from live item — try tally sheet first, fall back to grow cycle
+    let resolvedLiveItemId = rec.live_item_id as string | null;
+    if (!resolvedLiveItemId && rec.grow_cycle_id) {
+      const [gcRow] = await query<Record<string, unknown>>(
+        `SELECT live_item_id FROM grow_cycles WHERE id = $1 LIMIT 1`, [rec.grow_cycle_id]);
+      resolvedLiveItemId = (gcRow?.live_item_id as string | null) ?? null;
+    }
+    if (!resolvedLiveItemId) return err('No live item set. Set a Harvest Item on the grow cycle first.', 400);
     const [liveItem] = await query<Record<string, unknown>>(
-      `SELECT inventory_account_id, name FROM items WHERE id = $1`, [rec.live_item_id]);
+      `SELECT inventory_account_id, name FROM items WHERE id = $1`, [resolvedLiveItemId]);
     if (!liveItem?.inventory_account_id) return err('Live item has no inventory account set. Set it in Item Setup → Inventory Account.', 400);
     const liveInvAcctId = String(liveItem.inventory_account_id);
-    const liveItemId = String(rec.live_item_id);
+    const liveItemId = resolvedLiveItemId;
 
     // Live Buying account: expense account matching "live buying" / fallback cos+live
     const buyingRows = await query<Record<string, unknown>>(
