@@ -82,6 +82,15 @@ const NAV: NavItem[] = [
       { href: '/dashboard/poultry/sales-tallies', label: 'Sales Tallies' },
     ],
   },
+  {
+    href: '/dashboard/restaurant',
+    label: 'Restaurant',
+    children: [
+      { href: '/dashboard/purchasing/purchase-orders', label: 'Purchase Orders' },
+      { href: '/dashboard/ap/bills',                    label: 'Bills' },
+      { href: '/dashboard/ar/invoices',                 label: 'Sales Invoice' },
+    ],
+  },
   { href: '/dashboard/reports', label: 'Reports' },
   { href: '/dashboard/bir',     label: 'BIR Compliance' },
   { href: '/dashboard/ai',      label: 'AI Analysis' },
