@@ -313,6 +313,12 @@ export default function SalesOrderDetailPage() {
                   </button>
                 </>
               )}
+              {['approved','partially_delivered'].includes(order.status) && (
+                <Link href={`/dashboard/sales/allocations/new?from_so=${id}`}
+                  className="rounded border border-brand-500 px-5 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 dark:border-brand-500 dark:text-brand-400 dark:hover:bg-brand-900/20">
+                  Create Allocation
+                </Link>
+              )}
               <Link href={`/dashboard/purchasing/purchase-orders/new?from_so=${id}`}
                 className="rounded border border-brand-500 px-5 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 dark:border-brand-500 dark:text-brand-400 dark:hover:bg-brand-900/20">
                 Create PO

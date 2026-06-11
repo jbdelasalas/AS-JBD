@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useTaggingData } from '@/hooks/useTaggingData';
 import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
+import type { SalesOrder } from '@perpet/shared';
 
 interface Customer { id: string; code: string; name: string; payment_terms_days: number; address: string | null; }
 interface SORow    { id: string; order_no: string; customer_id: string; }
@@ -30,6 +31,8 @@ const EMPTY_LINE: Line = {
 
 export default function NewAllocationPage() {
   const router  = useRouter();
+  const search  = useSearchParams();
+  const fromSo  = search.get('from_so');
   const tagData = useTaggingData();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [orders, setOrders]       = useState<SORow[]>([]);
@@ -50,6 +53,46 @@ export default function NewAllocationPage() {
     api.get<{ data: Customer[] }>(`/ar/customers?company_id=${cid}&is_active=true&limit=200`).then(c => setCustomers(c.data)).catch(() => {});
     api.get<Item[]>(`/inventory/items?company_id=${cid}&limit=200`).then(i => setItems(i)).catch(() => {});
   }, []);
+
+  // Prefill from a Sales Order when arriving via "Create Allocation"
+  useEffect(() => {
+    if (!fromSo) return;
+    api.get<SalesOrder>(`/sales/orders/${fromSo}`).then(so => {
+      setForm(f => ({
+        ...f,
+        customer_id: so.customer_id,
+        so_id: so.id,
+        delivery_date: so.delivery_date ?? '',
+        reference: so.order_no,
+      }));
+      setTags({
+        branch_id: so.branch_id ?? '',
+        building_id: so.building_id ?? '',
+        cost_center_id: so.cost_center_id ?? '',
+        grow_reference_id: so.grow_reference_id ?? '',
+      });
+      const soLines = so.lines ?? [];
+      if (soLines.length) {
+        setLines(soLines.map(l => {
+          const remaining = Number(l.quantity) - Number(l.qty_delivered);
+          return {
+            item_id: l.item_id,
+            description: l.description,
+            qty_ordered: Number(l.quantity),
+            qty_allocated: remaining > 0 ? remaining : 0,
+            allocation_unit: l.item_uom && UNITS.includes(l.item_uom) ? l.item_uom : 'Pcs',
+            unit_price: Number(l.unit_price),
+            discount_pct: Number(l.discount_pct ?? 0),
+            vat_rate: Number(l.vat_rate ?? 12),
+            branch_id: l.branch_id ?? '',
+            building_id: l.building_id ?? '',
+            cost_center_id: l.cost_center_id ?? '',
+            grow_reference_id: l.grow_reference_id ?? '',
+          };
+        }));
+      }
+    }).catch(() => setError('Failed to load sales order'));
+  }, [fromSo]);
 
   // Load SOs for selected customer
   useEffect(() => {
