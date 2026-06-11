@@ -10,17 +10,24 @@ export async function GET(
 ) {
   try { await requireAuth(request); } catch (e) { return e as Response; }
 
-  // Load the grow cycle to get branch, building, grow_reference
+  // Load the grow cycle to get branch, building, grow_reference, and the chick
+  // item being grown (so it can be excluded from the consumable list — you don't
+  // "consume" the day-old chicks you are raising).
   const [cycle] = await query<{
     company_id: string; branch_id: string | null;
     building_id: string | null; grow_reference: string | null;
+    chick_item_id: string | null;
   }>(
-    `SELECT company_id, branch_id, building_id, grow_reference FROM grow_cycles WHERE id = $1`,
+    `SELECT g.company_id, g.branch_id, g.building_id, g.grow_reference,
+            b.item_id AS chick_item_id
+       FROM grow_cycles g
+       LEFT JOIN chick_batches b ON b.id = g.batch_id
+      WHERE g.id = $1`,
     [params.id],
   );
   if (!cycle) return err('Grow cycle not found', 404);
 
-  const { company_id, branch_id, building_id, grow_reference } = cycle;
+  const { company_id, branch_id, building_id, grow_reference, chick_item_id } = cycle;
 
   // Resolve grow_reference text → UUID if possible
   let growRefId: string | null = null;
@@ -52,6 +59,7 @@ export async function GET(
       WHERE i.company_id = $1
         AND i.is_active = true
         AND COALESCE(sb.qty_on_hand, 0) > 0
+        AND ($5::uuid IS NULL OR i.id <> $5)   -- exclude the chick item being grown
         AND i.id IN (
           -- items received on GRN/PO lines matching ALL set tags (AND logic)
           SELECT DISTINCT pol.item_id
@@ -74,7 +82,7 @@ export async function GET(
              AND iil.net_quantity > 0
         )
       ORDER BY i.sku`,
-    [company_id, branch_id, building_id, growRefId],
+    [company_id, branch_id, building_id, growRefId, chick_item_id],
   );
 
   return ok(rows.map(r => ({
