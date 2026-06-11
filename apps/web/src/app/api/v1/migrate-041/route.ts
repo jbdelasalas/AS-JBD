@@ -96,6 +96,10 @@ export async function POST(request: NextRequest) {
     ['sales_tally_lines.actual_weight_kgs',  `ALTER TABLE sales_tally_lines ADD COLUMN IF NOT EXISTS actual_weight_kgs  numeric(14,4) NOT NULL DEFAULT 0`],
     ['sales_tally_lines.unit_price',         `ALTER TABLE sales_tally_lines ADD COLUMN IF NOT EXISTS unit_price         numeric(14,4) NOT NULL DEFAULT 0`],
     ['sales_tally_lines.remarks',            `ALTER TABLE sales_tally_lines ADD COLUMN IF NOT EXISTS remarks            text`],
+
+    // ── items: kg conversion factors for Bag/Pcs → Kg on allocations ─────────
+    ['items.kg_per_bag', `ALTER TABLE items ADD COLUMN IF NOT EXISTS kg_per_bag numeric(14,4)`],
+    ['items.kg_per_pcs', `ALTER TABLE items ADD COLUMN IF NOT EXISTS kg_per_pcs numeric(14,4)`],
   ];
 
   const results: string[] = [];

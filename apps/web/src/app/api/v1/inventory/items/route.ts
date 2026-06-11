@@ -37,11 +37,25 @@ export async function GET(request: NextRequest) {
 
   try {
     if (minimal) {
-      const rows = await query(
-        `SELECT id, sku, name, uom, selling_price FROM items i WHERE ${where} ORDER BY sku LIMIT $${params.length}`,
-        params,
-      );
-      return ok(rows.map((r) => ({ ...r, selling_price: Number(r.selling_price) })));
+      // Include kg conversion factors when available (columns may not exist yet).
+      let rows: Array<Record<string, unknown>>;
+      try {
+        rows = await query(
+          `SELECT id, sku, name, uom, selling_price, kg_per_bag, kg_per_pcs FROM items i WHERE ${where} ORDER BY sku LIMIT $${params.length}`,
+          params,
+        );
+      } catch {
+        rows = await query(
+          `SELECT id, sku, name, uom, selling_price FROM items i WHERE ${where} ORDER BY sku LIMIT $${params.length}`,
+          params,
+        );
+      }
+      return ok(rows.map((r) => ({
+        ...r,
+        selling_price: Number(r.selling_price),
+        kg_per_bag: r.kg_per_bag == null ? null : Number(r.kg_per_bag),
+        kg_per_pcs: r.kg_per_pcs == null ? null : Number(r.kg_per_pcs),
+      })));
     }
 
     const rows = await query(
@@ -81,8 +95,25 @@ export async function GET(request: NextRequest) {
       }
     } catch { /* column not yet added — skip */ }
 
+    // Fetch kg conversion factors separately — columns may not exist before migration runs
+    const kgMap = new Map<string, { bag: number | null; pcs: number | null }>();
+    try {
+      const kgRows = await query(
+        `SELECT id, kg_per_bag, kg_per_pcs FROM items WHERE company_id = $1`,
+        [companyId],
+      );
+      for (const r of kgRows as Array<Record<string, unknown>>) {
+        kgMap.set(r.id as string, {
+          bag: r.kg_per_bag == null ? null : Number(r.kg_per_bag),
+          pcs: r.kg_per_pcs == null ? null : Number(r.kg_per_pcs),
+        });
+      }
+    } catch { /* columns not yet added — skip */ }
+
     return ok(rows.map((r) => {
-      const drRev = drRevAcctMap.get((r as Record<string, unknown>).id as string);
+      const id = (r as Record<string, unknown>).id as string;
+      const drRev = drRevAcctMap.get(id);
+      const kg = kgMap.get(id);
       return {
         ...r,
         standard_cost: Number(r.standard_cost),
@@ -90,6 +121,8 @@ export async function GET(request: NextRequest) {
         reorder_point: Number(r.reorder_point),
         dr_revenue_account_id: drRev?.id ?? null,
         dr_revenue_account_name: drRev?.name ?? null,
+        kg_per_bag: kg?.bag ?? null,
+        kg_per_pcs: kg?.pcs ?? null,
       };
     }));
   } catch (e: unknown) {
@@ -123,8 +156,10 @@ export async function POST(request: NextRequest) {
       if (dup.length) return err(`SKU ${sku} already exists`, 409);
     }
 
-    // Ensure late-added column exists; proceed even if DDL is rejected by the pooler
+    // Ensure late-added columns exist; proceed even if DDL is rejected by the pooler
     await query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS dr_revenue_account_id uuid`, []).catch(() => {});
+    await query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS kg_per_bag numeric(14,4)`, []).catch(() => {});
+    await query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS kg_per_pcs numeric(14,4)`, []).catch(() => {});
 
     // Build INSERT dynamically so it works whether or not dr_revenue_account_id exists yet
     const existingCols = new Set(
@@ -153,6 +188,14 @@ export async function POST(request: NextRequest) {
     if (existingCols.has('dr_revenue_account_id')) {
       cols.push('dr_revenue_account_id');
       vals.push(dto.dr_revenue_account_id ?? null);
+    }
+    if (existingCols.has('kg_per_bag')) {
+      cols.push('kg_per_bag');
+      vals.push(dto.kg_per_bag ?? null);
+    }
+    if (existingCols.has('kg_per_pcs')) {
+      cols.push('kg_per_pcs');
+      vals.push(dto.kg_per_pcs ?? null);
     }
 
     const placeholders = vals.map((_, i) => `$${i + 1}`).join(', ');

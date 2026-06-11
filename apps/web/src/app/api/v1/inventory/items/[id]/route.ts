@@ -48,6 +48,18 @@ export async function GET(request: NextRequest, { params }: Ctx) {
     }
   } catch { /* column not yet added — skip */ }
 
+  // Fetch kg conversion factors separately — columns may not exist before migration runs
+  let kgPerBag: number | null = null;
+  let kgPerPcs: number | null = null;
+  try {
+    const kgRows = await query(`SELECT kg_per_bag, kg_per_pcs FROM items WHERE id = $1 LIMIT 1`, [params.id]);
+    if (kgRows[0]) {
+      const k = kgRows[0] as Record<string, unknown>;
+      kgPerBag = k.kg_per_bag == null ? null : Number(k.kg_per_bag);
+      kgPerPcs = k.kg_per_pcs == null ? null : Number(k.kg_per_pcs);
+    }
+  } catch { /* columns not yet added — skip */ }
+
   return ok({
     ...r,
     standard_cost: Number(r.standard_cost),
@@ -55,6 +67,8 @@ export async function GET(request: NextRequest, { params }: Ctx) {
     reorder_point: Number(r.reorder_point),
     dr_revenue_account_id: drRevenueAccountId,
     dr_revenue_account_name: drRevenueAccountName,
+    kg_per_bag: kgPerBag,
+    kg_per_pcs: kgPerPcs,
   });
 }
 
@@ -69,8 +83,10 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
   let body: Record<string, unknown>;
   try { body = await request.json(); } catch { return err('Invalid request body', 400); }
 
-  // Ensure dr_revenue_account_id column exists (added in a later migration)
+  // Ensure late-added columns exist (added in later migrations)
   await query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS dr_revenue_account_id uuid`, []).catch(() => {});
+  await query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS kg_per_bag numeric(14,4)`, []).catch(() => {});
+  await query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS kg_per_pcs numeric(14,4)`, []).catch(() => {});
 
   // Check which columns exist (dr_revenue_account_id may not be migrated yet)
   const colRows = await query<{ column_name: string }>(
@@ -82,7 +98,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
   const allowed = ['sku', 'name', 'uom', 'item_type', 'costing_method',
     'standard_cost', 'selling_price', 'reorder_point', 'category_id', 'is_active',
     'inventory_account_id', 'cogs_account_id', 'revenue_account_id', 'purchase_variance_account_id',
-    'dr_revenue_account_id', 'default_warehouse_id'];
+    'dr_revenue_account_id', 'default_warehouse_id', 'kg_per_bag', 'kg_per_pcs'];
   const sets: string[] = [];
   const vals: unknown[] = [];
 

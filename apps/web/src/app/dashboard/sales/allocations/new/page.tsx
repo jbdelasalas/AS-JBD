@@ -8,7 +8,7 @@ import type { SalesOrder } from '@perpet/shared';
 
 interface Customer { id: string; code: string; name: string; payment_terms_days: number; address: string | null; }
 interface SORow    { id: string; order_no: string; customer_id: string; }
-interface Item     { id: string; sku: string; name: string; selling_price: number; }
+interface Item     { id: string; sku: string; name: string; selling_price: number; kg_per_bag: number | null; kg_per_pcs: number | null; }
 
 interface Line {
   item_id: string; description: string;
@@ -17,14 +17,24 @@ interface Line {
   branch_id: string; building_id: string; cost_center_id: string; grow_reference_id: string;
 }
 
-const UNITS = ['Pcs', 'Kls', 'Head', 'Bags', 'Box', 'Kg'];
+const UNITS = ['Kg', 'Bags', 'Pcs'];
+
+// Convert an allocation quantity in the given unit to kilos, using the item's
+// per-bag / per-pcs factors. Kg/Kls pass through unchanged.
+function toKg(qty: number, unit: string, item?: Item | null): number {
+  const u = unit.toLowerCase();
+  if (u === 'kg' || u === 'kls') return qty;
+  if ((u === 'bag' || u === 'bags') && item?.kg_per_bag) return qty * item.kg_per_bag;
+  if ((u === 'pcs' || u === 'pc' || u === 'piece') && item?.kg_per_pcs) return qty * item.kg_per_pcs;
+  return qty; // no factor set — fall back to raw qty
+}
 const lbl = 'mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400';
 const inp = 'w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100';
 const ro  = 'rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300';
 const sel = 'w-full rounded border border-slate-300 px-1 py-1 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100';
 
 const EMPTY_LINE: Line = {
-  item_id: '', description: '', qty_ordered: 0, qty_allocated: 0, allocation_unit: 'Pcs',
+  item_id: '', description: '', qty_ordered: 0, qty_allocated: 0, allocation_unit: 'Kg',
   unit_price: 0, discount_pct: 0, vat_rate: 12,
   branch_id: '', building_id: '', cost_center_id: '', grow_reference_id: '',
 };
@@ -80,7 +90,7 @@ export default function NewAllocationPage() {
             description: l.description,
             qty_ordered: Number(l.quantity),
             qty_allocated: remaining > 0 ? remaining : 0,
-            allocation_unit: l.item_uom && UNITS.includes(l.item_uom) ? l.item_uom : 'Pcs',
+            allocation_unit: l.item_uom && UNITS.includes(l.item_uom) ? l.item_uom : 'Kg',
             unit_price: Number(l.unit_price),
             discount_pct: Number(l.discount_pct ?? 0),
             vat_rate: Number(l.vat_rate ?? 12),
@@ -248,6 +258,7 @@ export default function NewAllocationPage() {
                   <th className="px-2 py-1.5 text-right font-medium w-20">Qty Ordered</th>
                   <th className="px-2 py-1.5 text-right font-medium w-20">Qty Allocated</th>
                   <th className="px-2 py-1.5 text-left font-medium w-20">Unit</th>
+                  <th className="px-2 py-1.5 text-right font-medium w-16">≈ Kg</th>
                   <th className="px-2 py-1.5 text-right font-medium w-22">Unit Price</th>
                   <th className="px-2 py-1.5 text-right font-medium w-12">Disc%</th>
                   <th className="px-2 py-1.5 text-right font-medium w-12">VAT%</th>
@@ -285,6 +296,9 @@ export default function NewAllocationPage() {
                       <select value={l.allocation_unit} onChange={e => updateLine(idx, 'allocation_unit', e.target.value)} className={sel}>
                         {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                       </select>
+                    </td>
+                    <td className="px-2 py-1 text-right text-xs text-slate-600 dark:text-slate-400">
+                      {toKg(l.qty_allocated, l.allocation_unit, items.find(i => i.id === l.item_id)).toLocaleString('en-PH', { maximumFractionDigits: 2 })}
                     </td>
                     <td className="px-2 py-1">
                       <input type="number" min={0} step="any" value={l.unit_price}

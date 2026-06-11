@@ -24,6 +24,7 @@ interface Item {
   purchase_variance_account_id: string | null; purchase_variance_account_name: string | null;
   dr_revenue_account_id: string | null;      dr_revenue_account_name: string | null;
   default_warehouse_id: string | null; default_warehouse_name: string | null;
+  kg_per_bag: number | null; kg_per_pcs: number | null;
 }
 
 interface Category  { id: string; name: string; }
@@ -95,6 +96,8 @@ export default function ItemDetailPage() {
         purchase_variance_account_id: form.purchase_variance_account_id || null,
         dr_revenue_account_id: form.dr_revenue_account_id || null,
         default_warehouse_id: form.default_warehouse_id || null,
+        kg_per_bag: form.kg_per_bag === undefined || form.kg_per_bag === null || (form.kg_per_bag as unknown as string) === '' ? null : Number(form.kg_per_bag),
+        kg_per_pcs: form.kg_per_pcs === undefined || form.kg_per_pcs === null || (form.kg_per_pcs as unknown as string) === '' ? null : Number(form.kg_per_pcs),
       });
       setSaved(true); setEditing(false); load();
       setTimeout(() => setSaved(false), 2000);
@@ -202,6 +205,24 @@ export default function ItemDetailPage() {
                   <input type="checkbox" checked={form.is_active ?? true} onChange={(e) => set('is_active', e.target.checked)} />
                   Active
                 </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Unit Conversion */}
+          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+            <div className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Unit Conversion</div>
+            <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
+              Kilos per bag / per piece. Used to convert Bag or Pcs quantities to kilos on allocations.
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={lbl}>Kg per Bag</label>
+                <NumericInput value={form.kg_per_bag ?? 0} onChange={v => set('kg_per_bag', v)} min={0} decimals={4} className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>Kg per Pcs</label>
+                <NumericInput value={form.kg_per_pcs ?? 0} onChange={v => set('kg_per_pcs', v)} min={0} decimals={4} className={inp} />
               </div>
             </div>
           </div>

@@ -26,6 +26,7 @@ export default function NewItemPage() {
     sku: '', name: '', uom: 'PCS', item_type: 'stock',
     costing_method: 'weighted_avg', standard_cost: '', selling_price: '',
     reorder_point: '', category_id: '', is_active: true,
+    kg_per_bag: '', kg_per_pcs: '',
     inventory_account_id: '',
     cogs_account_id: '',
     revenue_account_id: '',
@@ -72,6 +73,8 @@ export default function NewItemPage() {
         purchase_variance_account_id: form.purchase_variance_account_id || null,
         dr_revenue_account_id: form.dr_revenue_account_id || null,
         default_warehouse_id: form.default_warehouse_id || null,
+        kg_per_bag: parseFloat(form.kg_per_bag) || null,
+        kg_per_pcs: parseFloat(form.kg_per_pcs) || null,
       });
       router.push('/dashboard/inventory/items');
     } catch (e: unknown) {
@@ -163,6 +166,24 @@ export default function NewItemPage() {
                 <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
                 Active
               </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Unit Conversion */}
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+          <div className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Unit Conversion</div>
+          <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
+            Kilos per bag / per piece. Used to convert Bag or Pcs quantities to kilos on allocations.
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={lbl}>Kg per Bag</label>
+              <NumericInput value={form.kg_per_bag} onChange={v => set('kg_per_bag', String(v))} min={0} decimals={4} className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Kg per Pcs</label>
+              <NumericInput value={form.kg_per_pcs} onChange={v => set('kg_per_pcs', String(v))} min={0} decimals={4} className={inp} />
             </div>
           </div>
         </div>
