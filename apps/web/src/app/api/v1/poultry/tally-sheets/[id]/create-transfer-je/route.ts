@@ -22,6 +22,12 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   const pricePerKg = parseFloat(String(body.transfer_price ?? '0'));
   if (!pricePerKg || pricePerKg <= 0) return err('Transfer price must be greater than zero', 400);
 
+  // Ensure tagging columns exist on journal_entry_lines (added post-initial schema)
+  await Promise.all([
+    query(`ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS branch_id uuid REFERENCES branches(id)`, []).catch(() => {}),
+    query(`ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS cost_center_id uuid REFERENCES cost_centers(id)`, []).catch(() => {}),
+  ]);
+
   try {
     const [rec] = await query<Record<string, unknown>>(`SELECT * FROM tally_sheets WHERE id = $1`, [params.id]);
     if (!rec) return err('Not found', 404);
