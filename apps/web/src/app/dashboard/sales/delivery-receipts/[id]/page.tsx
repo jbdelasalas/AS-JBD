@@ -380,6 +380,10 @@ export default function DRDetailPage() {
                 className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
                 Create Sales Invoice
               </button>
+              <Link href={`/dashboard/sales/return-goods/new?dr_id=${id}`}
+                className="rounded border border-amber-400 bg-amber-50 px-5 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900">
+                Create Return
+              </Link>
               {dr.je_id && (
                 <Link href={`/dashboard/gl/journal-entries/${dr.je_id}`}
                   className="rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 dark:border-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">

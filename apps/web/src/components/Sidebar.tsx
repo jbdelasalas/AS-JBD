@@ -48,6 +48,7 @@ const NAV: NavItem[] = [
     children: [
       { href: '/dashboard/sales/orders',             label: 'Sales Orders' },
       { href: '/dashboard/sales/delivery-receipts',  label: 'Delivery Receipts' },
+      { href: '/dashboard/sales/return-goods',       label: 'Return Goods' },
       { href: '/dashboard/sales/allocations',        label: 'Order Allocations' },
     ],
   },
