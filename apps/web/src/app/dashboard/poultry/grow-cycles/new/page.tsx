@@ -64,16 +64,16 @@ export default function NewGrowCyclePage() {
   // Resolve grow_reference name → UUID for batch filtering
   const selectedGrowRefId = growRefs.find(g => g.name === form.grow_reference)?.id ?? null;
 
-  // Filter chick batches: only show batches whose GRN (or PO) match location, building, grow reference.
-  // A tag is only applied as a filter when the user has actually selected a value.
+  // Filter chick batches: only show batches whose GRN (or PO) strictly match every selected filter.
+  // Batches with null values for a selected filter are excluded (they have no matching data).
   const filteredBatches = allBatches.filter(b => {
     const branchId   = b.grn_branch_id   ?? b.po_branch_id;
     const buildingId = b.grn_building_id ?? b.po_building_id;
     const growRefId  = b.grn_grow_reference_id ?? b.po_grow_reference_id;
 
-    if (form.branch_id   && branchId   && branchId   !== form.branch_id)   return false;
-    if (form.building_id && buildingId && buildingId !== form.building_id)  return false;
-    if (selectedGrowRefId && growRefId && growRefId  !== selectedGrowRefId) return false;
+    if (form.branch_id    && branchId   !== form.branch_id)    return false;
+    if (form.building_id  && buildingId !== form.building_id)  return false;
+    if (selectedGrowRefId && growRefId  !== selectedGrowRefId) return false;
     return true;
   });
 
