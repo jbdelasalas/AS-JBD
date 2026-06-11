@@ -74,8 +74,23 @@ export default function DRPrintPage() {
     }
   }
 
-  const lines       = dr.lines;
-  const totalKgs    = lines.reduce((s, l) => s + Number(l.qty_delivered), 0);
+  // Combine lines with the same item into a single printed row (sum kilograms).
+  // Heads come from the tally sheet per item, so they are counted once per item.
+  const grouped = new Map<string, { key: string; item_id: string; item_name: string | null; description: string; qty_delivered: number }>();
+  for (const l of dr.lines) {
+    const key = l.item_id || `desc:${l.description}`;
+    const g = grouped.get(key);
+    if (g) {
+      g.qty_delivered += Number(l.qty_delivered);
+    } else {
+      grouped.set(key, {
+        key, item_id: l.item_id, item_name: l.item_name,
+        description: l.description, qty_delivered: Number(l.qty_delivered),
+      });
+    }
+  }
+  const lines       = [...grouped.values()];
+  const totalKgs    = lines.reduce((s, l) => s + l.qty_delivered, 0);
   const totalHeads  = lines.reduce((s, l) => s + (headsMap.get(l.item_id) ?? 0), 0);
   const blankRows   = Math.max(0, MIN_ROWS - lines.length);
   const termsLabel  = dr.payment_terms_days ? `Net ${dr.payment_terms_days}` : '';
@@ -173,9 +188,9 @@ export default function DRPrintPage() {
             {lines.map(l => {
               const heads = headsMap.get(l.item_id);
               return (
-                <tr key={l.id} style={{ borderBottom: '1px solid #ccc' }}>
+                <tr key={l.key} style={{ borderBottom: '1px solid #ccc' }}>
                   <td style={tdStyle('center')}>{heads ? fmtNum(heads, 0) : ''}</td>
-                  <td style={tdStyle('center')}>{fmtNum(Number(l.qty_delivered), 2)}</td>
+                  <td style={tdStyle('center')}>{fmtNum(l.qty_delivered, 2)}</td>
                   <td style={tdStyle('left')}>{l.item_name ?? l.description}</td>
                 </tr>
               );
