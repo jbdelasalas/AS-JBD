@@ -382,12 +382,19 @@ export async function POST(request: NextRequest) {
       const qty = Number(l.qty_received);
       if (qty <= 0) continue;
 
-      // Get item_id from the PO line
-      const { rows: polRows } = await client.query<{ item_id: string }>(
-        `SELECT item_id FROM purchase_order_lines WHERE id = $1 LIMIT 1`, [l.po_line_id]);
+      // Get item_id and UOM from the PO line
+      const { rows: polRows } = await client.query<{ item_id: string; uom: string }>(
+        `SELECT pol.item_id, i.uom
+           FROM purchase_order_lines pol
+           JOIN items i ON i.id = pol.item_id
+          WHERE pol.id = $1 LIMIT 1`, [l.po_line_id]);
       if (!polRows[0]) continue;
-      const itemId = polRows[0].item_id;
+      const itemId  = polRows[0].item_id;
+      const itemUom = (polRows[0].uom ?? '').toUpperCase();
       const unitCost = Number(l.unit_cost ?? 0);
+
+      // Only track live-animal items (UOM HEAD/HEADS) as chick batches; skip feed/supplies
+      if (!itemUom.startsWith('HEAD')) continue;
 
       // Merge into an existing available batch from the same PO + item:
       // sum heads and recompute price_per_head as a heads-weighted average.

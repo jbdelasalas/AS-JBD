@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
          LEFT JOIN goods_receipts gr ON gr.id = b.grn_id
          LEFT JOIN purchase_orders po ON po.id = b.po_id
         WHERE b.company_id = $1 AND b.status = $2${poFilter}
+          AND i.uom ILIKE 'HEAD%'
         ORDER BY b.date_received DESC`,
       params,
     );
