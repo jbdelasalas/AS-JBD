@@ -11,5 +11,6 @@ export const config = {
   matcher: [
     '/api/v1/((?!auth/).*)',
     '/dashboard/:path*',
+    '/portal/:path*',
   ],
 };

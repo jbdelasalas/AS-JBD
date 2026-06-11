@@ -15,8 +15,10 @@ export async function GET(req: NextRequest, { params }: Ctx) {
       id: string; email: string; full_name: string;
       is_active: boolean; is_superadmin: boolean;
       twofa_enabled: boolean; created_at: string;
+      is_portal_user: boolean; customer_id: string | null;
     }>(
-      `SELECT id, email, full_name, is_active, is_superadmin, twofa_enabled, created_at
+      `SELECT id, email, full_name, is_active, is_superadmin, twofa_enabled, created_at,
+              COALESCE(is_portal_user, false) AS is_portal_user, customer_id
          FROM users WHERE id = $1`,
       [params.id]
     );
@@ -46,11 +48,17 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     const values: unknown[] = [];
     let idx = 1;
 
-    for (const col of ['full_name', 'is_active', 'is_superadmin'] as const) {
+    for (const col of ['full_name', 'is_active', 'is_superadmin', 'is_portal_user'] as const) {
       if (col in body) {
         fields.push(`${col} = $${idx++}`);
         values.push(body[col]);
       }
+    }
+
+    // customer_id may be set to a uuid or cleared to null
+    if ('customer_id' in body) {
+      fields.push(`customer_id = $${idx++}`);
+      values.push(body.customer_id || null);
     }
 
     if (body.password) {
