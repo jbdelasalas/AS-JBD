@@ -8,6 +8,14 @@ import { loadBranding, getBrandingBg } from '@/lib/branding';
 
 type Company = { id: string; code: string; name: string };
 
+// Only honour same-origin relative paths to avoid open-redirect issues.
+function safeNext(raw: string | null): string {
+  if (!raw) return '/dashboard';
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/dashboard';
+  if (raw === '/login' || raw.startsWith('/login?')) return '/dashboard';
+  return raw;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('admin@afcc.ph');
@@ -46,7 +54,7 @@ export default function LoginPage() {
       if (res.companies.length === 1) {
         localStorage.setItem('company_id', res.companies[0].id);
         localStorage.setItem('company_name', res.companies[0].name);
-        router.replace('/dashboard');
+        await routeAfterLogin();
       } else {
         setPendingCompanies(res.companies);
       }
@@ -57,9 +65,29 @@ export default function LoginPage() {
     }
   }
 
-  function selectCompany(company: Company) {
+  async function selectCompany(company: Company) {
     localStorage.setItem('company_id', company.id);
     localStorage.setItem('company_name', company.name);
+    await routeAfterLogin();
+  }
+
+  // Portal customers go straight to /portal; everyone else to the dashboard
+  // (or the requested ?next= target).
+  async function routeAfterLogin() {
+    const explicitNext = new URLSearchParams(window.location.search).get('next');
+    if (explicitNext) {
+      router.replace(safeNext(explicitNext));
+      return;
+    }
+    try {
+      const me = await api.get<{ customer?: { id: string } }>('/portal/me');
+      if (me?.customer?.id) {
+        router.replace('/portal');
+        return;
+      }
+    } catch {
+      // not a portal user (403) — fall through to dashboard
+    }
     router.replace('/dashboard');
   }
 

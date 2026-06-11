@@ -18,7 +18,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     loadBranding();
     const token = localStorage.getItem('access_token');
     if (!token) {
-      router.replace('/login');
+      const here = window.location.pathname + window.location.search;
+      router.replace(`/login?next=${encodeURIComponent(here)}`);
     } else {
       // Default open on desktop, closed on mobile
       setSidebarOpen(window.innerWidth >= 768);

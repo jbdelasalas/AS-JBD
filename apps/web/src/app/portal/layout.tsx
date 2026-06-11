@@ -23,7 +23,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     if (typeof window === 'undefined') return;
     const token = localStorage.getItem('access_token');
     if (!token) {
-      router.replace('/login');
+      const here = window.location.pathname + window.location.search;
+      router.replace(`/login?next=${encodeURIComponent(here)}`);
       return;
     }
     // Confirm this user is a portal customer; non-portal users go to dashboard.

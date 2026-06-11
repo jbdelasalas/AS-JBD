@@ -80,7 +80,14 @@ async function request<T>(path: string, init: RequestInit = {}, _retry = false):
       if (refreshed) return request<T>(path, init, true);
     }
     clearAuth();
-    if (typeof window !== 'undefined') window.location.href = '/login';
+    if (typeof window !== 'undefined') {
+      // Preserve where the user was so they return there after re-login,
+      // instead of always being dumped on the dashboard.
+      const here = window.location.pathname + window.location.search;
+      const next =
+        here && here !== '/login' ? `?next=${encodeURIComponent(here)}` : '';
+      window.location.href = `/login${next}`;
+    }
     throw new ApiError(401, null, 'Unauthorized');
   }
 

@@ -50,6 +50,7 @@ const NAV: NavItem[] = [
       { href: '/dashboard/sales/delivery-receipts',  label: 'Delivery Receipts' },
       { href: '/dashboard/sales/return-goods',       label: 'Return Goods' },
       { href: '/dashboard/sales/allocations',        label: 'Order Allocations' },
+      { href: '/portal',                             label: 'Customer Portal ↗' },
     ],
   },
   {
