@@ -74,7 +74,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     }
 
     // Add output inventory
-    const outputCostMap: Array<{ item_id: string; unit_cost: number; total_cost: number; inventory_account_id: string | null }> = [];
+    const outputCostMap: Array<{ item_id: string; item_name: string; kgs: number; unit_cost: number; total_cost: number; inventory_account_id: string | null }> = [];
     for (const o of outputs) {
       const outKgs = Number(o.kgs ?? 0);
       const outHeads = Number(o.heads ?? 0);
@@ -96,7 +96,10 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
          ON CONFLICT (company_id, warehouse_id, item_id) DO UPDATE SET qty_heads=$4, qty_kgs=$5, last_updated=now()`,
         [rec.company_id, rec.warehouse_id, o.output_item_id, newHeads, newKgs],
       );
-      // Mirror output addition to stock_balances + stock_movement
+      // Mirror output addition to stock_balances + stock_movement; resolve item name and account for GL
+      const itemAcctRow = await client.query(
+        `SELECT inventory_account_id, name FROM items WHERE id = $1 LIMIT 1`, [o.output_item_id],
+      );
       if (tgtWarehouseId && outKgs > 0) {
         const unitCost = Number(o.unit_cost ?? 0);
         await client.query(
@@ -119,14 +122,14 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
            outKgs, unitCost, outKgs * unitCost,
            params.id, rec.doc_no, auth.userId],
         );
-        // Resolve item's inventory account for GL
-        const itemAcctRow = await client.query(
-          `SELECT inventory_account_id FROM items WHERE id = $1 LIMIT 1`, [o.output_item_id],
-        );
+      }
+      if (outKgs > 0) {
         outputCostMap.push({
           item_id: String(o.output_item_id),
-          unit_cost: unitCost,
-          total_cost: outKgs * unitCost,
+          item_name: (itemAcctRow.rows[0]?.name as string | null) ?? String(o.output_item_id),
+          kgs: outKgs,
+          unit_cost: Number(o.unit_cost ?? 0),
+          total_cost: outKgs * Number(o.unit_cost ?? 0),
           inventory_account_id: (itemAcctRow.rows[0]?.inventory_account_id as string | null) ?? null,
         });
       }
@@ -147,17 +150,21 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         [rec.company_id],
       );
       const defaultInvId: string | null = defInvRow.rows[0]?.id ?? null;
-      const srcItemAcctRow = await client.query(
-        `SELECT inventory_account_id FROM items WHERE id = $1 LIMIT 1`, [rec.source_item_id],
+      const srcItemRow = await client.query(
+        `SELECT inventory_account_id, name FROM items WHERE id = $1 LIMIT 1`, [rec.source_item_id],
       );
-      const srcInvId = (srcItemAcctRow.rows[0]?.inventory_account_id as string | null) ?? defaultInvId;
+      const srcInvId = (srcItemRow.rows[0]?.inventory_account_id as string | null) ?? defaultInvId;
+      const srcItemName = (srcItemRow.rows[0]?.name as string | null) ?? String(rec.source_item_id);
 
       if (srcInvId && defaultInvId) {
-        const totalOutputCost = outputCostMap.reduce((s, o) => s + o.total_cost, 0);
         const srcTotalCost = parseFloat((srcKgs * srcAvgCost).toFixed(2));
-        const effectiveCreditAmount = parseFloat(Math.max(totalOutputCost, srcTotalCost).toFixed(2));
+        const totalOutputCost = outputCostMap.reduce((s, o) => s + o.total_cost, 0);
+        // Credit = actual source cost consumed; fall back to output cost sum when source has no cost basis
+        const creditAmount = srcTotalCost > 0 ? srcTotalCost : parseFloat(totalOutputCost.toFixed(2));
+        // Allocate credit proportionally to outputs by weight for balanced DR lines
+        const totalOutputKgs = outputCostMap.reduce((s, o) => s + o.kgs, 0);
 
-        if (effectiveCreditAmount > 0) {
+        if (creditAmount > 0) {
           const seriesRows = await client.query(
             `UPDATE document_series SET current_number = GREATEST(current_number, COALESCE((SELECT MAX(NULLIF(regexp_replace(substr(je.entry_no, length(document_series.prefix) + 1), '\\D', '', 'g'), '')::bigint) FROM journal_entries je WHERE je.company_id = document_series.company_id AND je.entry_no LIKE document_series.prefix || '%'), 0)) + 1, updated_at = now()
               WHERE company_id = $1 AND doc_type = 'journal_voucher' AND is_active = true RETURNING prefix, current_number`,
@@ -174,21 +181,29 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
             );
             const jeId = jeInsert.rows[0].id;
             let lineNo = 1;
+            let totalDebit = 0;
             for (const o of outputCostMap) {
               const outInvId = o.inventory_account_id ?? defaultInvId;
-              const amount = parseFloat(o.total_cost.toFixed(2));
+              // Allocate source cost by weight; fall back to user unit_cost if no source cost
+              const amount = (srcTotalCost > 0 && totalOutputKgs > 0)
+                ? parseFloat((creditAmount * o.kgs / totalOutputKgs).toFixed(2))
+                : parseFloat(o.total_cost.toFixed(2));
               if (amount <= 0) continue;
               await client.query(
                 `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
                  VALUES ($1,$2,$3,$4,$5,0,'PHP',1,$5,0)`,
-                [jeId, lineNo++, outInvId, `Conversion output — ${o.item_id} (${rec.doc_no})`, amount],
+                [jeId, lineNo++, outInvId, `Conversion output — ${o.item_name} (${rec.doc_no})`, amount],
+              );
+              totalDebit += amount;
+            }
+            // CR = sum of actual DRs to guarantee balance (handles rounding)
+            if (totalDebit > 0) {
+              await client.query(
+                `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
+                 VALUES ($1,$2,$3,$4,0,$5,'PHP',1,0,$5)`,
+                [jeId, lineNo, srcInvId, `Conversion source — ${srcItemName} (${rec.doc_no})`, totalDebit],
               );
             }
-            await client.query(
-              `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
-               VALUES ($1,$2,$3,$4,0,$5,'PHP',1,0,$5)`,
-              [jeId, lineNo, srcInvId, `Conversion source — ${rec.source_item_id} (${rec.doc_no})`, effectiveCreditAmount],
-            );
             await client.query(
               `INSERT INTO account_balances (account_id, fiscal_period_id, debit_total, credit_total)
                SELECT jel.account_id, $2, SUM(jel.debit), SUM(jel.credit) FROM journal_entry_lines jel WHERE jel.entry_id = $1 GROUP BY jel.account_id
