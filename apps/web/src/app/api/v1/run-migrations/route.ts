@@ -2697,5 +2697,82 @@ export async function POST(request: NextRequest) {
     catch (e) { results.push(`038 ${label}: ${(e as Error).message}`); }
   }
 
+  // 023b — Customer Portal (db/migrations/023_customer_portal.sql).
+  // Additive + idempotent: portal user link, sales_orders 7-stage tracking,
+  // per-customer price list, and the 'customer' RBAC role + portal perms.
+  const portal023: [string, string][] = [
+    ['users.customer_id',         `ALTER TABLE users ADD COLUMN IF NOT EXISTS customer_id uuid REFERENCES customers(id)`],
+    ['users.is_portal_user',      `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_portal_user boolean NOT NULL DEFAULT false`],
+    ['idx_users_customer',        `CREATE INDEX IF NOT EXISTS idx_users_customer ON users (customer_id) WHERE customer_id IS NOT NULL`],
+
+    ['sales_orders.portal_status',     `ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS portal_status     varchar(30)`],
+    ['sales_orders.priority',          `ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS priority          varchar(10) NOT NULL DEFAULT 'Standard'`],
+    ['sales_orders.is_portal_order',   `ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS is_portal_order   boolean NOT NULL DEFAULT false`],
+    ['sales_orders.allocated_by',      `ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS allocated_by      uuid REFERENCES users(id)`],
+    ['sales_orders.allocated_at',      `ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS allocated_at      timestamptz`],
+    ['sales_orders.truck_assigned_by', `ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS truck_assigned_by uuid REFERENCES users(id)`],
+    ['sales_orders.truck_assigned_at', `ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS truck_assigned_at timestamptz`],
+    ['sales_orders.truck_no',          `ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS truck_no          varchar(40)`],
+    ['sales_orders.driver',            `ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS driver            varchar(120)`],
+    ['sales_orders.loaded_by',         `ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS loaded_by         uuid REFERENCES users(id)`],
+    ['sales_orders.loaded_at',         `ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS loaded_at         timestamptz`],
+    ['sales_orders.dr_number',         `ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS dr_number         varchar(40)`],
+    ['sales_orders.dr_photo_url',      `ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS dr_photo_url      text`],
+    ['sales_orders.dispatched_by',     `ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS dispatched_by     uuid REFERENCES users(id)`],
+    ['sales_orders.dispatched_at',     `ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS dispatched_at     timestamptz`],
+    ['sales_orders.gps_url',           `ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS gps_url           text`],
+    ['sales_orders.delivered_at',      `ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS delivered_at      timestamptz`],
+    ['idx_sales_orders_portal',        `CREATE INDEX IF NOT EXISTS idx_sales_orders_portal ON sales_orders (company_id, customer_id, portal_status) WHERE is_portal_order = true`],
+
+    ['customer_price_list', `
+      CREATE TABLE IF NOT EXISTS customer_price_list (
+        id             uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id     uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        customer_id    uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+        item_id        uuid NOT NULL REFERENCES items(id)     ON DELETE CASCADE,
+        custom_price   numeric(18, 4) NOT NULL,
+        effective_date date,
+        notes          text,
+        created_at     timestamptz NOT NULL DEFAULT now(),
+        updated_at     timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (customer_id, item_id)
+      )`],
+    ['customer_price_list_updated trigger', `
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'customer_price_list_updated') THEN
+          CREATE TRIGGER customer_price_list_updated
+            BEFORE UPDATE ON customer_price_list
+            FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+        END IF;
+      END$$`],
+    ['idx_customer_price_list_lookup', `CREATE INDEX IF NOT EXISTS idx_customer_price_list_lookup ON customer_price_list (company_id, customer_id, item_id)`],
+
+    ['roles customer', `
+      INSERT INTO roles (code, name, description) VALUES
+        ('customer', 'Portal customer', 'Self-service customer: place and track orders')
+      ON CONFLICT DO NOTHING`],
+    ['permissions portal.*', `
+      INSERT INTO permissions (code, module, action, name) VALUES
+        ('portal.order.view',   'portal', 'view',   'View own orders in the customer portal'),
+        ('portal.order.create', 'portal', 'create', 'Place orders in the customer portal')
+      ON CONFLICT DO NOTHING`],
+    ['grant portal perms to customer', `
+      INSERT INTO role_permissions (role_id, permission_id)
+      SELECT r.id, p.id FROM roles r, permissions p
+      WHERE r.code = 'customer'
+        AND p.code IN ('portal.order.view', 'portal.order.create')
+      ON CONFLICT DO NOTHING`],
+    ['grant portal perms to superadmin', `
+      INSERT INTO role_permissions (role_id, permission_id)
+      SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
+      WHERE r.code = 'superadmin' AND p.module = 'portal'
+      ON CONFLICT DO NOTHING`],
+  ];
+  for (const [label, sql] of portal023) {
+    try { await query(sql); results.push(`023b ${label}: ok`); }
+    catch (e) { results.push(`023b ${label}: ${(e as Error).message}`); }
+  }
+
   return ok({ results });
 }
