@@ -682,7 +682,7 @@ export default function TallySheetDetailPage() {
           )}
           {doc.status === 'posted' && (
             <>
-              {!doc.conversion_id && !doc.dr_id && (
+              {!doc.conversion_id && !doc.dr_id && !doc.transfer_je_id && (
                 <button type="button" onClick={openTransferModal}
                   className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700">
                   Create Conversion
@@ -694,7 +694,7 @@ export default function TallySheetDetailPage() {
                   View Transfer JE
                 </Link>
               )}
-              {!doc.dr_id && !doc.conversion_id && (
+              {!doc.dr_id && !doc.conversion_id && !doc.transfer_je_id && (
                 <button type="button" onClick={openDRModal}
                   className="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700">
                   Create DR
