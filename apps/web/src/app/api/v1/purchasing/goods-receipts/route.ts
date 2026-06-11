@@ -386,6 +386,37 @@ export async function POST(request: NextRequest) {
       const { rows: polRows } = await client.query<{ item_id: string }>(
         `SELECT item_id FROM purchase_order_lines WHERE id = $1 LIMIT 1`, [l.po_line_id]);
       if (!polRows[0]) continue;
+      const itemId = polRows[0].item_id;
+      const unitCost = Number(l.unit_cost ?? 0);
+
+      // Merge into an existing available batch from the same PO + item:
+      // sum heads and recompute price_per_head as a heads-weighted average.
+      const existing = poId
+        ? await client.query<{ id: string; heads_in: string; heads_available: string; price_per_head: string }>(
+            `SELECT id, heads_in, heads_available, price_per_head
+               FROM chick_batches
+              WHERE company_id = $1 AND po_id = $2 AND item_id = $3 AND status = 'available'
+              ORDER BY date_received ASC
+              LIMIT 1`,
+            [companyId, poId, itemId])
+        : { rows: [] };
+
+      if (existing.rows[0]) {
+        const e = existing.rows[0];
+        const prevIn = Number(e.heads_in);
+        const avgPrice = prevIn + qty > 0
+          ? (prevIn * Number(e.price_per_head) + qty * unitCost) / (prevIn + qty)
+          : unitCost;
+        await client.query(
+          `UPDATE chick_batches
+              SET heads_in        = heads_in + $2,
+                  heads_available = heads_available + $2,
+                  price_per_head  = $3
+            WHERE id = $1`,
+          [e.id, qty, avgPrice],
+        );
+        continue;
+      }
 
       batchSeq += 1;
       const batchNo = `BATCH-${year}-${String(batchSeq).padStart(5, '0')}`;
@@ -401,8 +432,7 @@ export async function POST(request: NextRequest) {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$7,$8,$9,'available')
          ON CONFLICT DO NOTHING`,
         [companyId, batchNo, header.id, grnLineId, poId,
-         polRows[0].item_id, qty, Number(l.unit_cost ?? 0),
-         dto.receipt_date],
+         itemId, qty, unitCost, dto.receipt_date],
       );
     }
 
