@@ -38,21 +38,21 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return err(`Cannot create DR: SO is in status "${so.status}"`, 400);
   }
 
-  // Get warehouse from tally's branch_id
+  // The DR must ship from the tally sheet's own location. Use the warehouse
+  // linked to the tally sheet's branch — never fall back to an arbitrary
+  // company warehouse (that silently shipped from the wrong farm).
   const branchId = tally.branch_id as string | null;
-  let warehouseId: string | null = null;
-  if (branchId) {
-    const whRows = await query<{ id: string }>(
-      `SELECT id FROM warehouses WHERE branch_id = $1 LIMIT 1`, [branchId]);
-    warehouseId = whRows[0]?.id ?? null;
+  if (!branchId) {
+    return err('This tally sheet has no location set. Set its location before creating a delivery receipt.', 400);
   }
+  const whRows = await query<{ id: string }>(
+    `SELECT id FROM warehouses WHERE branch_id = $1 AND company_id = $2 LIMIT 1`,
+    [branchId, so.company_id],
+  );
+  const warehouseId = whRows[0]?.id ?? null;
   if (!warehouseId) {
-    // Fall back to first warehouse for the company
-    const whRows = await query<{ id: string }>(
-      `SELECT id FROM warehouses WHERE company_id = $1 LIMIT 1`, [so.company_id]);
-    warehouseId = whRows[0]?.id ?? null;
+    return err('The tally sheet location has no linked warehouse. Add a warehouse for that location first.', 400);
   }
-  if (!warehouseId) return err('No warehouse found for this tally sheet', 400);
 
   // Tally lines
   const tallyLines = await query<Record<string, unknown>>(
