@@ -1,10 +1,9 @@
 export const dynamic = 'force-dynamic';
 import { type NextRequest } from 'next/server';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { query } from '@/lib/db';
 import { requireAuth, verifyAccess } from '@/lib/auth-helpers';
 import { PDFDocument, rgb, StandardFonts, LineCapStyle } from 'pdf-lib';
+import { BIR_SEAL_PNG_B64, BIR_BARCODE_PNG_B64 } from './bir-images';
 
 const Q_STARTS = ['01/01','04/01','07/01','10/01'];
 const Q_ENDS   = ['03/31','06/30','09/30','12/31'];
@@ -19,7 +18,7 @@ function monthPos(d:string,q:number):0|1|2 {
   const m=new Date(d).getMonth()+1;
   return Math.max(0,Math.min(2,m-(q-1)*3-1)) as 0|1|2;
 }
-function fmt(n:number){return n.toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmt(n:number){return Number(n||0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});}
 
 export async function GET(request:NextRequest,{params}:{params:{id:string}}) {
   // Accept token from Authorization header OR ?token= query param
@@ -31,6 +30,7 @@ export async function GET(request:NextRequest,{params}:{params:{id:string}}) {
     try { await requireAuth(request); } catch(e){ return e as Response; }
   }
 
+  try {
   const rows = await query(
     `SELECT wc.*,
             b.bill_no,b.internal_no,b.bill_date,
@@ -58,11 +58,10 @@ export async function GET(request:NextRequest,{params}:{params:{id:string}}) {
   const page = pdf.addPage([612,936]); // 8.5×13 in long bond
   const W=612, H=936;
 
-  // Embed real seal & barcode images
-  const sealPng    = readFileSync(join(process.cwd(),'public/bir/image1.png'));
-  const barcodePng = readFileSync(join(process.cwd(),'public/bir/image2.png'));
-  const sealImg    = await pdf.embedPng(sealPng);
-  const barcodeImg = await pdf.embedPng(barcodePng);
+  // Embed real seal & barcode images from base64 constants (no filesystem read,
+  // which is unreliable on serverless and caused HTTP 500 on download).
+  const sealImg    = await pdf.embedPng(Buffer.from(BIR_SEAL_PNG_B64, 'base64'));
+  const barcodeImg = await pdf.embedPng(Buffer.from(BIR_BARCODE_PNG_B64, 'base64'));
 
   const helv  = await pdf.embedFont(StandardFonts.Helvetica);
   const helvB = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -455,4 +454,10 @@ export async function GET(request:NextRequest,{params}:{params:{id:string}}) {
       'Content-Disposition':`inline; filename="BIR-2307-${String(cert.cert_no)}.pdf"`,
     },
   });
+  } catch(e){
+    return new Response(
+      JSON.stringify({error:`Failed to generate BIR 2307 PDF: ${(e as Error).message}`}),
+      {status:500,headers:{'Content-Type':'application/json'}},
+    );
+  }
 }
