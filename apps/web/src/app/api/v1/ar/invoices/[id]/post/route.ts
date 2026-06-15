@@ -4,6 +4,8 @@ import { type PoolClient } from 'pg';
 import { query, getPool } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
+import { assertEntryBalanced, writeAuditLog, GLIntegrityError } from '@/lib/gl-integrity';
+import { isFeatureEnabled, FLAGS } from '@/lib/feature-flags';
 
 function mapRow(r: Record<string, unknown>) {
   return {
@@ -67,10 +69,7 @@ export async function POST(
 
     // Inventory check (only for direct SIs not linked to a DR — DR post already decremented stock)
     if (!inv.dr_id) {
-      const flagRows = await client.query(
-        `SELECT enabled FROM feature_flags WHERE name = 'allow_negative_inventory' LIMIT 1`,
-      );
-      const allowNegative = flagRows.rows[0]?.enabled ?? false;
+      const allowNegative = await isFeatureEnabled(FLAGS.ALLOW_NEGATIVE_INVENTORY, client);
 
       if (!allowNegative) {
         const itemLines = await client.query(
@@ -172,10 +171,10 @@ export async function POST(
     const isFromDR = !!inv.dr_id;
 
     if (!isFromDR) {
-      // Direct invoice: Dr AR
+      // Direct invoice: Dr AR (tagged with customer for the subsidiary ledger)
       await client.query(
-        `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit) VALUES ($1,$2,$3,$4,$5,0,'PHP',1,$5,0)`,
-        [je.id, lineNo++, arAccountId, `AR — ${inv.invoice_no}`, total],
+        `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, customer_id, description, debit, credit, currency, fx_rate, base_debit, base_credit) VALUES ($1,$2,$3,$4,$5,$6,0,'PHP',1,$6,0)`,
+        [je.id, lineNo++, arAccountId, inv.customer_id, `AR — ${inv.invoice_no}`, total],
       );
     }
 
@@ -237,6 +236,9 @@ export async function POST(
       }
     }
 
+    // Refuse to post a lopsided entry — never silently plug an imbalance.
+    await assertEntryBalanced(client, je.id as string);
+
     // Update account balances
     await client.query(
       `INSERT INTO account_balances (account_id, fiscal_period_id, debit_total, credit_total)
@@ -248,15 +250,21 @@ export async function POST(
     await client.query(`UPDATE journal_entries SET posted_at = now(), posted_by = $2 WHERE id = $1`, [je.id, auth.userId]);
     await client.query(`UPDATE sales_invoices SET status = 'open', je_id = $2, posted_at = now() WHERE id = $1`, [id, je.id]);
 
-    await client.query(
-      `INSERT INTO audit_log (user_id, company_id, action, entity_type, entity_id) VALUES ($1, $2, $3, $4, $5)`,
-      [auth.userId, inv.company_id, 'post', 'sales_invoice', id],
-    ).catch(() => {/* non-fatal */});
+    // Audit log is part of the transaction: it commits with the post or not at all.
+    await writeAuditLog(client, {
+      userId: auth.userId,
+      companyId: inv.company_id as string,
+      action: 'post',
+      entityType: 'sales_invoice',
+      entityId: id,
+      afterState: { je_id: je.id, je_no: jeNo, total },
+    });
 
     await client.query('COMMIT');
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});
-    return err((e as Error).message ?? 'Internal server error', 500);
+    const status = e instanceof GLIntegrityError ? 400 : 500;
+    return err((e as Error).message ?? 'Internal server error', status);
   } finally {
     client.release();
   }

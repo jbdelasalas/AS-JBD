@@ -71,6 +71,7 @@ CREATE TABLE journal_entry_lines (
   entry_id      uuid NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
   line_no       int  NOT NULL,
   account_id    uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+  customer_id   uuid,  -- subsidiary party when line hits an AR control account; FK added in 004 (after customers exists)
   description   text,
   debit         numeric(18, 4) NOT NULL DEFAULT 0 CHECK (debit  >= 0),
   credit        numeric(18, 4) NOT NULL DEFAULT 0 CHECK (credit >= 0),

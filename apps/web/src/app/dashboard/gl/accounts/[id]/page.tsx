@@ -17,6 +17,9 @@ interface LedgerEntry {
   source_module: string;
   source_doc_type: string | null;
   source_doc_id: string | null;
+  customer_id: string | null;
+  customer_code: string | null;
+  customer_name: string | null;
   debit: number;
   credit: number;
   balance: number;
@@ -89,6 +92,7 @@ export default function AccountDetailPage() {
 
   const inp = 'w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100';
   const lbl = 'mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400';
+  const showCustomerCol = ledger.some((e) => e.customer_id);
 
   return (
     <div>
@@ -206,6 +210,7 @@ export default function AccountDetailPage() {
                     <th className="px-3 py-2 text-left font-medium">Entry No.</th>
                     <th className="px-3 py-2 text-left font-medium">Date</th>
                     <th className="px-3 py-2 text-left font-medium">Description</th>
+                    {showCustomerCol && <th className="px-3 py-2 text-left font-medium">Customer</th>}
                     <th className="px-3 py-2 text-left font-medium">Module</th>
                     <th className="px-3 py-2 text-right font-medium">Debit</th>
                     <th className="px-3 py-2 text-right font-medium">Credit</th>
@@ -218,6 +223,15 @@ export default function AccountDetailPage() {
                       <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300">{e.entry_no}</td>
                       <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{formatDate(e.entry_date)}</td>
                       <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{e.description ?? e.memo ?? '—'}</td>
+                      {showCustomerCol && (
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
+                          {e.customer_id ? (
+                            <Link href={`/dashboard/ar/customers/${e.customer_id}`} className="text-brand-600 hover:underline">
+                              {e.customer_name ?? e.customer_code}
+                            </Link>
+                          ) : '—'}
+                        </td>
+                      )}
                       <td className="px-3 py-2 capitalize text-slate-500 dark:text-slate-400">{e.source_module.replace(/_/g, ' ')}</td>
                       <td className="px-3 py-2 text-right font-mono text-slate-800 dark:text-slate-200">{e.debit > 0 ? formatPHP(e.debit) : '—'}</td>
                       <td className="px-3 py-2 text-right font-mono text-slate-800 dark:text-slate-200">{e.credit > 0 ? formatPHP(e.credit) : '—'}</td>

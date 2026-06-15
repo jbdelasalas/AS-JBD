@@ -3,6 +3,7 @@ import { type NextRequest } from 'next/server';
 import { query, getPool } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
+import { writeAuditLog } from '@/lib/gl-integrity';
 
 export async function POST(
   request: NextRequest,
@@ -87,11 +88,15 @@ export async function POST(
       [id, entry.fiscal_period_id],
     );
 
-    await client.query(
-      `INSERT INTO audit_log (user_id, company_id, action, entity_type, entity_id)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [auth.userId, entry.company_id, 'post', 'journal_entry', id],
-    ).catch(() => {/* non-fatal */});
+    // Audit log is part of the transaction: it commits with the post or not at all.
+    await writeAuditLog(client, {
+      userId: auth.userId,
+      companyId: entry.company_id,
+      action: 'post',
+      entityType: 'journal_entry',
+      entityId: id,
+      afterState: { entry_no: entry.entry_no, debit: d, credit: c },
+    });
 
     await client.query('COMMIT');
   } catch (e) {

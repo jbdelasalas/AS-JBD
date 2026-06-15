@@ -3,6 +3,7 @@ import { type NextRequest } from 'next/server';
 import { query, getPool } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
+import { isFeatureEnabled, FLAGS } from '@/lib/feature-flags';
 
 export async function POST(
   request: NextRequest,
@@ -30,10 +31,7 @@ export async function POST(
 
     if (dr.status !== 'draft') { await client.query('ROLLBACK'); return err(`DR is already ${dr.status}`, 409); }
 
-    const flagRows = await client.query(
-      `SELECT enabled FROM feature_flags WHERE name = 'allow_negative_inventory' LIMIT 1`,
-    );
-    const allowNegative = flagRows.rows[0]?.enabled ?? false;
+    const allowNegative = await isFeatureEnabled(FLAGS.ALLOW_NEGATIVE_INVENTORY, client);
 
     const lines = await client.query(
       `SELECT drl.item_id, drl.qty_delivered, drl.unit_cost, drl.so_line_id, i.name AS item_name,
@@ -154,7 +152,7 @@ export async function POST(
         [id],
       );
 
-      const jeLines: Array<{ account_id: string; description: string; debit: number; credit: number }> = [];
+      const jeLines: Array<{ account_id: string; description: string; debit: number; credit: number; customer_id?: string | null }> = [];
       let totalARDebit = 0;
       let totalVAT = 0;
 
@@ -191,9 +189,9 @@ export async function POST(
       totalARDebit = parseFloat(totalARDebit.toFixed(2));
       totalVAT     = parseFloat(totalVAT.toFixed(2));
 
-      // Dr AR (consolidated, gross incl. VAT)
+      // Dr AR (consolidated, gross incl. VAT) — tagged with customer for the subsidiary ledger
       if (totalARDebit > 0 && arAccountId) {
-        jeLines.unshift({ account_id: arAccountId, description: `AR — ${dr.dr_no}`, debit: totalARDebit, credit: 0 });
+        jeLines.unshift({ account_id: arAccountId, description: `AR — ${dr.dr_no}`, debit: totalARDebit, credit: 0, customer_id: dr.customer_id as string });
       }
       // Cr Output VAT
       if (totalVAT > 0 && vatAccountId) {
@@ -219,9 +217,9 @@ export async function POST(
           for (let i = 0; i < jeLines.length; i++) {
             const l = jeLines[i];
             await client.query(
-              `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
-               VALUES ($1,$2,$3,$4,$5,$6,'PHP',1,$5,$6)`,
-              [drJeId, i + 1, l.account_id, l.description, l.debit, l.credit],
+              `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, customer_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,'PHP',1,$6,$7)`,
+              [drJeId, i + 1, l.account_id, l.customer_id ?? null, l.description, l.debit, l.credit],
             );
           }
           await client.query(

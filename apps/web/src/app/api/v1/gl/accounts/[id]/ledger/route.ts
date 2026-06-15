@@ -16,10 +16,12 @@ export async function GET(
 
   const rows = await query(
     `SELECT jel.id, jel.line_no, jel.debit, jel.credit, jel.description,
+            jel.customer_id, c.code AS customer_code, c.name AS customer_name,
             je.id AS entry_id, je.entry_no, je.entry_date, je.memo,
             je.status, je.source_module, je.source_doc_type, je.source_doc_id
        FROM journal_entry_lines jel
        JOIN journal_entries je ON je.id = jel.entry_id
+       LEFT JOIN customers c ON c.id = jel.customer_id
       WHERE jel.account_id = $1 AND je.status = 'posted'
       ORDER BY je.entry_date DESC, je.entry_no DESC
       LIMIT $2`,
@@ -40,6 +42,9 @@ export async function GET(
       source_module: String(row.source_module ?? ''),
       source_doc_type: row.source_doc_type ? String(row.source_doc_type) : null,
       source_doc_id: row.source_doc_id ? String(row.source_doc_id) : null,
+      customer_id: row.customer_id ? String(row.customer_id) : null,
+      customer_code: row.customer_code ? String(row.customer_code) : null,
+      customer_name: row.customer_name ? String(row.customer_name) : null,
       debit: Number(row.debit),
       credit: Number(row.credit),
       balance: runningBalance,

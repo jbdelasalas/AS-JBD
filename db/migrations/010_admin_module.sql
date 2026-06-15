@@ -289,6 +289,12 @@ CREATE TABLE IF NOT EXISTS feature_flags (
 CREATE TRIGGER feature_flags_updated BEFORE UPDATE ON feature_flags
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+-- Seed known flags so they appear in the admin UI on a fresh database.
+-- Idempotent: re-running never clobbers an admin's chosen enabled state.
+INSERT INTO feature_flags (name, enabled, description) VALUES
+  ('allow_negative_inventory', false, 'When enabled, posting transactions that reduce stock below zero is permitted.')
+ON CONFLICT (name) DO NOTHING;
+
 -- ============================================================================
 -- PERFORMANCE INDEXES
 -- ============================================================================

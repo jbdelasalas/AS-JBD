@@ -92,10 +92,10 @@ export async function POST(
     const je = jeRows.rows[0];
 
     let lineNo = 1;
-    // CR AR
+    // CR AR (tagged with customer for the subsidiary ledger)
     await client.query(
-      `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit) VALUES ($1,$2,$3,$4,0,$5,'PHP',1,0,$5)`,
-      [je.id, lineNo++, arAccountId, `AR reduction — ${cm.cm_no}`, total],
+      `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, customer_id, description, debit, credit, currency, fx_rate, base_debit, base_credit) VALUES ($1,$2,$3,$4,$5,0,$6,'PHP',1,0,$6)`,
+      [je.id, lineNo++, arAccountId, cm.customer_id, `AR reduction — ${cm.cm_no}`, total],
     );
     // DR Revenue
     if (defaultRevRows.rows[0]) {

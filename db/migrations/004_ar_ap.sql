@@ -27,6 +27,10 @@ CREATE TABLE customers (
 );
 CREATE TRIGGER customers_updated BEFORE UPDATE ON customers FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+-- GL line subsidiary link (column declared in 003_gl.sql; FK + index added here now that customers exists)
+ALTER TABLE journal_entry_lines ADD CONSTRAINT journal_entry_lines_customer_fk FOREIGN KEY (customer_id) REFERENCES customers(id);
+CREATE INDEX idx_jel_customer ON journal_entry_lines (customer_id) WHERE customer_id IS NOT NULL;
+
 -- Sales invoices
 CREATE TABLE sales_invoices (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),

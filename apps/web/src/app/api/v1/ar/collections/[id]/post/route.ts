@@ -84,10 +84,10 @@ export async function POST(
       `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit) VALUES ($1,1,$2,$3,$4,0,'PHP',1,$4,0)`,
       [je.id, cashAccountId, `Receipt — ${pmt.receipt_no}`, amount],
     );
-    // CR AR
+    // CR AR (tagged with customer for the subsidiary ledger)
     await client.query(
-      `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit) VALUES ($1,2,$2,$3,0,$4,'PHP',1,0,$4)`,
-      [je.id, arAccountId, `AR payment — ${pmt.receipt_no}`, amount],
+      `INSERT INTO journal_entry_lines (entry_id, line_no, account_id, customer_id, description, debit, credit, currency, fx_rate, base_debit, base_credit) VALUES ($1,2,$2,$3,$4,0,$5,'PHP',1,0,$5)`,
+      [je.id, arAccountId, pmt.customer_id, `AR payment — ${pmt.receipt_no}`, amount],
     );
 
     // Update account balances

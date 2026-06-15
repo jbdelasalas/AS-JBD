@@ -23,16 +23,27 @@ export default function SalesTallyDetailPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const load = useCallback(() => {
     api.get<SalesTally>(`/poultry/sales-tallies/${id}`).then(setDoc).catch(() => {}).finally(() => setLoading(false));
   }, [id]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    try { const u = JSON.parse(localStorage.getItem('user') ?? 'null'); setIsAdmin(u?.is_superadmin === true); } catch {}
+  }, []);
 
   async function action(act: string) {
     setBusy(true); setMsg(null);
     try { await api.post(`/poultry/sales-tallies/${id}/${act}`, {}); load(); }
     catch (e: unknown) { setMsg((e as Error).message); } finally { setBusy(false); }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm('Delete this sales tally sheet? This cannot be undone.')) return;
+    setBusy(true); setMsg(null);
+    try { await api.delete(`/poultry/sales-tallies/${id}`); router.push('/dashboard/poultry/sales-tallies'); }
+    catch (e: unknown) { setMsg((e as Error).message ?? 'Delete failed'); setBusy(false); }
   }
 
   if (loading) return <div className="py-12 text-center text-sm text-slate-500">Loading…</div>;
@@ -59,6 +70,9 @@ export default function SalesTallyDetailPage() {
           )}
           {doc.status === 'posted' && (
             <Link href={`/dashboard/poultry/deliveries/new?sales_tally_id=${doc.id}`} className="rounded bg-brand-600 px-4 py-1.5 text-sm text-white hover:bg-brand-700">Create Delivery</Link>
+          )}
+          {isAdmin && (
+            <button onClick={handleDelete} disabled={busy} className="rounded border border-red-300 bg-red-50 px-4 py-1.5 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-700 dark:bg-red-950 dark:text-red-400">Delete</button>
           )}
         </div>
       </div>

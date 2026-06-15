@@ -2703,6 +2703,7 @@ export async function POST(request: NextRequest) {
   const portal023: [string, string][] = [
     ['users.customer_id',         `ALTER TABLE users ADD COLUMN IF NOT EXISTS customer_id uuid REFERENCES customers(id)`],
     ['users.is_portal_user',      `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_portal_user boolean NOT NULL DEFAULT false`],
+    ['users.updated_by',          `ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_by uuid REFERENCES users(id)`],
     ['idx_users_customer',        `CREATE INDEX IF NOT EXISTS idx_users_customer ON users (customer_id) WHERE customer_id IS NOT NULL`],
 
     ['sales_orders.portal_status',     `ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS portal_status     varchar(30)`],
@@ -2773,6 +2774,138 @@ export async function POST(request: NextRequest) {
     try { await query(sql); results.push(`023b ${label}: ok`); }
     catch (e) { results.push(`023b ${label}: ${(e as Error).message}`); }
   }
+
+  // --- 024: Customer (subsidiary) dimension on GL lines ---
+  // Tags each journal_entry_line that hits a customer's AR control account with
+  // the originating customer, enabling a GL-level customer subsidiary ledger.
+  try {
+    await query(`ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS customer_id uuid REFERENCES customers(id)`);
+    results.push('024 journal_entry_lines.customer_id: ok');
+  } catch (e) { results.push(`024 journal_entry_lines.customer_id: ${(e as Error).message}`); }
+
+  try {
+    await query(`CREATE INDEX IF NOT EXISTS idx_jel_customer ON journal_entry_lines (customer_id) WHERE customer_id IS NOT NULL`);
+    results.push('024 idx_jel_customer: ok');
+  } catch (e) { results.push(`024 idx_jel_customer: ${(e as Error).message}`); }
+
+  // Backfill existing posted AR lines from their source documents.
+  // Each source doc carries exactly one customer; we tag the line(s) on that
+  // entry that post to that customer's AR account.
+  // An AR line posts either to the customer's specific ar_account_id or, when
+  // that is null, to the company's AR control account (is_control ASSET). The
+  // backfill resolves the line's account against both possibilities.
+  const backfill024: [string, string][] = [
+    ['sales_invoices', `
+      UPDATE journal_entry_lines jel
+         SET customer_id = src.customer_id
+        FROM journal_entries je
+        JOIN sales_invoices src ON src.id = je.source_doc_id
+        JOIN customers c ON c.id = src.customer_id
+        JOIN accounts a ON a.id = jel.account_id
+       WHERE jel.entry_id = je.id
+         AND je.source_doc_type = 'sales_invoice'
+         AND jel.customer_id IS NULL
+         AND (jel.account_id = c.ar_account_id
+              OR (c.ar_account_id IS NULL AND a.is_control = true AND a.account_type = 'ASSET'))
+    `],
+    ['customer_payments', `
+      UPDATE journal_entry_lines jel
+         SET customer_id = src.customer_id
+        FROM journal_entries je
+        JOIN customer_payments src ON src.id = je.source_doc_id
+        JOIN customers c ON c.id = src.customer_id
+        JOIN accounts a ON a.id = jel.account_id
+       WHERE jel.entry_id = je.id
+         AND je.source_doc_type = 'customer_payment'
+         AND jel.customer_id IS NULL
+         AND (jel.account_id = c.ar_account_id
+              OR (c.ar_account_id IS NULL AND a.is_control = true AND a.account_type = 'ASSET'))
+    `],
+    ['ar_credit_memos', `
+      UPDATE journal_entry_lines jel
+         SET customer_id = src.customer_id
+        FROM journal_entries je
+        JOIN ar_credit_memos src ON src.id = je.source_doc_id
+        JOIN customers c ON c.id = src.customer_id
+        JOIN accounts a ON a.id = jel.account_id
+       WHERE jel.entry_id = je.id
+         AND je.source_doc_type = 'credit_memo'
+         AND jel.customer_id IS NULL
+         AND (jel.account_id = c.ar_account_id
+              OR (c.ar_account_id IS NULL AND a.is_control = true AND a.account_type = 'ASSET'))
+    `],
+    ['delivery_receipts', `
+      UPDATE journal_entry_lines jel
+         SET customer_id = src.customer_id
+        FROM journal_entries je
+        JOIN delivery_receipts src ON src.id = je.source_doc_id
+        JOIN customers c ON c.id = src.customer_id
+        JOIN accounts a ON a.id = jel.account_id
+       WHERE jel.entry_id = je.id
+         AND je.source_doc_type = 'delivery_receipt'
+         AND jel.customer_id IS NULL
+         AND (jel.account_id = c.ar_account_id
+              OR (c.ar_account_id IS NULL AND a.is_control = true AND a.account_type = 'ASSET'))
+    `],
+  ];
+  for (const [label, sql] of backfill024) {
+    try { await query(sql); results.push(`024 backfill ${label}: ok`); }
+    catch (e) { results.push(`024 backfill ${label}: ${(e as Error).message}`); }
+  }
+
+  // --- 025: Bank reconciliation ---
+  // Reconciles the book balance (posted journal lines on a bank account's GL
+  // account) against an actual bank statement. Never mutates journal lines;
+  // records which lines a statement cleared, preserving ledger immutability.
+  // The "a GL line may only be cleared by one COMPLETED reconciliation" rule
+  // can't be a partial unique index (Postgres forbids subqueries in the
+  // predicate), so it is enforced in the complete route.
+  const client025 = await getPool().connect();
+  try {
+    await client025.query('BEGIN');
+
+    await client025.query(`
+      CREATE TABLE IF NOT EXISTS bank_reconciliations (
+        id                       uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id               uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        bank_account_id          uuid NOT NULL REFERENCES bank_accounts(id),
+        statement_date           date NOT NULL,
+        statement_ending_balance numeric(18,4) NOT NULL,
+        beginning_balance        numeric(18,4) NOT NULL DEFAULT 0,
+        status                   varchar(20) NOT NULL DEFAULT 'in_progress' CHECK (status IN ('in_progress','completed')),
+        cleared_balance          numeric(18,4),
+        difference               numeric(18,4),
+        notes                    text,
+        created_by               uuid REFERENCES users(id),
+        completed_by             uuid REFERENCES users(id),
+        completed_at             timestamptz,
+        created_at               timestamptz NOT NULL DEFAULT now(),
+        updated_at               timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client025.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='bank_reconciliations_updated') THEN CREATE TRIGGER bank_reconciliations_updated BEFORE UPDATE ON bank_reconciliations FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+    await client025.query(`CREATE INDEX IF NOT EXISTS idx_bank_recon_company_account_date ON bank_reconciliations (company_id, bank_account_id, statement_date DESC)`);
+
+    await client025.query(`
+      CREATE TABLE IF NOT EXISTS bank_reconciliation_items (
+        id                    uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        reconciliation_id     uuid NOT NULL REFERENCES bank_reconciliations(id) ON DELETE CASCADE,
+        journal_entry_line_id uuid NOT NULL REFERENCES journal_entry_lines(id) ON DELETE CASCADE,
+        cleared               boolean NOT NULL DEFAULT true,
+        created_at            timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (reconciliation_id, journal_entry_line_id)
+      )
+    `);
+    await client025.query(`CREATE INDEX IF NOT EXISTS idx_bank_recon_items_recon ON bank_reconciliation_items (reconciliation_id)`);
+    await client025.query(`CREATE INDEX IF NOT EXISTS idx_bank_recon_items_line ON bank_reconciliation_items (journal_entry_line_id)`);
+
+    await client025.query('COMMIT');
+    results.push('025 bank_reconciliations: ok');
+    results.push('025 bank_reconciliation_items: ok');
+  } catch (e) {
+    await client025.query('ROLLBACK');
+    results.push(`025 FAILED: ${(e as Error).message}`);
+  } finally { client025.release(); }
 
   return ok({ results });
 }

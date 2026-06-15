@@ -20,6 +20,7 @@ const NAV: NavItem[] = [
       { href: '/dashboard/gl/accounts',       label: 'Chart of Accounts' },
       { href: '/dashboard/gl/journal-entries', label: 'Journal Entries' },
       { href: '/dashboard/gl/trial-balance',  label: 'Trial Balance' },
+      { href: '/dashboard/gl/bank-reconciliation', label: 'Bank Reconciliation' },
     ],
   },
   {

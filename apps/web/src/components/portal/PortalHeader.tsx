@@ -1,6 +1,26 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
+
+function PortalLogo() {
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg bg-white text-2xl shadow">
+      {failed ? (
+        '🐔'
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src="/api/v1/company-icon?size=128"
+          alt="Art Fresh Chicken"
+          className="h-full w-full object-contain p-1"
+          onError={() => setFailed(true)}
+        />
+      )}
+    </div>
+  );
+}
 
 export function PortalHeader({
   subtitle = 'ORDER ONLINE · TRACK REAL-TIME',
@@ -15,9 +35,7 @@ export function PortalHeader({
     <header className="bg-[#1e2a44] text-white">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-white text-2xl shadow">
-            🐔
-          </div>
+          <PortalLogo />
           <div>
             <h1 className="text-base font-bold leading-tight sm:text-lg">
               Art Fresh Chicken <span className="font-semibold text-white/80">— Customer Portal</span>
