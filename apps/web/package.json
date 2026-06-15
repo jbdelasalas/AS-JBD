@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
+    "@google/genai": "^2.8.0",
     "@perpet/shared": "*",
     "@types/bcryptjs": "^2.4.6",
     "bcryptjs": "^2.4.3",

@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { type NextRequest } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenAI } from '@google/genai';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { err } from '@/lib/api-response';
@@ -9,7 +9,7 @@ import * as path from 'path';
 
 // Next.js sometimes doesn't inject non-NEXT_PUBLIC_ vars into route handlers in dev.
 // Read .env.local directly as a fallback.
-if (!process.env.ANTHROPIC_API_KEY) {
+if (!process.env.GEMINI_API_KEY) {
   try {
     const envFile = fs.readFileSync(path.join(process.cwd(), '.env.local'), 'utf8');
     for (const line of envFile.split('\n')) {
@@ -139,15 +139,15 @@ export async function POST(request: NextRequest) {
   const { company_id, mode, messages } = body as {
     company_id?: string;
     mode?: string;
-    messages?: Anthropic.MessageParam[];
+    messages?: { role: 'user' | 'assistant'; content: string }[];
   };
 
   if (!company_id) return err('company_id is required', 400);
   if (mode !== 'insights' && mode !== 'chat') return err('mode must be "insights" or "chat"', 400);
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return err('ANTHROPIC_API_KEY is not configured', 503);
+    return err('GEMINI_API_KEY is not configured', 503);
   }
 
   let context: string;
@@ -169,27 +169,34 @@ Rules:
 CURRENT BUSINESS DATA:
 ${context}`;
 
-  const apiMessages: Anthropic.MessageParam[] =
+  const sourceMessages: { role: 'user' | 'assistant'; content: string }[] =
     mode === 'insights'
       ? [{ role: 'user', content: 'Give me a business health analysis covering: (1) financial highlights and warnings, (2) AR collection priorities, (3) cash flow position (AR vs AP), and (4) poultry operations performance. Be specific with the numbers.' }]
-      : (messages ?? []);
+      : (messages ?? []) as { role: 'user' | 'assistant'; content: string }[];
 
-  if (apiMessages.length === 0) return err('messages array is required for chat mode', 400);
+  if (sourceMessages.length === 0) return err('messages array is required for chat mode', 400);
 
-  const client = new Anthropic({ apiKey });
-  const stream = await client.messages.stream({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
-    system: systemPrompt,
-    messages: apiMessages,
+  // Gemini uses role 'model' (not 'assistant') and a parts[] content shape.
+  const contents = sourceMessages.map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }));
+
+  const client = new GoogleGenAI({ apiKey });
+  const stream = await client.models.generateContentStream({
+    model: 'gemini-flash-latest',
+    contents,
+    config: {
+      systemInstruction: systemPrompt,
+      maxOutputTokens: 1024,
+    },
   });
 
   const readable = new ReadableStream({
     async start(controller) {
-      for await (const event of stream) {
-        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-          controller.enqueue(new TextEncoder().encode(event.delta.text));
-        }
+      for await (const chunk of stream) {
+        const text = chunk.text;
+        if (text) controller.enqueue(new TextEncoder().encode(text));
       }
       controller.close();
     },
