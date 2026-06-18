@@ -17,5 +17,5 @@ export async function GET(request: NextRequest) {
       ORDER BY name`,
     [companyId],
   );
-  return ok(rows);
+  return ok({ data: rows });
 }
