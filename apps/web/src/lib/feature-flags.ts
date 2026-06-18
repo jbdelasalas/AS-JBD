@@ -49,4 +49,5 @@ export async function isFeatureEnabled(
 // becomes a compile error and every flag the code relies on is discoverable here.
 export const FLAGS = {
   ALLOW_NEGATIVE_INVENTORY: 'allow_negative_inventory',
+  WMS: 'wms',
 } as const;
