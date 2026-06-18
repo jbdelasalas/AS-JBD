@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { clearAuth } from '@/lib/api';
+import { api, clearAuth } from '@/lib/api';
 
 interface NavItem {
   href: string;
   label: string;
   children?: { href: string; label: string }[];
+  // Optional feature-flag name; the group is hidden until the flag is enabled.
+  flag?: string;
 }
 
 const NAV: NavItem[] = [
@@ -75,6 +77,19 @@ const NAV: NavItem[] = [
     ],
   },
   {
+    href: '/dashboard/wms',
+    label: 'Warehouse',
+    flag: 'wms',
+    children: [
+      { href: '/dashboard/wms/bins',         label: 'Bins' },
+      { href: '/dashboard/wms/stock-on-hand', label: 'Bin Stock' },
+      { href: '/dashboard/wms/putaways',     label: 'Put-away' },
+      { href: '/dashboard/wms/pick-lists',   label: 'Pick Lists' },
+      { href: '/dashboard/wms/shipments',    label: 'Shipments' },
+      { href: '/dashboard/wms/lots',         label: 'Lots & Serials' },
+    ],
+  },
+  {
     href: '/dashboard/poultry',
     label: 'Poultry Operations',
     children: [
@@ -112,13 +127,31 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const [isSandbox, setIsSandbox] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  // Names of feature flags that have resolved to ON. Flag-gated nav groups stay
+  // hidden until their flag appears here, so they never flash for users without it.
+  const [enabledFlags, setEnabledFlags] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const name = localStorage.getItem('company_name');
     if (name) setCompanyName(name);
     const mode = localStorage.getItem('db-mode');
     setIsSandbox(mode === 'sandbox');
+
+    // Resolve every flag the nav references, in parallel.
+    const flagNames = [...new Set(NAV.map((n) => n.flag).filter((f): f is string => !!f))];
+    Promise.all(
+      flagNames.map(async (f) => {
+        try {
+          const res = await api.get<{ data: { enabled: boolean } }>(`/flags?name=${encodeURIComponent(f)}`);
+          return res.data.enabled ? f : null;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((on) => setEnabledFlags(new Set(on.filter((f): f is string => !!f))));
   }, []);
+
+  const navItems = NAV.filter((item) => !item.flag || enabledFlags.has(item.flag));
 
   async function confirmSwitch() {
     setShowConfirm(false);
@@ -135,7 +168,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
   // Auto-expand the group whose parent or children match the current page
   useEffect(() => {
-    for (const item of NAV) {
+    for (const item of navItems) {
       if (!item.children) continue;
       const parentMatch = pathname === item.href || pathname.startsWith(item.href + '/');
       const childMatch = item.children.some((c) => pathname.startsWith(c.href));
@@ -266,7 +299,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-2 py-3">
-          {NAV.map((item) => {
+          {navItems.map((item) => {
             const isActive =
               pathname === item.href ||
               (item.href !== '/dashboard' && pathname.startsWith(item.href));

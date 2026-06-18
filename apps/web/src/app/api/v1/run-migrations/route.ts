@@ -2907,5 +2907,243 @@ export async function POST(request: NextRequest) {
     results.push(`025 FAILED: ${(e as Error).message}`);
   } finally { client025.release(); }
 
+  // --- 043: WMS — bins, lot/serial, put-away, pick/ship (extends inventory) ---
+  const client043a = await getPool().connect();
+  try {
+    await client043a.query('BEGIN');
+
+    await client043a.query(`
+      CREATE TABLE IF NOT EXISTS bins (
+        id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id    uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        warehouse_id  uuid NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
+        code          varchar(30) NOT NULL,
+        zone          varchar(30),
+        bin_type      varchar(20) NOT NULL DEFAULT 'storage'
+                        CHECK (bin_type IN ('receiving','storage','picking','staging','shipping')),
+        is_active     boolean NOT NULL DEFAULT true,
+        created_at    timestamptz NOT NULL DEFAULT now(),
+        updated_at    timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (warehouse_id, code)
+      )
+    `);
+    await client043a.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='bins_updated') THEN CREATE TRIGGER bins_updated BEFORE UPDATE ON bins FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+    await client043a.query(`CREATE INDEX IF NOT EXISTS idx_bins_warehouse ON bins (warehouse_id, is_active)`);
+
+    await client043a.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS tracking_mode varchar(10) NOT NULL DEFAULT 'none'`);
+    await client043a.query(`DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.constraint_column_usage WHERE constraint_name='items_tracking_mode_chk') THEN
+        ALTER TABLE items ADD CONSTRAINT items_tracking_mode_chk CHECK (tracking_mode IN ('none','lot','serial'));
+      END IF;
+    END $$`);
+
+    await client043a.query(`
+      CREATE TABLE IF NOT EXISTS item_lots (
+        id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id   uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        item_id      uuid NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        lot_no       varchar(60) NOT NULL,
+        expiry_date  date,
+        received_at  timestamptz NOT NULL DEFAULT now(),
+        notes        text,
+        UNIQUE (item_id, lot_no)
+      )
+    `);
+    await client043a.query(`CREATE INDEX IF NOT EXISTS idx_item_lots_item ON item_lots (item_id)`);
+    await client043a.query(`CREATE INDEX IF NOT EXISTS idx_item_lots_expiry ON item_lots (expiry_date) WHERE expiry_date IS NOT NULL`);
+
+    await client043a.query(`
+      CREATE TABLE IF NOT EXISTS item_serials (
+        id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id    uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        item_id       uuid NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        serial_no     varchar(80) NOT NULL,
+        lot_id        uuid REFERENCES item_lots(id),
+        warehouse_id  uuid REFERENCES warehouses(id),
+        bin_id        uuid REFERENCES bins(id),
+        status        varchar(20) NOT NULL DEFAULT 'in_stock'
+                        CHECK (status IN ('in_stock','reserved','shipped','consumed')),
+        received_at   timestamptz NOT NULL DEFAULT now(),
+        shipped_at    timestamptz,
+        UNIQUE (item_id, serial_no)
+      )
+    `);
+    await client043a.query(`CREATE INDEX IF NOT EXISTS idx_item_serials_loc ON item_serials (warehouse_id, bin_id, status)`);
+
+    // Bin-level sub-ledger (rolls up to warehouse-level stock_balances, which is
+    // left untouched so existing ON CONFLICT (item_id, warehouse_id) upserts work).
+    await client043a.query(`
+      CREATE TABLE IF NOT EXISTS bin_stock_balances (
+        id               uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id       uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        item_id          uuid NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        warehouse_id     uuid NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
+        bin_id           uuid NOT NULL REFERENCES bins(id) ON DELETE CASCADE,
+        lot_id           uuid REFERENCES item_lots(id),
+        qty_on_hand      numeric(18,4) NOT NULL DEFAULT 0,
+        avg_cost         numeric(18,4) NOT NULL DEFAULT 0,
+        last_movement_at timestamptz
+      )
+    `);
+    await client043a.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_bin_stock_item_bin_lot
+        ON bin_stock_balances (item_id, bin_id,
+          COALESCE(lot_id, '00000000-0000-0000-0000-000000000000'::uuid))
+    `);
+    await client043a.query(`CREATE INDEX IF NOT EXISTS idx_bin_stock_wh ON bin_stock_balances (warehouse_id)`);
+    await client043a.query(`CREATE INDEX IF NOT EXISTS idx_bin_stock_item ON bin_stock_balances (item_id)`);
+
+    await client043a.query(`ALTER TABLE stock_movements ADD COLUMN IF NOT EXISTS bin_id uuid REFERENCES bins(id)`);
+    await client043a.query(`ALTER TABLE stock_movements ADD COLUMN IF NOT EXISTS lot_id uuid REFERENCES item_lots(id)`);
+    await client043a.query(`CREATE INDEX IF NOT EXISTS idx_sm_bin ON stock_movements (bin_id) WHERE bin_id IS NOT NULL`);
+
+    await client043a.query('COMMIT');
+    results.push('043 bins/lots/serials + bin sub-ledger: ok');
+  } catch (e) {
+    await client043a.query('ROLLBACK');
+    results.push(`043 phase1 FAILED: ${(e as Error).message}`);
+  } finally { client043a.release(); }
+
+  const client043b = await getPool().connect();
+  try {
+    await client043b.query('BEGIN');
+
+    await client043b.query(`
+      CREATE TABLE IF NOT EXISTS putaways (
+        id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id    uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        putaway_no    varchar(30) NOT NULL,
+        grn_id        uuid REFERENCES goods_receipts(id),
+        warehouse_id  uuid NOT NULL REFERENCES warehouses(id),
+        status        varchar(20) NOT NULL DEFAULT 'draft'
+                        CHECK (status IN ('draft','posted','cancelled')),
+        notes         text,
+        posted_at     timestamptz,
+        posted_by     uuid REFERENCES users(id),
+        created_by    uuid NOT NULL REFERENCES users(id),
+        created_at    timestamptz NOT NULL DEFAULT now(),
+        updated_at    timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, putaway_no)
+      )
+    `);
+    await client043b.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='putaways_updated') THEN CREATE TRIGGER putaways_updated BEFORE UPDATE ON putaways FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+    await client043b.query(`
+      CREATE TABLE IF NOT EXISTS putaway_lines (
+        id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        putaway_id  uuid NOT NULL REFERENCES putaways(id) ON DELETE CASCADE,
+        line_no     int NOT NULL,
+        item_id     uuid NOT NULL REFERENCES items(id),
+        bin_id      uuid NOT NULL REFERENCES bins(id),
+        lot_id      uuid REFERENCES item_lots(id),
+        qty         numeric(18,4) NOT NULL,
+        unit_cost   numeric(18,4) NOT NULL DEFAULT 0,
+        UNIQUE (putaway_id, line_no)
+      )
+    `);
+    await client043b.query(`CREATE INDEX IF NOT EXISTS idx_putaways_company_status ON putaways (company_id, status)`);
+    await client043b.query(`CREATE INDEX IF NOT EXISTS idx_putaways_grn ON putaways (grn_id)`);
+
+    await client043b.query('COMMIT');
+    results.push('043 putaways: ok');
+  } catch (e) {
+    await client043b.query('ROLLBACK');
+    results.push(`043 phase2 FAILED: ${(e as Error).message}`);
+  } finally { client043b.release(); }
+
+  const client043c = await getPool().connect();
+  try {
+    await client043c.query('BEGIN');
+
+    await client043c.query(`
+      CREATE TABLE IF NOT EXISTS pick_lists (
+        id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id    uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        pick_no       varchar(30) NOT NULL,
+        so_id         uuid REFERENCES sales_orders(id),
+        warehouse_id  uuid NOT NULL REFERENCES warehouses(id),
+        status        varchar(20) NOT NULL DEFAULT 'draft'
+                        CHECK (status IN ('draft','picking','picked','packed','cancelled')),
+        notes         text,
+        picked_at     timestamptz,
+        packed_at     timestamptz,
+        picked_by     uuid REFERENCES users(id),
+        packed_by     uuid REFERENCES users(id),
+        created_by    uuid NOT NULL REFERENCES users(id),
+        created_at    timestamptz NOT NULL DEFAULT now(),
+        updated_at    timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, pick_no)
+      )
+    `);
+    await client043c.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='pick_lists_updated') THEN CREATE TRIGGER pick_lists_updated BEFORE UPDATE ON pick_lists FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+    await client043c.query(`
+      CREATE TABLE IF NOT EXISTS pick_list_lines (
+        id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        pick_id       uuid NOT NULL REFERENCES pick_lists(id) ON DELETE CASCADE,
+        line_no       int NOT NULL,
+        item_id       uuid NOT NULL REFERENCES items(id),
+        bin_id        uuid NOT NULL REFERENCES bins(id),
+        lot_id        uuid REFERENCES item_lots(id),
+        qty_to_pick   numeric(18,4) NOT NULL,
+        qty_picked    numeric(18,4) NOT NULL DEFAULT 0,
+        UNIQUE (pick_id, line_no)
+      )
+    `);
+    await client043c.query(`CREATE INDEX IF NOT EXISTS idx_pick_lists_company_status ON pick_lists (company_id, status)`);
+    await client043c.query(`CREATE INDEX IF NOT EXISTS idx_pick_lists_so ON pick_lists (so_id)`);
+
+    await client043c.query(`
+      CREATE TABLE IF NOT EXISTS shipments (
+        id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id    uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        shipment_no   varchar(30) NOT NULL,
+        pick_id       uuid REFERENCES pick_lists(id),
+        so_id         uuid REFERENCES sales_orders(id),
+        warehouse_id  uuid NOT NULL REFERENCES warehouses(id),
+        carrier       varchar(100),
+        tracking_no   varchar(100),
+        status        varchar(20) NOT NULL DEFAULT 'draft'
+                        CHECK (status IN ('draft','shipped','cancelled')),
+        notes         text,
+        shipped_at    timestamptz,
+        shipped_by    uuid REFERENCES users(id),
+        created_by    uuid NOT NULL REFERENCES users(id),
+        created_at    timestamptz NOT NULL DEFAULT now(),
+        updated_at    timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, shipment_no)
+      )
+    `);
+    await client043c.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='shipments_updated') THEN CREATE TRIGGER shipments_updated BEFORE UPDATE ON shipments FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+    await client043c.query(`
+      CREATE TABLE IF NOT EXISTS shipment_lines (
+        id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        shipment_id   uuid NOT NULL REFERENCES shipments(id) ON DELETE CASCADE,
+        line_no       int NOT NULL,
+        item_id       uuid NOT NULL REFERENCES items(id),
+        bin_id        uuid NOT NULL REFERENCES bins(id),
+        lot_id        uuid REFERENCES item_lots(id),
+        qty           numeric(18,4) NOT NULL,
+        unit_cost     numeric(18,4) NOT NULL DEFAULT 0,
+        UNIQUE (shipment_id, line_no)
+      )
+    `);
+    await client043c.query(`CREATE INDEX IF NOT EXISTS idx_shipments_company_status ON shipments (company_id, status)`);
+    await client043c.query(`CREATE INDEX IF NOT EXISTS idx_shipments_so ON shipments (so_id)`);
+
+    await client043c.query('COMMIT');
+    results.push('043 pick_lists/shipments: ok');
+  } catch (e) {
+    await client043c.query('ROLLBACK');
+    results.push(`043 phase3 FAILED: ${(e as Error).message}`);
+  } finally { client043c.release(); }
+
+  try {
+    await query(
+      `INSERT INTO feature_flags (name, enabled, description)
+       VALUES ('wms', false, 'Warehouse Management System — bins, put-away, picking, shipping, lot/serial tracking')
+       ON CONFLICT (name) DO NOTHING`,
+    );
+    results.push('043 wms feature flag: ok');
+  } catch (e) { results.push(`043 wms feature flag FAILED: ${(e as Error).message}`); }
+
   return ok({ results });
 }
