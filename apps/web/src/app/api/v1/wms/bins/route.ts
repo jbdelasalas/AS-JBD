@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       ORDER BY w.name, b.code`,
     params,
   );
-  return ok(rows);
+  return ok({ data: rows });
 }
 
 export async function POST(request: NextRequest) {
