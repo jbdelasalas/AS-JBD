@@ -20,11 +20,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!token) {
       const here = window.location.pathname + window.location.search;
       router.replace(`/login?next=${encodeURIComponent(here)}`);
-    } else {
-      // Default open on desktop, closed on mobile
-      setSidebarOpen(window.innerWidth >= 768);
-      setReady(true);
+      return;
     }
+    // Portal customers belong in /portal, not the system dashboard.
+    try {
+      const user = JSON.parse(localStorage.getItem('user') ?? 'null');
+      if (user?.customer_id) {
+        router.replace('/portal');
+        return;
+      }
+    } catch {
+      /* malformed user — fall through to dashboard */
+    }
+    // Default open on desktop, closed on mobile
+    setSidebarOpen(window.innerWidth >= 768);
+    setReady(true);
   }, [router]);
 
   if (!ready) {

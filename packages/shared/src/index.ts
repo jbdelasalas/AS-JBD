@@ -88,6 +88,7 @@ export interface User {
   is_active: boolean;
   is_superadmin: boolean;
   twofa_enabled: boolean;
+  customer_id: string | null;
 }
 
 export interface AuthTokens {

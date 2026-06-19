@@ -6,10 +6,13 @@ import { api } from '@/lib/api';
 
 interface Employee { id: string; employee_no: string; full_name: string; }
 interface Account  { id: string; code: string; name: string; account_type: string; }
+/** Location / Cost Center / Building / Grow all share { id, code?, name } from
+ *  their admin master-data endpoints. */
+interface Ref { id: string; code?: string; name: string; }
 
-/** A line maps to the schema (receipt_date, expense_account, description, amount, notes).
- *  payee / supplier / tin / vat_code are AFCC-form fields that are display/print-only
- *  for now — they are not persisted by the current API. */
+/** A line maps to the schema (receipt_date, expense_account, description, amount, notes)
+ *  plus the four dimensions (location/cost center/building/grow). payee / supplier /
+ *  tin / vat_code remain AFCC display/print-only fields (not persisted). */
 interface Line {
   receipt_date: string;
   payee: string;
@@ -20,6 +23,10 @@ interface Line {
   amount: number;
   vat_code: string;
   notes: string;
+  location_id: string;
+  cost_center_id: string;
+  building_id: string;
+  grow_reference_id: string;
 }
 
 const DENOMS = [1000, 500, 200, 100, 50, 20, 10, 5, 1, 0.25] as const;
@@ -28,6 +35,7 @@ const today = new Date().toISOString().split('T')[0];
 const EMPTY_LINE: Line = {
   receipt_date: today, payee: '', supplier: '', tin: '',
   description: '', expense_account_id: '', amount: 0, vat_code: '', notes: '',
+  location_id: '', cost_center_id: '', building_id: '', grow_reference_id: '',
 };
 
 function NewExpenseReportForm() {
@@ -35,6 +43,10 @@ function NewExpenseReportForm() {
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [accounts, setAccounts]   = useState<Account[]>([]);
+  const [locations, setLocations]       = useState<Ref[]>([]);
+  const [costCenters, setCostCenters]   = useState<Ref[]>([]);
+  const [buildings, setBuildings]       = useState<Ref[]>([]);
+  const [grows, setGrows]               = useState<Ref[]>([]);
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState<string | null>(null);
 
@@ -44,13 +56,15 @@ function NewExpenseReportForm() {
     report_date: today,
     period_from: '',
     period_to: '',
-    purpose: '',
     notes: '',
+    location_id: '',
+    cost_center_id: '',
+    building_id: '',
+    grow_reference_id: '',
     // AFCC display-only header fields
     dept: '',
     company: '',
     klass: '',
-    location: '',
     type: 'REIMBURSEMENT',
     reference_no: '',
     external_id: '',
@@ -68,15 +82,40 @@ function NewExpenseReportForm() {
 
   useEffect(() => {
     const cid = localStorage.getItem('company_id');
-    if (!cid) return;
+    if (!cid) { setError('No company selected — please re-login.'); return; }
+
+    // Some endpoints return a bare array, others wrap as { data: [...] }.
+    const asArray = <T,>(v: unknown): T[] =>
+      Array.isArray(v) ? (v as T[])
+      : Array.isArray((v as { data?: unknown })?.data) ? ((v as { data: T[] }).data)
+      : [];
+
     Promise.all([
-      api.get<Employee[]>(`/admin/employees?company_id=${cid}`),
-      api.get<Account[]>(`/gl/accounts?company_id=${cid}&limit=500`),
-    ]).then(([emps, accs]) => {
-      setEmployees(Array.isArray(emps) ? emps.filter(e => (e as unknown as Record<string,unknown>).is_active !== false) : []);
-      setAccounts(Array.isArray(accs) ? accs.filter(a => a.account_type === 'EXPENSE') : []);
-    }).catch(() => {});
+      api.get<unknown>(`/admin/employees?company_id=${cid}`),
+      api.get<unknown>(`/gl/accounts?company_id=${cid}&limit=500`),
+      api.get<unknown>(`/inventory/locations?company_id=${cid}`),
+      api.get<unknown>(`/admin/cost-centers?company_id=${cid}`),
+      api.get<unknown>(`/poultry/buildings?company_id=${cid}`),
+      api.get<unknown>(`/poultry/grow-references?company_id=${cid}`),
+    ]).then(([empsRaw, accsRaw, locRaw, ccRaw, bldRaw, growRaw]) => {
+      const emps = asArray<Employee>(empsRaw).filter(
+        e => (e as unknown as Record<string, unknown>).is_active !== false,
+      );
+      const accs = asArray<Account>(accsRaw).filter(a => a.account_type === 'EXPENSE');
+      const active = (r: Ref) => (r as unknown as Record<string, unknown>).is_active !== false;
+      setEmployees(emps);
+      setAccounts(accs);
+      setLocations(asArray<Ref>(locRaw).filter(active));
+      setCostCenters(asArray<Ref>(ccRaw).filter(active));
+      setBuildings(asArray<Ref>(bldRaw).filter(active));
+      setGrows(asArray<Ref>(growRaw).filter(active));
+      if (emps.length === 0) setError('No active employees found for this company.');
+    }).catch((e: unknown) => {
+      setError(`Could not load form data: ${(e as Error).message ?? 'unknown error'}`);
+    });
   }, []);
+
+  const refLabel = (r: Ref) => (r.code ? `${r.code} — ${r.name}` : r.name);
 
   function updateLine(idx: number, field: keyof Line, val: string | number) {
     setLines(prev => {
@@ -111,14 +150,21 @@ function NewExpenseReportForm() {
         report_date: form.report_date,
         period_from:  form.period_from  || undefined,
         period_to:    form.period_to    || undefined,
-        purpose:      form.purpose      || undefined,
         notes:        form.notes        || undefined,
+        location_id:       form.location_id       || undefined,
+        cost_center_id:    form.cost_center_id     || undefined,
+        building_id:       form.building_id        || undefined,
+        grow_reference_id: form.grow_reference_id  || undefined,
         lines: lines.map(l => ({
           expense_account_id: l.expense_account_id || undefined,
           description: l.description,
           receipt_date: l.receipt_date,
           amount: l.amount,
           notes: l.notes || undefined,
+          location_id:       l.location_id       || undefined,
+          cost_center_id:    l.cost_center_id     || undefined,
+          building_id:       l.building_id        || undefined,
+          grow_reference_id: l.grow_reference_id  || undefined,
         })),
       });
       router.push(`/dashboard/ap/expense-reports/${er.id}`);
@@ -194,7 +240,41 @@ function NewExpenseReportForm() {
                 <tr>
                   <td className={lblCell}>Location:</td>
                   <td className={`${cell} ${shaded}`}>
-                    <input value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} className={field} />
+                    <select value={form.location_id}
+                      onChange={e => setForm(f => ({ ...f, location_id: e.target.value }))} className={field}>
+                      <option value="">— select —</option>
+                      {locations.map(r => <option key={r.id} value={r.id}>{refLabel(r)}</option>)}
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <td className={lblCell}>Cost Center:</td>
+                  <td className={`${cell} ${shaded}`}>
+                    <select value={form.cost_center_id}
+                      onChange={e => setForm(f => ({ ...f, cost_center_id: e.target.value }))} className={field}>
+                      <option value="">— select —</option>
+                      {costCenters.map(r => <option key={r.id} value={r.id}>{refLabel(r)}</option>)}
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <td className={lblCell}>Building:</td>
+                  <td className={`${cell} ${shaded}`}>
+                    <select value={form.building_id}
+                      onChange={e => setForm(f => ({ ...f, building_id: e.target.value }))} className={field}>
+                      <option value="">— select —</option>
+                      {buildings.map(r => <option key={r.id} value={r.id}>{refLabel(r)}</option>)}
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <td className={lblCell}>Grow:</td>
+                  <td className={`${cell} ${shaded}`}>
+                    <select value={form.grow_reference_id}
+                      onChange={e => setForm(f => ({ ...f, grow_reference_id: e.target.value }))} className={field}>
+                      <option value="">— select —</option>
+                      {grows.map(r => <option key={r.id} value={r.id}>{refLabel(r)}</option>)}
+                    </select>
                   </td>
                 </tr>
               </tbody>
@@ -267,6 +347,10 @@ function NewExpenseReportForm() {
                   <th className={`${cell} px-1.5 py-1 text-left`}>TIN</th>
                   <th className={`${cell} px-1.5 py-1 text-left`}>Particulars</th>
                   <th className={`${cell} px-1.5 py-1 text-left`}>Expense Account</th>
+                  <th className={`${cell} px-1.5 py-1 text-left`}>Location</th>
+                  <th className={`${cell} px-1.5 py-1 text-left`}>Cost Center</th>
+                  <th className={`${cell} px-1.5 py-1 text-left`}>Building</th>
+                  <th className={`${cell} px-1.5 py-1 text-left`}>Grow</th>
                   <th className={`${cell} px-1.5 py-1 text-right`}>Amount</th>
                   <th className={`${cell} px-1.5 py-1 text-left`}>Vat Code</th>
                   <th className="w-6" />
@@ -300,6 +384,34 @@ function NewExpenseReportForm() {
                       </select>
                     </td>
                     <td className={cell}>
+                      <select value={l.location_id}
+                        onChange={e => updateLine(idx, 'location_id', e.target.value)} className={field}>
+                        <option value="">—</option>
+                        {locations.map(r => <option key={r.id} value={r.id}>{refLabel(r)}</option>)}
+                      </select>
+                    </td>
+                    <td className={cell}>
+                      <select value={l.cost_center_id}
+                        onChange={e => updateLine(idx, 'cost_center_id', e.target.value)} className={field}>
+                        <option value="">—</option>
+                        {costCenters.map(r => <option key={r.id} value={r.id}>{refLabel(r)}</option>)}
+                      </select>
+                    </td>
+                    <td className={cell}>
+                      <select value={l.building_id}
+                        onChange={e => updateLine(idx, 'building_id', e.target.value)} className={field}>
+                        <option value="">—</option>
+                        {buildings.map(r => <option key={r.id} value={r.id}>{refLabel(r)}</option>)}
+                      </select>
+                    </td>
+                    <td className={cell}>
+                      <select value={l.grow_reference_id}
+                        onChange={e => updateLine(idx, 'grow_reference_id', e.target.value)} className={field}>
+                        <option value="">—</option>
+                        {grows.map(r => <option key={r.id} value={r.id}>{refLabel(r)}</option>)}
+                      </select>
+                    </td>
+                    <td className={cell}>
                       <input type="number" min={0} step="0.01" value={l.amount}
                         onChange={e => updateLine(idx, 'amount', parseFloat(e.target.value) || 0)}
                         className={`${field} text-right`} />
@@ -320,7 +432,7 @@ function NewExpenseReportForm() {
               <tfoot>
                 <tr className={`${shaded} text-xs font-semibold text-slate-800 dark:text-slate-200`}>
                   <td className={`${cell} px-1.5 py-1`}>Total:</td>
-                  <td className={cell} colSpan={5} />
+                  <td className={cell} colSpan={9} />
                   <td className={`${cell} px-1.5 py-1 text-right font-mono`}>{fmt(grandTotal)}</td>
                   <td className={cell} />
                   <td />

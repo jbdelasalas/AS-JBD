@@ -105,12 +105,15 @@ export async function POST(request: NextRequest) {
     const headerRows = await client.query(
       `INSERT INTO employee_expense_reports
          (company_id, branch_id, er_no, employee_id, report_date, period_from, period_to,
-          purpose, notes, total, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'draft',$11) RETURNING *`,
+          purpose, notes, location_id, cost_center_id, building_id, grow_reference_id,
+          total, status, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'draft',$15) RETURNING *`,
       [
         companyId, dto.branch_id ?? null, erNo, employeeId,
         dto.report_date, dto.period_from ?? null, dto.period_to ?? null,
         dto.purpose ?? null, dto.notes ?? null,
+        dto.location_id ?? null, dto.cost_center_id ?? null,
+        dto.building_id ?? null, dto.grow_reference_id ?? null,
         total.toFixed(2), auth.userId,
       ],
     );
@@ -120,8 +123,9 @@ export async function POST(request: NextRequest) {
       const l = lines[i];
       await client.query(
         `INSERT INTO expense_report_lines
-           (er_id, line_no, expense_account_id, description, receipt_date, amount, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+           (er_id, line_no, expense_account_id, description, receipt_date, amount, notes,
+            location_id, cost_center_id, building_id, grow_reference_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
         [
           header.id, i + 1,
           l.expense_account_id ?? null,
@@ -129,6 +133,10 @@ export async function POST(request: NextRequest) {
           l.receipt_date,
           Number(l.amount ?? 0).toFixed(2),
           l.notes ?? null,
+          l.location_id ?? null,
+          l.cost_center_id ?? null,
+          l.building_id ?? null,
+          l.grow_reference_id ?? null,
         ],
       );
     }

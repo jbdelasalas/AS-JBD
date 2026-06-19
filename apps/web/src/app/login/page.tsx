@@ -54,7 +54,7 @@ export default function LoginPage() {
       if (res.companies.length === 1) {
         localStorage.setItem('company_id', res.companies[0].id);
         localStorage.setItem('company_name', res.companies[0].name);
-        await routeAfterLogin();
+        routeAfterLogin();
       } else {
         setPendingCompanies(res.companies);
       }
@@ -65,28 +65,28 @@ export default function LoginPage() {
     }
   }
 
-  async function selectCompany(company: Company) {
+  function selectCompany(company: Company) {
     localStorage.setItem('company_id', company.id);
     localStorage.setItem('company_name', company.name);
-    await routeAfterLogin();
+    routeAfterLogin();
   }
 
   // Portal customers go straight to /portal; everyone else to the dashboard
   // (or the requested ?next= target).
-  async function routeAfterLogin() {
+  function routeAfterLogin() {
     const explicitNext = new URLSearchParams(window.location.search).get('next');
     if (explicitNext) {
       router.replace(safeNext(explicitNext));
       return;
     }
     try {
-      const me = await api.get<{ customer?: { id: string } }>('/portal/me');
-      if (me?.customer?.id) {
+      const user = JSON.parse(localStorage.getItem('user') ?? 'null');
+      if (user?.customer_id) {
         router.replace('/portal');
         return;
       }
     } catch {
-      // not a portal user (403) — fall through to dashboard
+      // malformed user — fall through to dashboard
     }
     router.replace('/dashboard');
   }

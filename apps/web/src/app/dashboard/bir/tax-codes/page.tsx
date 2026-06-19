@@ -21,13 +21,12 @@ export default function BirTaxCodesPage() {
   const [loading, setLoading] = useState(false);
   const [filterType, setFilterType] = useState('');
   const [showNew, setShowNew] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const [form, setForm] = useState({
-    code: '', name: '', tax_type: 'ewt',
-    rate_pct: '', bir_atc_code: '', account_id: '',
-  });
+  const emptyForm = { code: '', name: '', tax_type: 'ewt', rate_pct: '', bir_atc_code: '', account_id: '', is_active: true };
+  const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
     const cid = localStorage.getItem('company_id');
@@ -53,19 +52,45 @@ export default function BirTaxCodesPage() {
     } catch { setRows([]); } finally { setLoading(false); }
   }
 
+  function openEdit(tc: TaxCode) {
+    setEditId(tc.id);
+    setForm({
+      code: tc.code,
+      name: tc.name,
+      tax_type: tc.tax_type,
+      rate_pct: String(tc.rate_pct),
+      bir_atc_code: tc.bir_atc_code ?? '',
+      account_id: tc.account_id ?? '',
+      is_active: tc.is_active,
+    });
+    setError('');
+    setShowNew(true);
+  }
+
+  function closeModal() {
+    setShowNew(false);
+    setEditId(null);
+    setForm(emptyForm);
+    setError('');
+  }
+
   async function save() {
     if (!form.code || !form.name || !form.rate_pct) { setError('Code, Name, and Rate are required.'); return; }
     setSaving(true); setError('');
+    const payload = {
+      ...form,
+      company_id: companyId,
+      rate_pct: Number(form.rate_pct),
+      account_id: form.account_id || null,
+      bir_atc_code: form.bir_atc_code || null,
+    };
     try {
-      await api.post('/bir/tax-codes', {
-        ...form,
-        company_id: companyId,
-        rate_pct: Number(form.rate_pct),
-        account_id: form.account_id || null,
-        bir_atc_code: form.bir_atc_code || null,
-      });
-      setShowNew(false);
-      setForm({ code: '', name: '', tax_type: 'ewt', rate_pct: '', bir_atc_code: '', account_id: '' });
+      if (editId) {
+        await api.put(`/bir/tax-codes/${editId}`, payload);
+      } else {
+        await api.post('/bir/tax-codes', payload);
+      }
+      closeModal();
       load();
     } catch (e: unknown) { setError((e as Error).message); }
     finally { setSaving(false); }
@@ -89,7 +114,7 @@ export default function BirTaxCodesPage() {
           <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Tax Codes</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">VAT, EWT, excise, and percentage tax codes with BIR ATC mapping</p>
         </div>
-        <button onClick={() => setShowNew(true)}
+        <button onClick={() => { setEditId(null); setForm(emptyForm); setError(''); setShowNew(true); }}
           className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700">
           + New Tax Code
         </button>
@@ -113,11 +138,12 @@ export default function BirTaxCodesPage() {
               {['Code','Name','Type','Rate','BIR ATC Code','GL Account','Status'].map((h) => (
                 <th key={h} className="px-3 py-2 text-left font-medium">{h}</th>
               ))}
+              <th className="px-3 py-2 text-right font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={7} className="px-3 py-8 text-center text-slate-400">Loading…</td></tr>}
-            {!loading && filtered.length === 0 && <tr><td colSpan={7} className="px-3 py-8 text-center text-slate-400">No tax codes found.</td></tr>}
+            {loading && <tr><td colSpan={8} className="px-3 py-8 text-center text-slate-400">Loading…</td></tr>}
+            {!loading && filtered.length === 0 && <tr><td colSpan={8} className="px-3 py-8 text-center text-slate-400">No tax codes found.</td></tr>}
             {filtered.map((tc) => (
               <tr key={tc.id} className="border-t border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                 <td className="px-3 py-2 font-mono text-xs font-semibold text-slate-800 dark:text-slate-200">{tc.code}</td>
@@ -137,6 +163,12 @@ export default function BirTaxCodesPage() {
                     {tc.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </td>
+                <td className="px-3 py-2 text-right">
+                  <button onClick={() => openEdit(tc)}
+                    className="rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                    Edit
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -147,7 +179,7 @@ export default function BirTaxCodesPage() {
       {showNew && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-lg rounded-lg bg-white dark:bg-slate-900 shadow-xl p-6">
-            <h2 className="mb-4 text-base font-semibold text-slate-900 dark:text-slate-100">New Tax Code</h2>
+            <h2 className="mb-4 text-base font-semibold text-slate-900 dark:text-slate-100">{editId ? 'Edit Tax Code' : 'New Tax Code'}</h2>
             {error && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -196,15 +228,22 @@ export default function BirTaxCodesPage() {
                   For EWT codes: link to the "EWT Payable" liability account — credited when withholding is applied on a bill.
                 </p>
               </div>
+              {editId && (
+                <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                  <input type="checkbox" checked={form.is_active}
+                    onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))} />
+                  Active
+                </label>
+              )}
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <button onClick={() => { setShowNew(false); setError(''); }}
+              <button onClick={closeModal}
                 className="rounded px-4 py-1.5 text-sm border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
                 Cancel
               </button>
               <button onClick={save} disabled={saving}
                 className="rounded bg-blue-600 px-5 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-                {saving ? 'Saving…' : 'Create'}
+                {saving ? 'Saving…' : editId ? 'Save Changes' : 'Create'}
               </button>
             </div>
           </div>

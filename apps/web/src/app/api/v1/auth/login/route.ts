@@ -85,8 +85,9 @@ export async function POST(request: NextRequest) {
       is_active: boolean;
       is_superadmin: boolean;
       twofa_enabled: boolean;
+      customer_id: string | null;
     }>(
-      `SELECT id, email, password_hash, full_name, is_active, is_superadmin, twofa_enabled
+      `SELECT id, email, password_hash, full_name, is_active, is_superadmin, twofa_enabled, customer_id
          FROM users WHERE lower(email) = lower($1) LIMIT 1`,
       [email],
     );
@@ -129,6 +130,7 @@ export async function POST(request: NextRequest) {
         is_active: user.is_active,
         is_superadmin: user.is_superadmin,
         twofa_enabled: user.twofa_enabled,
+        customer_id: user.customer_id,
       },
       permissions,
       companies,
