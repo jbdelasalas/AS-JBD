@@ -179,8 +179,9 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     Promise.all(
       flagNames.map(async (f) => {
         try {
-          const res = await api.get<{ data: { enabled: boolean } }>(`/flags?name=${encodeURIComponent(f)}`);
-          return [f, res.data.enabled] as const;
+          // /flags returns { name, enabled } at the top level (no `data` wrapper).
+          const res = await api.get<{ name: string; enabled: boolean }>(`/flags?name=${encodeURIComponent(f)}`);
+          return [f, res.enabled] as const;
         } catch {
           return null;
         }
