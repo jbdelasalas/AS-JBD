@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 
-interface Client { id: string; code: string; name: string; }
+interface Customer { id: string; code: string; name: string; }
 interface JobOrder {
   id: string;
   batch_no: string;
@@ -29,19 +29,14 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 export default function JobOrdersPage() {
-  const [clients, setClients] = useState<Client[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [orders, setOrders] = useState<JobOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [clientId, setClientId] = useState('');
+  const [customerId, setCustomerId] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
-
-  // Inline new-client fields (a job order needs a client).
-  const [showClient, setShowClient] = useState(false);
-  const [newClientCode, setNewClientCode] = useState('');
-  const [newClientName, setNewClientName] = useState('');
 
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('company_id') : null;
 
@@ -54,36 +49,23 @@ export default function JobOrdersPage() {
       .finally(() => setLoading(false));
   }, [companyId]);
 
-  const loadClients = useCallback(() => {
+  const loadCustomers = useCallback(() => {
     if (!companyId) return;
-    api.get<{ data: Client[] }>(`/dressing-plant/clients?company_id=${companyId}`)
-      .then((r) => { setClients(r.data); if (r.data[0] && !clientId) setClientId(r.data[0].id); })
+    // The tolling-client list is the ERP customer master.
+    api.get<{ data: Customer[] }>(`/ar/customers?company_id=${companyId}&limit=500`)
+      .then((r) => { setCustomers(r.data); setCustomerId((prev) => prev || r.data[0]?.id || ''); })
       .catch(() => {});
-  }, [companyId, clientId]);
+  }, [companyId]);
 
-  useEffect(() => { loadClients(); load(); }, [loadClients, load]);
-
-  async function addClient(e: React.FormEvent) {
-    e.preventDefault();
-    if (!companyId || !newClientCode.trim() || !newClientName.trim()) return;
-    setError(null);
-    try {
-      const r = await api.post<{ id: string }>('/dressing-plant/clients', {
-        company_id: companyId, code: newClientCode, name: newClientName,
-      });
-      setNewClientCode(''); setNewClientName(''); setShowClient(false);
-      setClientId(r.id);
-      loadClients();
-    } catch (e) { setError((e as Error).message); }
-  }
+  useEffect(() => { loadCustomers(); load(); }, [loadCustomers, load]);
 
   async function addOrder(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!companyId || !clientId) { setError('Select a tolling client first'); return; }
+    if (!companyId || !customerId) { setError('Select a customer first'); return; }
     setSaving(true);
     try {
-      await api.post('/dressing-plant/job-orders', { company_id: companyId, client_id: clientId, notes: notes || null });
+      await api.post('/dressing-plant/job-orders', { company_id: companyId, customer_id: customerId, notes: notes || null });
       setNotes('');
       load();
     } catch (e) { setError((e as Error).message); }
@@ -101,16 +83,12 @@ export default function JobOrdersPage() {
 
       <form onSubmit={addOrder} className="mb-5 grid grid-cols-12 gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
         <div className="col-span-12 sm:col-span-4">
-          <label className="mb-1 block text-xs text-slate-600 dark:text-slate-400">Tolling client *</label>
-          <div className="flex gap-2">
-            <select value={clientId} onChange={(e) => setClientId(e.target.value)}
-              className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
-              {clients.length === 0 && <option value="">No clients yet</option>}
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
-            </select>
-            <button type="button" onClick={() => setShowClient((s) => !s)}
-              className="shrink-0 rounded border border-slate-300 px-2 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300">+</button>
-          </div>
+          <label className="mb-1 block text-xs text-slate-600 dark:text-slate-400">Customer (tolling client) *</label>
+          <select value={customerId} onChange={(e) => setCustomerId(e.target.value)}
+            className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+            {customers.length === 0 && <option value="">No customers found</option>}
+            {customers.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+          </select>
         </div>
         <div className="col-span-8 sm:col-span-5">
           <label className="mb-1 block text-xs text-slate-600 dark:text-slate-400">Notes</label>
@@ -118,27 +96,15 @@ export default function JobOrdersPage() {
             className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
         </div>
         <div className="col-span-4 sm:col-span-3 flex items-end">
-          <button type="submit" disabled={saving || !clientId}
+          <button type="submit" disabled={saving || !customerId}
             className="w-full rounded bg-brand-600 px-2 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
             {saving ? '…' : '+ New batch'}
           </button>
         </div>
-
-        {showClient && (
-          <div className="col-span-12 mt-1 flex flex-wrap items-end gap-2 rounded border border-dashed border-slate-300 p-2 dark:border-slate-600">
-            <div>
-              <label className="mb-1 block text-xs text-slate-600 dark:text-slate-400">Client code</label>
-              <input value={newClientCode} onChange={(e) => setNewClientCode(e.target.value)} placeholder="GOLD"
-                className="w-28 rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
-            </div>
-            <div className="flex-1">
-              <label className="mb-1 block text-xs text-slate-600 dark:text-slate-400">Client name</label>
-              <input value={newClientName} onChange={(e) => setNewClientName(e.target.value)} placeholder="Gold Broilers Corp"
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
-            </div>
-            <button type="button" onClick={addClient}
-              className="rounded bg-slate-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800">Add client</button>
-          </div>
+        {customers.length === 0 && (
+          <p className="col-span-12 text-xs text-slate-500 dark:text-slate-400">
+            No customers yet. Add customers under Receivables → Customers, then create a batch here.
+          </p>
         )}
       </form>
 

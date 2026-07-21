@@ -52,7 +52,40 @@ export async function POST(request: NextRequest) {
 
   const companyId = dto.company_id as string;
   if (!companyId) return err('company_id is required', 400);
-  if (!dto.client_id) return err('client_id is required', 400);
+
+  // A batch is owned by a tolling client. Callers pass an ERP customer_id (the
+  // client list comes straight from the customer master); we find-or-create the
+  // matching dp_clients row so the two-key model (job_orders.client_id) holds.
+  let clientId = (dto.client_id as string) || null;
+  const customerId = (dto.customer_id as string) || null;
+  if (!clientId) {
+    if (!customerId) return err('customer_id (or client_id) is required', 400);
+    try {
+      const cust = await query<{ code: string; name: string }>(
+        `SELECT code, name FROM customers WHERE id = $1 AND company_id = $2 LIMIT 1`,
+        [customerId, companyId],
+      );
+      if (!cust[0]) return err('Customer not found', 404);
+      const existing = await query<{ id: string }>(
+        `SELECT id FROM dp_clients WHERE company_id = $1 AND customer_id = $2 LIMIT 1`,
+        [companyId, customerId],
+      );
+      if (existing[0]) {
+        clientId = existing[0].id;
+      } else {
+        const [created] = await query<{ id: string }>(
+          `INSERT INTO dp_clients (company_id, code, name, customer_id)
+           VALUES ($1,$2,$3,$4)
+           ON CONFLICT (company_id, code) DO UPDATE SET customer_id = EXCLUDED.customer_id
+           RETURNING id`,
+          [companyId, cust[0].code, cust[0].name, customerId],
+        );
+        clientId = created.id;
+      }
+    } catch (e: unknown) {
+      return err((e as Error).message ?? 'Failed to resolve tolling client', 500);
+    }
+  }
 
   try {
     const [seq] = await query<{ c: number }>(
@@ -70,7 +103,7 @@ export async function POST(request: NextRequest) {
         companyId,
         (dto.branch_id as string) || null,
         batchNo,
-        dto.client_id,
+        clientId,
         (dto.notes as string) || null,
         auth.userId,
       ],
