@@ -3817,21 +3817,34 @@ export async function POST(request: NextRequest) {
 
         -- Dressing-plant chart of accounts (AFCC spec). These codes are what the
         -- posting engine resolves; insert any that a company doesn't already have.
-        INSERT INTO accounts (company_id, code, name, account_type, normal_side, is_active) VALUES
-          (p_company_id, '1130','Accounts Receivable — Tolling',                  'ASSET',    'DR', true),
-          (p_company_id, '1140','Inventory — Processing Supplies',                'ASSET',    'DR', true),
-          (p_company_id, '1145','Inventory — Marination Ingredients',             'ASSET',    'DR', true),
-          (p_company_id, '1150','Inventory — Maintenance Spare Parts',            'ASSET',    'DR', true),
-          (p_company_id, '4100','Tolling Revenue — Basic Dressing',               'REVENUE',  'CR', true),
-          (p_company_id, '4200','Tolling Revenue — Cut-Ups & Portioning',         'REVENUE',  'CR', true),
-          (p_company_id, '4300','Tolling Revenue — Marination Services',          'REVENUE',  'CR', true),
-          (p_company_id, '4400','Warehousing Revenue — Blast Freezing',           'REVENUE',  'CR', true),
-          (p_company_id, '4450','Warehousing Revenue — Cold Storage',             'REVENUE',  'CR', true),
-          (p_company_id, '4500','Sales of By-Products / DOA Penalty',             'REVENUE',  'CR', true),
-          (p_company_id, '5220','Marination Raw Materials',                       'EXPENSE',  'DR', true),
-          (p_company_id, '5230','Food-grade Sanitation Chemicals',                'EXPENSE',  'DR', true),
-          (p_company_id, '5340','Repairs & Maintenance — Plant Machinery',        'EXPENSE',  'DR', true)
+        -- Only guaranteed columns are set. normal_side is an optional column
+        -- added by a later migration that isn't present on every deployment, and
+        -- it is derivable from account_types; the posting engine keys on code.
+        INSERT INTO accounts (company_id, code, name, account_type, is_active) VALUES
+          (p_company_id, '1130','Accounts Receivable — Tolling',                  'ASSET',    true),
+          (p_company_id, '1140','Inventory — Processing Supplies',                'ASSET',    true),
+          (p_company_id, '1145','Inventory — Marination Ingredients',             'ASSET',    true),
+          (p_company_id, '1150','Inventory — Maintenance Spare Parts',            'ASSET',    true),
+          (p_company_id, '4100','Tolling Revenue — Basic Dressing',               'REVENUE',  true),
+          (p_company_id, '4200','Tolling Revenue — Cut-Ups & Portioning',         'REVENUE',  true),
+          (p_company_id, '4300','Tolling Revenue — Marination Services',          'REVENUE',  true),
+          (p_company_id, '4400','Warehousing Revenue — Blast Freezing',           'REVENUE',  true),
+          (p_company_id, '4450','Warehousing Revenue — Cold Storage',             'REVENUE',  true),
+          (p_company_id, '4500','Sales of By-Products / DOA Penalty',             'REVENUE',  true),
+          (p_company_id, '5220','Marination Raw Materials',                       'EXPENSE',  true),
+          (p_company_id, '5230','Food-grade Sanitation Chemicals',                'EXPENSE',  true),
+          (p_company_id, '5340','Repairs & Maintenance — Plant Machinery',        'EXPENSE',  true)
         ON CONFLICT (company_id, code) DO NOTHING;
+
+        -- Backfill normal_side only where that optional column exists.
+        IF EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_name='accounts' AND column_name='normal_side') THEN
+          UPDATE accounts a SET normal_side =
+            CASE WHEN a.account_type IN ('ASSET','EXPENSE') THEN 'DR' ELSE 'CR' END
+          WHERE a.company_id = p_company_id
+            AND a.code IN ('1130','1140','1145','1150','4100','4200','4300','4400','4450','4500','5220','5230','5340')
+            AND a.normal_side IS NULL;
+        END IF;
 
         INSERT INTO dp_posting_rules (company_id, event_type, dr_code, cr_code, description) VALUES
           (p_company_id, 'generate_tolling_invoice','1130','4100','Basic tolling billed to client'),
