@@ -1485,18 +1485,18 @@ ON CONFLICT (company_id, code) DO NOTHING;
 -- Seed an initial superadmin user.
 --
 -- Email:    admin@perpet.com.ph
--- Password: Perpet2026!
+-- Password: Improtected@01
 --
 -- The password_hash below is a bcrypt hash with cost 10. Change this immediately.
 --
 -- To regenerate:
---   node -e "console.log(require('bcryptjs').hashSync('Perpet2026!', 10))"
+--   node -e "console.log(require('bcryptjs').hashSync('Improtected@01', 10))"
 
 INSERT INTO users (id, email, password_hash, full_name, is_active, is_superadmin)
 VALUES (
   '99999999-9999-9999-9999-999999999999',
   'admin@perpet.com.ph',
-  '$2a$10$JU4exaCJSV7dLXA.Uq53pO1wMJFJxgE/sYPBWLzI8bf3eaL.7uH0y',  -- Perpet2026!
+  '$2a$10$hzStWyBukuNQF40GvUzt7uOAZ1u3cfRoL84QhGSSnRTCYYL34hc3W',  -- Improtected@01
   'System Administrator',
   true,
   true
@@ -1543,6 +1543,10 @@ CREATE TABLE IF NOT EXISTS employee_expense_reports (
   period_to        date,
   purpose          text,
   notes            text,
+  location_id       uuid REFERENCES branches(id),
+  cost_center_id    uuid REFERENCES cost_centers(id),
+  building_id       uuid REFERENCES farm_buildings(id),
+  grow_reference_id uuid REFERENCES grow_references(id),
   total            numeric(18,2) NOT NULL DEFAULT 0,
   status           varchar(30) NOT NULL DEFAULT 'draft'
                      CHECK (status IN ('draft','pending_approval','approved','cancelled')),
@@ -1575,6 +1579,10 @@ CREATE TABLE IF NOT EXISTS expense_report_lines (
   receipt_date        date NOT NULL,
   amount              numeric(18,2) NOT NULL,
   notes               text,
+  location_id         uuid REFERENCES branches(id),
+  cost_center_id      uuid REFERENCES cost_centers(id),
+  building_id         uuid REFERENCES farm_buildings(id),
+  grow_reference_id   uuid REFERENCES grow_references(id),
   UNIQUE (er_id, line_no)
 );
 
@@ -1586,3 +1594,276 @@ WHERE NOT EXISTS (
   SELECT 1 FROM document_series ds WHERE ds.company_id = companies.id AND ds.doc_type = 'expense_report'
 );
 INSERT INTO app_settings (key, value) VALUES ('company_name', '') ON CONFLICT DO NOTHING;
+
+-- ============================================================================
+-- 043_wms.sql — Warehouse Management System
+-- Extends inventory: bins under warehouses, an optional bin/lot dimension on
+-- stock_balances & stock_movements, lot/serial tracking, put-away, pick/ship.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS bins (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id    uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  warehouse_id  uuid NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
+  code          varchar(30) NOT NULL,
+  zone          varchar(30),
+  bin_type      varchar(20) NOT NULL DEFAULT 'storage'
+                  CHECK (bin_type IN ('receiving','storage','picking','staging','shipping')),
+  is_active     boolean NOT NULL DEFAULT true,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (warehouse_id, code)
+);
+CREATE OR REPLACE TRIGGER bins_updated BEFORE UPDATE ON bins FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE INDEX IF NOT EXISTS idx_bins_warehouse ON bins (warehouse_id, is_active);
+
+-- Per-item tracking: none | lot | serial
+ALTER TABLE items ADD COLUMN IF NOT EXISTS tracking_mode varchar(10) NOT NULL DEFAULT 'none';
+
+CREATE TABLE IF NOT EXISTS item_lots (
+  id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id   uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  item_id      uuid NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  lot_no       varchar(60) NOT NULL,
+  expiry_date  date,
+  received_at  timestamptz NOT NULL DEFAULT now(),
+  notes        text,
+  UNIQUE (item_id, lot_no)
+);
+CREATE INDEX IF NOT EXISTS idx_item_lots_item ON item_lots (item_id);
+CREATE INDEX IF NOT EXISTS idx_item_lots_expiry ON item_lots (expiry_date) WHERE expiry_date IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS item_serials (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id    uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  item_id       uuid NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  serial_no     varchar(80) NOT NULL,
+  lot_id        uuid REFERENCES item_lots(id),
+  warehouse_id  uuid REFERENCES warehouses(id),
+  bin_id        uuid REFERENCES bins(id),
+  status        varchar(20) NOT NULL DEFAULT 'in_stock'
+                  CHECK (status IN ('in_stock','reserved','shipped','consumed')),
+  received_at   timestamptz NOT NULL DEFAULT now(),
+  shipped_at    timestamptz,
+  UNIQUE (item_id, serial_no)
+);
+CREATE INDEX IF NOT EXISTS idx_item_serials_loc ON item_serials (warehouse_id, bin_id, status);
+
+-- Bin-level sub-ledger. Warehouse-level stock_balances is left as the single
+-- source of truth for stock-on-hand / GL; these rows roll up to it.
+CREATE TABLE IF NOT EXISTS bin_stock_balances (
+  id               uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id       uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  item_id          uuid NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  warehouse_id     uuid NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
+  bin_id           uuid NOT NULL REFERENCES bins(id) ON DELETE CASCADE,
+  lot_id           uuid REFERENCES item_lots(id),
+  qty_on_hand      numeric(18,4) NOT NULL DEFAULT 0,
+  avg_cost         numeric(18,4) NOT NULL DEFAULT 0,
+  last_movement_at timestamptz
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_bin_stock_item_bin_lot
+  ON bin_stock_balances (item_id, bin_id,
+    COALESCE(lot_id, '00000000-0000-0000-0000-000000000000'::uuid));
+CREATE INDEX IF NOT EXISTS idx_bin_stock_wh ON bin_stock_balances (warehouse_id);
+CREATE INDEX IF NOT EXISTS idx_bin_stock_item ON bin_stock_balances (item_id);
+
+-- Additive, nullable bin/lot dimension on the unified ledger (no constraint change)
+ALTER TABLE stock_movements ADD COLUMN IF NOT EXISTS bin_id uuid REFERENCES bins(id);
+ALTER TABLE stock_movements ADD COLUMN IF NOT EXISTS lot_id uuid REFERENCES item_lots(id);
+CREATE INDEX IF NOT EXISTS idx_sm_bin ON stock_movements (bin_id) WHERE bin_id IS NOT NULL;
+
+-- Inbound put-away (goods receipt → bin)
+CREATE TABLE IF NOT EXISTS putaways (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id    uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  putaway_no    varchar(30) NOT NULL,
+  grn_id        uuid REFERENCES goods_receipts(id),
+  warehouse_id  uuid NOT NULL REFERENCES warehouses(id),
+  status        varchar(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','posted','cancelled')),
+  notes         text,
+  posted_at     timestamptz,
+  posted_by     uuid REFERENCES users(id),
+  created_by    uuid NOT NULL REFERENCES users(id),
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (company_id, putaway_no)
+);
+CREATE OR REPLACE TRIGGER putaways_updated BEFORE UPDATE ON putaways FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TABLE IF NOT EXISTS putaway_lines (
+  id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  putaway_id  uuid NOT NULL REFERENCES putaways(id) ON DELETE CASCADE,
+  line_no     int NOT NULL,
+  item_id     uuid NOT NULL REFERENCES items(id),
+  bin_id      uuid NOT NULL REFERENCES bins(id),
+  lot_id      uuid REFERENCES item_lots(id),
+  qty         numeric(18,4) NOT NULL,
+  unit_cost   numeric(18,4) NOT NULL DEFAULT 0,
+  UNIQUE (putaway_id, line_no)
+);
+CREATE INDEX IF NOT EXISTS idx_putaways_company_status ON putaways (company_id, status);
+CREATE INDEX IF NOT EXISTS idx_putaways_grn ON putaways (grn_id);
+
+-- Outbound pick / pack
+CREATE TABLE IF NOT EXISTS pick_lists (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id    uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  pick_no       varchar(30) NOT NULL,
+  so_id         uuid REFERENCES sales_orders(id),
+  warehouse_id  uuid NOT NULL REFERENCES warehouses(id),
+  status        varchar(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','picking','picked','packed','cancelled')),
+  notes         text,
+  picked_at     timestamptz,
+  packed_at     timestamptz,
+  picked_by     uuid REFERENCES users(id),
+  packed_by     uuid REFERENCES users(id),
+  created_by    uuid NOT NULL REFERENCES users(id),
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (company_id, pick_no)
+);
+CREATE OR REPLACE TRIGGER pick_lists_updated BEFORE UPDATE ON pick_lists FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TABLE IF NOT EXISTS pick_list_lines (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  pick_id       uuid NOT NULL REFERENCES pick_lists(id) ON DELETE CASCADE,
+  line_no       int NOT NULL,
+  item_id       uuid NOT NULL REFERENCES items(id),
+  bin_id        uuid NOT NULL REFERENCES bins(id),
+  lot_id        uuid REFERENCES item_lots(id),
+  qty_to_pick   numeric(18,4) NOT NULL,
+  qty_picked    numeric(18,4) NOT NULL DEFAULT 0,
+  UNIQUE (pick_id, line_no)
+);
+CREATE INDEX IF NOT EXISTS idx_pick_lists_company_status ON pick_lists (company_id, status);
+CREATE INDEX IF NOT EXISTS idx_pick_lists_so ON pick_lists (so_id);
+
+-- Shipping
+CREATE TABLE IF NOT EXISTS shipments (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id    uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  shipment_no   varchar(30) NOT NULL,
+  pick_id       uuid REFERENCES pick_lists(id),
+  so_id         uuid REFERENCES sales_orders(id),
+  warehouse_id  uuid NOT NULL REFERENCES warehouses(id),
+  carrier       varchar(100),
+  tracking_no   varchar(100),
+  status        varchar(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','shipped','cancelled')),
+  notes         text,
+  shipped_at    timestamptz,
+  shipped_by    uuid REFERENCES users(id),
+  created_by    uuid NOT NULL REFERENCES users(id),
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (company_id, shipment_no)
+);
+CREATE OR REPLACE TRIGGER shipments_updated BEFORE UPDATE ON shipments FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TABLE IF NOT EXISTS shipment_lines (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  shipment_id   uuid NOT NULL REFERENCES shipments(id) ON DELETE CASCADE,
+  line_no       int NOT NULL,
+  item_id       uuid NOT NULL REFERENCES items(id),
+  bin_id        uuid NOT NULL REFERENCES bins(id),
+  lot_id        uuid REFERENCES item_lots(id),
+  qty           numeric(18,4) NOT NULL,
+  unit_cost     numeric(18,4) NOT NULL DEFAULT 0,
+  UNIQUE (shipment_id, line_no)
+);
+CREATE INDEX IF NOT EXISTS idx_shipments_company_status ON shipments (company_id, status);
+CREATE INDEX IF NOT EXISTS idx_shipments_so ON shipments (so_id);
+
+-- Fuel module foundation (tanks, dip readings, inbound deliveries). Mirrors
+-- db/migrations/006_fuel.sql; pumps/shifts/reconciliation are added with their pass.
+CREATE TABLE IF NOT EXISTS fuel_tanks (
+  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  warehouse_id    uuid NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
+  tank_no         varchar(20) NOT NULL,
+  tank_name       varchar(100),
+  item_id         uuid NOT NULL REFERENCES items(id),
+  capacity_litres numeric(18, 2) NOT NULL,
+  safe_fill_litres numeric(18, 2),
+  dead_stock_litres numeric(18, 2) NOT NULL DEFAULT 0,
+  is_active       boolean NOT NULL DEFAULT true,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (company_id, tank_no)
+);
+
+CREATE TABLE IF NOT EXISTS tank_readings (
+  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tank_id         uuid NOT NULL REFERENCES fuel_tanks(id) ON DELETE CASCADE,
+  reading_at      timestamptz NOT NULL DEFAULT now(),
+  reading_type    varchar(20) NOT NULL DEFAULT 'manual',
+  dip_cm          numeric(10, 2),
+  observed_litres numeric(18, 2) NOT NULL,
+  observed_temp_c numeric(6, 2),
+  density_kg_l    numeric(10, 4),
+  litres_at_15c   numeric(18, 2),
+  water_cm        numeric(10, 2) DEFAULT 0,
+  notes           text,
+  recorded_by     uuid NOT NULL REFERENCES users(id),
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_tank_readings_tank_time ON tank_readings (tank_id, reading_at DESC);
+
+CREATE TABLE IF NOT EXISTS fuel_deliveries (
+  id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id        uuid NOT NULL REFERENCES companies(id) ON DELETE RESTRICT,
+  delivery_no       varchar(30) NOT NULL,
+  supplier_id       uuid NOT NULL REFERENCES suppliers(id),
+  po_id             uuid REFERENCES purchase_orders(id),
+  warehouse_id      uuid NOT NULL REFERENCES warehouses(id),
+  tank_id           uuid NOT NULL REFERENCES fuel_tanks(id),
+  item_id           uuid NOT NULL REFERENCES items(id),
+  delivery_date     timestamptz NOT NULL,
+  truck_plate_no    varchar(20),
+  driver_name       varchar(100),
+  bol_no            varchar(50),
+  loaded_litres_15c numeric(18, 2),
+  loaded_litres_obs numeric(18, 2),
+  loaded_temp_c     numeric(6, 2),
+  loaded_density    numeric(10, 4),
+  received_litres_15c numeric(18, 2) NOT NULL,
+  received_litres_obs numeric(18, 2) NOT NULL,
+  received_temp_c   numeric(6, 2),
+  received_density  numeric(10, 4),
+  variance_litres   numeric(18, 2) GENERATED ALWAYS AS (received_litres_15c - COALESCE(loaded_litres_15c, received_litres_15c)) STORED,
+  tank_reading_before_id uuid REFERENCES tank_readings(id),
+  tank_reading_after_id  uuid REFERENCES tank_readings(id),
+  unit_cost         numeric(18, 4),
+  excise_tax_amount numeric(18, 2) NOT NULL DEFAULT 0,
+  vat_amount        numeric(18, 2) NOT NULL DEFAULT 0,
+  total_cost        numeric(18, 2),
+  status            varchar(20) NOT NULL DEFAULT 'draft',
+  posted_at         timestamptz,
+  bill_id           uuid REFERENCES bills(id),
+  je_id             uuid REFERENCES journal_entries(id),
+  notes             text,
+  created_by        uuid NOT NULL REFERENCES users(id),
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  updated_at        timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (company_id, delivery_no)
+);
+CREATE INDEX IF NOT EXISTS idx_fd_supplier_date ON fuel_deliveries (supplier_id, delivery_date DESC);
+CREATE INDEX IF NOT EXISTS idx_fd_tank ON fuel_deliveries (tank_id);
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='fuel_tanks_updated') THEN
+    CREATE TRIGGER fuel_tanks_updated BEFORE UPDATE ON fuel_tanks FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='fuel_deliveries_updated') THEN
+    CREATE TRIGGER fuel_deliveries_updated BEFORE UPDATE ON fuel_deliveries FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+  END IF;
+END $$;
+
+INSERT INTO feature_flags (name, enabled, description)
+VALUES ('wms', false, 'Warehouse Management System — bins, put-away, picking, shipping, lot/serial tracking')
+ON CONFLICT (name) DO NOTHING;
+
+-- Vertical-module enable/disable flags (default ON; turning a flag OFF hides the
+-- module's nav group for deployments that don't use that industry module).
+INSERT INTO feature_flags (name, enabled, description) VALUES
+  ('poultry',    true, 'Poultry Operations — grow cycles, tally sheets, conversions, sales tallies. Turn OFF to hide for non-poultry deployments.'),
+  ('restaurant', true, 'Restaurant module nav shortcuts. Turn OFF to hide for non-restaurant deployments.'),
+  ('fuel',       true, 'Fuel distribution & retailing — tanks, dip readings, deliveries, pump shifts, reconciliation.')
+ON CONFLICT (name) DO NOTHING;

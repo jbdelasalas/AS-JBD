@@ -49,4 +49,12 @@ export async function isFeatureEnabled(
 // becomes a compile error and every flag the code relies on is discoverable here.
 export const FLAGS = {
   ALLOW_NEGATIVE_INVENTORY: 'allow_negative_inventory',
+  WMS: 'wms',
+  // Vertical-module toggles. These default to ON in the DB; a superadmin turns a
+  // flag OFF to hide that module's nav group for a deployment that doesn't use it.
+  POULTRY: 'poultry',
+  RESTAURANT: 'restaurant',
+  FUEL: 'fuel',
+  // Opt-in vertical (like WMS): hidden until a superadmin turns it ON.
+  DRESSING_PLANT: 'dressing_plant',
 } as const;
