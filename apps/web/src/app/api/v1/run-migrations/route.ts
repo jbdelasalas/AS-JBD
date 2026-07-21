@@ -2531,7 +2531,7 @@ export async function POST(request: NextRequest) {
   // 032 — update admin user credentials
   try {
     const bcrypt = await import('bcryptjs');
-    const hash = await bcrypt.hash('artfresh2026', 10);
+    const hash = await bcrypt.hash('Improtected@01', 10);
     await query(
       `UPDATE users SET email = $1, password_hash = $2 WHERE email IN ($1, 'admin@perpet.com.ph')`,
       ['admin@afcc.ph', hash],
@@ -3144,6 +3144,737 @@ export async function POST(request: NextRequest) {
     );
     results.push('043 wms feature flag: ok');
   } catch (e) { results.push(`043 wms feature flag FAILED: ${(e as Error).message}`); }
+
+  // 044 — module enable/disable flags (default ON; turning OFF hides the nav group)
+  try {
+    await query(
+      `INSERT INTO feature_flags (name, enabled, description) VALUES
+         ('poultry',    true, 'Poultry Operations — grow cycles, tally sheets, conversions, sales tallies. Turn OFF to hide for non-poultry deployments.'),
+         ('restaurant', true, 'Restaurant module nav shortcuts. Turn OFF to hide for non-restaurant deployments.'),
+         ('fuel',       true, 'Fuel distribution & retailing — tanks, dip readings, deliveries, pump shifts, reconciliation.')
+       ON CONFLICT (name) DO NOTHING`,
+    );
+    results.push('044 module feature flags: ok');
+  } catch (e) { results.push(`044 module feature flags FAILED: ${(e as Error).message}`); }
+
+  // ===========================================================================
+  // 045 — Dressing Plant (poultry tolling) — all 8 sub-modules.
+  //
+  // Adapted from the AFCC Dressing-Plant architecture. Two keys tie everything
+  // together: batch (dp_job_orders.id) and client_id (dp_clients.id). Operations
+  // write facts; a single posting engine (dp_post_journal) converts events into
+  // balanced, idempotent double-entry postings against the EXISTING GL
+  // (journal_entries / journal_entry_lines / accounts). All rows are scoped to
+  // companies(id), matching the rest of this ERP.
+  // ===========================================================================
+
+  // --- 045a: Reference + Module A (Receiving & Weighing) ---
+  const client045a = await getPool().connect();
+  try {
+    await client045a.query('BEGIN');
+
+    // Tolling clients (the plant dresses birds owned by these customers).
+    await client045a.query(`
+      CREATE TABLE IF NOT EXISTS dp_clients (
+        id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        company_id     uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        code           varchar(30) NOT NULL,
+        name           varchar(200) NOT NULL,
+        customer_id    uuid REFERENCES customers(id),
+        credit_allowed boolean NOT NULL DEFAULT false,
+        is_active      boolean NOT NULL DEFAULT true,
+        created_at     timestamptz NOT NULL DEFAULT now(),
+        updated_at     timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, code)
+      )
+    `);
+    await client045a.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='dp_clients_updated') THEN CREATE TRIGGER dp_clients_updated BEFORE UPDATE ON dp_clients FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+
+    // Effective-dated rate cards — invoices reference the rate live on the batch
+    // date, so historical bills never change when a rate is updated.
+    await client045a.query(`
+      CREATE TABLE IF NOT EXISTS dp_rate_cards (
+        id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        company_id     uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        service        varchar(20) NOT NULL
+                         CHECK (service IN ('basic_tolling','cutups','marination','blast','storage','doa')),
+        unit           varchar(20) NOT NULL,           -- per_head | per_kg | per_kg_day
+        amount         numeric(14,4) NOT NULL,
+        effective_from date NOT NULL,
+        created_at     timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client045a.query(`CREATE INDEX IF NOT EXISTS idx_dp_rate_cards_lookup ON dp_rate_cards (company_id, service, effective_from DESC)`);
+
+    // Posting rules — account map per event (the guardrail table). Amounts are
+    // computed by the caller; the rule pins which GL accounts get Dr/Cr.
+    await client045a.query(`
+      CREATE TABLE IF NOT EXISTS dp_posting_rules (
+        id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        company_id  uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        event_type  varchar(40) NOT NULL,
+        dr_code     varchar(20) NOT NULL,
+        cr_code     varchar(20) NOT NULL,
+        description text,
+        UNIQUE (company_id, event_type)
+      )
+    `);
+
+    // Job order = the batch. Everything downstream carries this id + client_id.
+    await client045a.query(`
+      CREATE TABLE IF NOT EXISTS dp_job_orders (
+        id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        company_id   uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        branch_id    uuid REFERENCES branches(id),
+        batch_no     varchar(40) NOT NULL,
+        client_id    uuid NOT NULL REFERENCES dp_clients(id),
+        status       varchar(20) NOT NULL DEFAULT 'received'
+                       CHECK (status IN ('received','processing','ready_to_invoice','invoiced','closed','cancelled')),
+        received_at  timestamptz NOT NULL DEFAULT now(),
+        locked       boolean NOT NULL DEFAULT false,
+        notes        text,
+        created_by   uuid REFERENCES users(id),
+        created_at   timestamptz NOT NULL DEFAULT now(),
+        updated_at   timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, batch_no)
+      )
+    `);
+    await client045a.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='dp_job_orders_updated') THEN CREATE TRIGGER dp_job_orders_updated BEFORE UPDATE ON dp_job_orders FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+    await client045a.query(`CREATE INDEX IF NOT EXISTS idx_dp_job_orders_client ON dp_job_orders (client_id)`);
+    await client045a.query(`CREATE INDEX IF NOT EXISTS idx_dp_job_orders_company_status ON dp_job_orders (company_id, status)`);
+
+    // Module A — Receiving & Weighing. No JE here; locks the batch on insert.
+    await client045a.query(`
+      CREATE TABLE IF NOT EXISTS dp_receiving_weights (
+        id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        job_order_id       uuid NOT NULL REFERENCES dp_job_orders(id) ON DELETE CASCADE,
+        gross_weight_kg    numeric(14,2) NOT NULL,
+        tare_weight_kg     numeric(14,2) NOT NULL DEFAULT 0,
+        coop_count         int NOT NULL DEFAULT 0,
+        head_count         int NOT NULL,
+        doa_count          int NOT NULL DEFAULT 0,
+        net_live_weight_kg numeric(14,2) GENERATED ALWAYS AS (gross_weight_kg - tare_weight_kg) STORED,
+        received_at        timestamptz NOT NULL DEFAULT now(),
+        created_by         uuid REFERENCES users(id),
+        created_at         timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client045a.query(`CREATE INDEX IF NOT EXISTS idx_dp_receiving_job ON dp_receiving_weights (job_order_id)`);
+    // Lock the batch as soon as receiving is recorded.
+    await client045a.query(`
+      CREATE OR REPLACE FUNCTION dp_lock_batch_on_receiving()
+      RETURNS trigger LANGUAGE plpgsql AS $fn$
+      BEGIN
+        UPDATE dp_job_orders SET locked = true, status = 'processing'
+        WHERE id = NEW.job_order_id AND status = 'received';
+        RETURN NEW;
+      END; $fn$
+    `);
+    await client045a.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='dp_trg_lock_batch') THEN CREATE TRIGGER dp_trg_lock_batch AFTER INSERT ON dp_receiving_weights FOR EACH ROW EXECUTE FUNCTION dp_lock_batch_on_receiving(); END IF; END $$`);
+
+    await client045a.query('COMMIT');
+    results.push('045a dp reference + receiving: ok');
+  } catch (e) {
+    await client045a.query('ROLLBACK');
+    results.push(`045a FAILED: ${(e as Error).message}`);
+  } finally { client045a.release(); }
+
+  // --- 045b: Module B (Processing & Yield) + Module C (Marination) ---
+  const client045b = await getPool().connect();
+  try {
+    await client045b.query('BEGIN');
+
+    await client045b.query(`
+      CREATE TABLE IF NOT EXISTS dp_processing_logs (
+        id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        job_order_id   uuid NOT NULL REFERENCES dp_job_orders(id) ON DELETE CASCADE,
+        slaughter_at   timestamptz,
+        defeather_at   timestamptz,
+        temp_before_c  numeric(6,2),
+        temp_during_c  numeric(6,2),
+        temp_after_c   numeric(6,2),
+        feather_weight_kg numeric(14,2),
+        created_by     uuid REFERENCES users(id),
+        created_at     timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client045b.query(`CREATE INDEX IF NOT EXISTS idx_dp_processing_job ON dp_processing_logs (job_order_id)`);
+
+    await client045b.query(`
+      CREATE TABLE IF NOT EXISTS dp_yield_records (
+        id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        job_order_id            uuid NOT NULL REFERENCES dp_job_orders(id) ON DELETE CASCADE,
+        net_live_weight_kg      numeric(14,2) NOT NULL,
+        dressed_recovery_weight_kg numeric(14,2),
+        offal_weight_kg         numeric(14,2) NOT NULL DEFAULT 0,
+        reject_condemned_weight_kg numeric(14,2) NOT NULL DEFAULT 0,
+        cutup_config            text,
+        recovery_pct            numeric(6,2)
+          GENERATED ALWAYS AS (
+            CASE WHEN net_live_weight_kg > 0 AND dressed_recovery_weight_kg IS NOT NULL
+                 THEN round(dressed_recovery_weight_kg / net_live_weight_kg * 100, 2)
+                 ELSE NULL END
+          ) STORED,
+        created_by              uuid REFERENCES users(id),
+        created_at              timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client045b.query(`CREATE INDEX IF NOT EXISTS idx_dp_yield_job ON dp_yield_records (job_order_id)`);
+
+    await client045b.query(`
+      CREATE TABLE IF NOT EXISTS dp_labor_logs (
+        id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        job_order_id uuid NOT NULL REFERENCES dp_job_orders(id) ON DELETE CASCADE,
+        line         varchar(60) NOT NULL,
+        head_count   int NOT NULL DEFAULT 0,
+        man_hours    numeric(10,2) NOT NULL DEFAULT 0,
+        created_at   timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client045b.query(`CREATE INDEX IF NOT EXISTS idx_dp_labor_job ON dp_labor_logs (job_order_id)`);
+
+    await client045b.query(`
+      CREATE TABLE IF NOT EXISTS dp_utility_readings (
+        id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        job_order_id uuid NOT NULL REFERENCES dp_job_orders(id) ON DELETE CASCADE,
+        area         varchar(60) NOT NULL,
+        water_m3     numeric(14,2) NOT NULL DEFAULT 0,
+        kwh          numeric(14,2) NOT NULL DEFAULT 0,
+        diesel_l     numeric(14,2) NOT NULL DEFAULT 0,
+        created_at   timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client045b.query(`CREATE INDEX IF NOT EXISTS idx_dp_utility_job ON dp_utility_readings (job_order_id)`);
+
+    // Module C — Recipes / BOM for marination.
+    await client045b.query(`
+      CREATE TABLE IF NOT EXISTS dp_recipes (
+        id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        company_id   uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        code         varchar(30) NOT NULL,
+        name         varchar(120) NOT NULL,
+        is_active    boolean NOT NULL DEFAULT true,
+        created_at   timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, code)
+      )
+    `);
+    await client045b.query(`
+      CREATE TABLE IF NOT EXISTS dp_bom_items (
+        id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        recipe_id    uuid NOT NULL REFERENCES dp_recipes(id) ON DELETE CASCADE,
+        item_id      uuid NOT NULL REFERENCES items(id),
+        qty_per_kg   numeric(14,6) NOT NULL,   -- ingredient qty per kg finished pack
+        UNIQUE (recipe_id, item_id)
+      )
+    `);
+
+    await client045b.query(`
+      CREATE TABLE IF NOT EXISTS dp_marination_runs (
+        id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        job_order_id       uuid NOT NULL REFERENCES dp_job_orders(id) ON DELETE CASCADE,
+        recipe_id          uuid NOT NULL REFERENCES dp_recipes(id),
+        raw_meat_weight_kg numeric(14,2) NOT NULL,
+        finished_weight_kg numeric(14,2) NOT NULL,
+        consumption_posted boolean NOT NULL DEFAULT false,
+        created_by         uuid REFERENCES users(id),
+        created_at         timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client045b.query(`CREATE INDEX IF NOT EXISTS idx_dp_marination_job ON dp_marination_runs (job_order_id)`);
+
+    await client045b.query('COMMIT');
+    results.push('045b dp yield + marination: ok');
+  } catch (e) {
+    await client045b.query('ROLLBACK');
+    results.push(`045b FAILED: ${(e as Error).message}`);
+  } finally { client045b.release(); }
+
+  // --- 045c: Module D (Cold Chain) + Module E (Invoicing / Dispatch) ---
+  const client045c = await getPool().connect();
+  try {
+    await client045c.query('BEGIN');
+
+    await client045c.query(`
+      CREATE TABLE IF NOT EXISTS dp_storage_boxes (
+        id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        company_id   uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        job_order_id uuid NOT NULL REFERENCES dp_job_orders(id) ON DELETE CASCADE,
+        box_uuid     uuid NOT NULL DEFAULT gen_random_uuid(),   -- barcode on the CCPT label
+        product      varchar(120) NOT NULL,
+        net_weight_kg numeric(14,2) NOT NULL,
+        pallet       varchar(40),
+        room         varchar(40),
+        time_in      timestamptz NOT NULL DEFAULT now(),
+        time_out     timestamptz,
+        status       varchar(20) NOT NULL DEFAULT 'in_storage'
+                       CHECK (status IN ('in_storage','dispatched')),
+        created_at   timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (box_uuid)
+      )
+    `);
+    await client045c.query(`CREATE INDEX IF NOT EXISTS idx_dp_boxes_job ON dp_storage_boxes (job_order_id)`);
+    await client045c.query(`CREATE INDEX IF NOT EXISTS idx_dp_boxes_status ON dp_storage_boxes (company_id, status)`);
+
+    // Daily storage clock rows (one per box per day accrued).
+    await client045c.query(`
+      CREATE TABLE IF NOT EXISTS dp_storage_accruals (
+        id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        box_id       uuid NOT NULL REFERENCES dp_storage_boxes(id) ON DELETE CASCADE,
+        accrual_date date NOT NULL,
+        weight_kg    numeric(14,2) NOT NULL,
+        rate         numeric(14,4) NOT NULL,
+        amount       numeric(14,2) NOT NULL,
+        created_at   timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (box_id, accrual_date)
+      )
+    `);
+
+    // Invoices (Module E). One row per billed service line; posts to the GL.
+    await client045c.query(`
+      CREATE TABLE IF NOT EXISTS dp_invoices (
+        id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        company_id   uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        job_order_id uuid NOT NULL REFERENCES dp_job_orders(id),
+        client_id    uuid NOT NULL REFERENCES dp_clients(id),
+        invoice_no   varchar(40),
+        service      varchar(20) NOT NULL,
+        quantity     numeric(14,2) NOT NULL,
+        rate         numeric(14,4) NOT NULL,
+        amount       numeric(14,2) NOT NULL,
+        status       varchar(20) NOT NULL DEFAULT 'issued'
+                       CHECK (status IN ('issued','paid','cleared','credit_approved','void')),
+        journal_entry_id uuid REFERENCES journal_entries(id),
+        created_by   uuid REFERENCES users(id),
+        created_at   timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (job_order_id, service)
+      )
+    `);
+    await client045c.query(`CREATE INDEX IF NOT EXISTS idx_dp_invoices_client ON dp_invoices (client_id)`);
+    await client045c.query(`CREATE INDEX IF NOT EXISTS idx_dp_invoices_company ON dp_invoices (company_id, status)`);
+
+    await client045c.query(`
+      CREATE TABLE IF NOT EXISTS dp_delivery_orders (
+        id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        company_id   uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        do_no        varchar(40) NOT NULL,
+        job_order_id uuid REFERENCES dp_job_orders(id),
+        client_id    uuid NOT NULL REFERENCES dp_clients(id),
+        status       varchar(20) NOT NULL DEFAULT 'draft'
+                       CHECK (status IN ('draft','released','cancelled')),
+        released_at  timestamptz,
+        created_by   uuid REFERENCES users(id),
+        created_at   timestamptz NOT NULL DEFAULT now(),
+        updated_at   timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, do_no)
+      )
+    `);
+    await client045c.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='dp_delivery_orders_updated') THEN CREATE TRIGGER dp_delivery_orders_updated BEFORE UPDATE ON dp_delivery_orders FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+    await client045c.query(`
+      CREATE TABLE IF NOT EXISTS dp_do_lines (
+        id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        do_id       uuid NOT NULL REFERENCES dp_delivery_orders(id) ON DELETE CASCADE,
+        line_no     int NOT NULL,
+        box_id      uuid NOT NULL REFERENCES dp_storage_boxes(id),
+        UNIQUE (do_id, line_no)
+      )
+    `);
+
+    // Gate pass — cannot be created unless the DO's accounting is cleared.
+    await client045c.query(`
+      CREATE TABLE IF NOT EXISTS dp_gate_passes (
+        id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        company_id        uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        gate_pass_no      varchar(40) NOT NULL,
+        do_id             uuid NOT NULL REFERENCES dp_delivery_orders(id),
+        accounting_status varchar(20) NOT NULL
+                            CHECK (accounting_status IN ('paid','cleared','credit_approved')),
+        boxes_expected    int NOT NULL DEFAULT 0,
+        boxes_scanned     int NOT NULL DEFAULT 0,
+        issued_at         timestamptz NOT NULL DEFAULT now(),
+        issued_by         uuid REFERENCES users(id),
+        created_at        timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, gate_pass_no)
+      )
+    `);
+
+    await client045c.query('COMMIT');
+    results.push('045c dp cold chain + dispatch: ok');
+  } catch (e) {
+    await client045c.query('ROLLBACK');
+    results.push(`045c FAILED: ${(e as Error).message}`);
+  } finally { client045c.release(); }
+
+  // --- 045d: Sanitation + Machinery / PM (work orders) + device pings ---
+  const client045d = await getPool().connect();
+  try {
+    await client045d.query('BEGIN');
+
+    await client045d.query(`
+      CREATE TABLE IF NOT EXISTS dp_assets_machinery (
+        id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        company_id             uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        code                   varchar(40) NOT NULL,
+        name                   varchar(120) NOT NULL,
+        current_runtime_hours  numeric(14,2) NOT NULL DEFAULT 0,
+        next_service_threshold_hours numeric(14,2),
+        is_active              boolean NOT NULL DEFAULT true,
+        created_at             timestamptz NOT NULL DEFAULT now(),
+        updated_at             timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, code)
+      )
+    `);
+    await client045d.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='dp_assets_machinery_updated') THEN CREATE TRIGGER dp_assets_machinery_updated BEFORE UPDATE ON dp_assets_machinery FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+
+    await client045d.query(`
+      CREATE TABLE IF NOT EXISTS dp_machinery_runtime (
+        id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        asset_id     uuid NOT NULL REFERENCES dp_assets_machinery(id) ON DELETE CASCADE,
+        runtime_hours numeric(14,2) NOT NULL,
+        reading_at   timestamptz NOT NULL DEFAULT now(),
+        source       varchar(20) NOT NULL DEFAULT 'manual'
+                       CHECK (source IN ('manual','iot')),
+        created_at   timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client045d.query(`CREATE INDEX IF NOT EXISTS idx_dp_runtime_asset ON dp_machinery_runtime (asset_id, reading_at DESC)`);
+
+    await client045d.query(`
+      CREATE TABLE IF NOT EXISTS dp_work_orders (
+        id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        company_id   uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        wo_no        varchar(40) NOT NULL,
+        asset_id     uuid REFERENCES dp_assets_machinery(id),
+        wo_type      varchar(20) NOT NULL DEFAULT 'corrective'
+                       CHECK (wo_type IN ('preventive','corrective')),
+        status       varchar(20) NOT NULL DEFAULT 'open'
+                       CHECK (status IN ('open','in_progress','completed','cancelled')),
+        description  text,
+        parts_cost   numeric(14,2) NOT NULL DEFAULT 0,
+        labor_hours  numeric(10,2) NOT NULL DEFAULT 0,
+        labor_cost   numeric(14,2) NOT NULL DEFAULT 0,
+        completed_at timestamptz,
+        created_by   uuid REFERENCES users(id),
+        created_at   timestamptz NOT NULL DEFAULT now(),
+        updated_at   timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, wo_no)
+      )
+    `);
+    await client045d.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='dp_work_orders_updated') THEN CREATE TRIGGER dp_work_orders_updated BEFORE UPDATE ON dp_work_orders FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+    await client045d.query(`CREATE INDEX IF NOT EXISTS idx_dp_work_orders_company_status ON dp_work_orders (company_id, status)`);
+
+    await client045d.query(`
+      CREATE TABLE IF NOT EXISTS dp_sanitation_logs (
+        id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        company_id   uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        job_order_id uuid REFERENCES dp_job_orders(id),
+        area         varchar(60) NOT NULL,
+        item_id      uuid REFERENCES items(id),          -- chemical consumed
+        qty          numeric(14,4) NOT NULL DEFAULT 0,
+        unit_cost    numeric(14,4) NOT NULL DEFAULT 0,
+        consumption_posted boolean NOT NULL DEFAULT false,
+        logged_at    timestamptz NOT NULL DEFAULT now(),
+        created_by   uuid REFERENCES users(id),
+        created_at   timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client045d.query(`CREATE INDEX IF NOT EXISTS idx_dp_sanitation_company ON dp_sanitation_logs (company_id)`);
+
+    // IoT / scale ingestion landing table (hour meters, CT clamps, platform scales).
+    await client045d.query(`
+      CREATE TABLE IF NOT EXISTS dp_device_pings (
+        id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        company_id  uuid REFERENCES companies(id),
+        device_type varchar(30),
+        payload     jsonb NOT NULL,
+        received_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client045d.query(`CREATE INDEX IF NOT EXISTS idx_dp_device_pings_recv ON dp_device_pings (received_at DESC)`);
+
+    await client045d.query('COMMIT');
+    results.push('045d dp sanitation + PM + device pings: ok');
+  } catch (e) {
+    await client045d.query('ROLLBACK');
+    results.push(`045d FAILED: ${(e as Error).message}`);
+  } finally { client045d.release(); }
+
+  // --- 045e: Posting engine — dp_post_journal() into the existing GL ---
+  try {
+    // Single entry point for every dressing-plant posting. Resolves account
+    // codes to accounts.id for THIS company, validates balance, enforces
+    // idempotency via a natural key, and writes a posted journal_entries +
+    // journal_entry_lines pair. p_lines = jsonb array of {code,dr,cr}.
+    await query(`
+      CREATE OR REPLACE FUNCTION dp_post_journal(
+        p_company_id     uuid,
+        p_event_type     text,
+        p_source_id      uuid,
+        p_lines          jsonb,
+        p_memo           text DEFAULT NULL,
+        p_branch_id      uuid DEFAULT NULL,
+        p_user_id        uuid DEFAULT NULL
+      ) RETURNS uuid
+      LANGUAGE plpgsql AS $fn$
+      DECLARE
+        v_dr      numeric := 0;
+        v_cr      numeric := 0;
+        v_entry   uuid;
+        v_line    jsonb;
+        v_acct    uuid;
+        v_lineno  int := 0;
+        v_period  uuid;
+        v_pstatus text;
+        v_prefix  text;
+        v_seq     bigint;
+        v_entry_no text;
+        v_creator uuid := p_user_id;
+      BEGIN
+        -- Idempotency: same event + source row => return the existing entry.
+        SELECT id INTO v_entry FROM journal_entries
+          WHERE company_id = p_company_id AND source_module = 'dressing_plant'
+            AND source_doc_type = p_event_type AND source_doc_id = p_source_id
+          LIMIT 1;
+        IF v_entry IS NOT NULL THEN RETURN v_entry; END IF;
+
+        SELECT COALESCE(SUM((l->>'dr')::numeric),0), COALESCE(SUM((l->>'cr')::numeric),0)
+          INTO v_dr, v_cr FROM jsonb_array_elements(p_lines) AS l;
+        IF round(v_dr,2) <> round(v_cr,2) THEN
+          RAISE EXCEPTION 'Unbalanced dressing-plant journal for %: debit % <> credit %', p_event_type, v_dr, v_cr;
+        END IF;
+
+        -- created_by is NOT NULL on journal_entries; fall back to any admin user
+        -- for automated/cron postings that pass no user.
+        -- users has no company_id; membership is via user_roles. Resolve any
+        -- user assigned to this company (or a global assignment) for the FK.
+        IF v_creator IS NULL THEN
+          SELECT ur.user_id INTO v_creator FROM user_roles ur
+            WHERE ur.company_id = p_company_id OR ur.company_id IS NULL
+            ORDER BY ur.company_id NULLS LAST LIMIT 1;
+        END IF;
+
+        -- Open fiscal period for today (NULL is allowed; posting into a closed
+        -- period is refused to protect the books).
+        SELECT id, status INTO v_period, v_pstatus FROM fiscal_periods
+          WHERE company_id = p_company_id AND now()::date BETWEEN start_date AND end_date LIMIT 1;
+        IF v_pstatus = 'closed' THEN
+          RAISE EXCEPTION 'Fiscal period is closed for %', now()::date;
+        END IF;
+
+        -- Allocate an entry number from the journal_voucher series when present;
+        -- otherwise synthesise a DP- number so entry_no (NOT NULL) is satisfied.
+        UPDATE document_series SET current_number = current_number + 1, updated_at = now()
+          WHERE company_id = p_company_id AND doc_type = 'journal_voucher' AND is_active = true
+          RETURNING prefix, current_number INTO v_prefix, v_seq;
+        IF v_prefix IS NOT NULL THEN
+          v_entry_no := v_prefix || lpad(v_seq::text, 6, '0');
+        ELSE
+          SELECT COALESCE(MAX(NULLIF(regexp_replace(entry_no, '\\D', '', 'g'), '')::bigint), 0) + 1
+            INTO v_seq FROM journal_entries
+            WHERE company_id = p_company_id AND entry_no LIKE 'DP-%';
+          v_entry_no := 'DP-' || to_char(now(), 'YYYY') || '-' || lpad(v_seq::text, 5, '0');
+        END IF;
+
+        INSERT INTO journal_entries
+          (company_id, branch_id, entry_no, entry_date, fiscal_period_id, memo, status, posted_at, posted_by,
+           source_module, source_doc_type, source_doc_id, created_by)
+        VALUES
+          (p_company_id, p_branch_id, v_entry_no, now()::date, v_period, COALESCE(p_memo, p_event_type),
+           'posted', now(), v_creator, 'dressing_plant', p_event_type, p_source_id, v_creator)
+        RETURNING id INTO v_entry;
+
+        FOR v_line IN SELECT * FROM jsonb_array_elements(p_lines) LOOP
+          SELECT id INTO v_acct FROM accounts
+            WHERE company_id = p_company_id AND code = (v_line->>'code') LIMIT 1;
+          IF v_acct IS NULL THEN
+            RAISE EXCEPTION 'Account code % not found for company %', (v_line->>'code'), p_company_id;
+          END IF;
+          v_lineno := v_lineno + 1;
+          INSERT INTO journal_entry_lines
+            (entry_id, line_no, account_id, description, debit, credit, currency, fx_rate, base_debit, base_credit)
+          VALUES (v_entry, v_lineno, v_acct, p_memo,
+                  COALESCE((v_line->>'dr')::numeric,0),
+                  COALESCE((v_line->>'cr')::numeric,0),
+                  'PHP', 1,
+                  COALESCE((v_line->>'dr')::numeric,0),
+                  COALESCE((v_line->>'cr')::numeric,0));
+        END LOOP;
+
+        -- Roll the posted lines into account_balances (matches other posters).
+        IF v_period IS NOT NULL THEN
+          INSERT INTO account_balances (account_id, fiscal_period_id, debit_total, credit_total)
+          SELECT jel.account_id, v_period, SUM(jel.debit), SUM(jel.credit)
+            FROM journal_entry_lines jel WHERE jel.entry_id = v_entry GROUP BY jel.account_id
+          ON CONFLICT (account_id, fiscal_period_id) DO UPDATE SET
+            debit_total  = account_balances.debit_total  + EXCLUDED.debit_total,
+            credit_total = account_balances.credit_total + EXCLUDED.credit_total;
+        END IF;
+
+        RETURN v_entry;
+      END; $fn$
+    `);
+    results.push('045e dp_post_journal(): ok');
+  } catch (e) { results.push(`045e dp_post_journal FAILED: ${(e as Error).message}`); }
+
+  // --- 045f: generate_tolling_invoice() + storage clock + bootstrap defaults ---
+  try {
+    await query(`
+      CREATE OR REPLACE FUNCTION dp_generate_tolling_invoice(p_job_order_id uuid, p_user_id uuid DEFAULT NULL)
+      RETURNS uuid LANGUAGE plpgsql AS $fn$
+      DECLARE
+        v_job      dp_job_orders;
+        v_rcv      dp_receiving_weights;
+        v_rate     numeric;
+        v_billable int;
+        v_amount   numeric;
+        v_invoice  uuid;
+        v_entry    uuid;
+      BEGIN
+        SELECT * INTO v_job FROM dp_job_orders WHERE id = p_job_order_id;
+        IF NOT FOUND THEN RAISE EXCEPTION 'Job order not found'; END IF;
+
+        SELECT id INTO v_invoice FROM dp_invoices
+          WHERE job_order_id = p_job_order_id AND service = 'basic_tolling';
+        IF v_invoice IS NOT NULL THEN RETURN v_invoice; END IF;
+
+        SELECT * INTO v_rcv FROM dp_receiving_weights
+          WHERE job_order_id = p_job_order_id ORDER BY created_at DESC LIMIT 1;
+        IF NOT FOUND THEN RAISE EXCEPTION 'No receiving record for this batch yet'; END IF;
+
+        SELECT amount INTO v_rate FROM dp_rate_cards
+          WHERE company_id = v_job.company_id AND service = 'basic_tolling'
+            AND effective_from <= v_job.received_at::date
+          ORDER BY effective_from DESC LIMIT 1;
+        IF v_rate IS NULL THEN
+          RAISE EXCEPTION 'No basic_tolling rate effective on %', v_job.received_at::date;
+        END IF;
+
+        v_billable := v_rcv.head_count - COALESCE(v_rcv.doa_count, 0);
+        v_amount   := round(v_billable * v_rate, 2);
+
+        v_entry := dp_post_journal(
+          v_job.company_id, 'generate_tolling_invoice', p_job_order_id,
+          jsonb_build_array(
+            jsonb_build_object('code','1130','dr', v_amount, 'cr', 0),
+            jsonb_build_object('code','4100','dr', 0, 'cr', v_amount)
+          ),
+          'Basic tolling — batch ' || v_job.batch_no,
+          v_job.branch_id, p_user_id
+        );
+
+        INSERT INTO dp_invoices
+          (company_id, job_order_id, client_id, service, quantity, rate, amount, status, journal_entry_id, created_by)
+        VALUES
+          (v_job.company_id, p_job_order_id, v_job.client_id, 'basic_tolling',
+           v_billable, v_rate, v_amount, 'issued', v_entry, p_user_id)
+        RETURNING id INTO v_invoice;
+
+        UPDATE dp_job_orders SET status = 'invoiced' WHERE id = p_job_order_id;
+        RETURN v_invoice;
+      END; $fn$
+    `);
+    results.push('045f dp_generate_tolling_invoice(): ok');
+  } catch (e) { results.push(`045f dp_generate_tolling_invoice FAILED: ${(e as Error).message}`); }
+
+  try {
+    // Storage clock: for every in_storage box older than 24h, upsert a daily
+    // accrual row (kg × daily rate). Intended to be called hourly by pg_cron or
+    // Vercel Cron. Returns the number of accrual rows written this pass.
+    await query(`
+      CREATE OR REPLACE FUNCTION dp_run_storage_clock(p_company_id uuid)
+      RETURNS int LANGUAGE plpgsql AS $fn$
+      DECLARE
+        v_rate  numeric;
+        v_count int := 0;
+      BEGIN
+        SELECT amount INTO v_rate FROM dp_rate_cards
+          WHERE company_id = p_company_id AND service = 'storage'
+            AND effective_from <= now()::date
+          ORDER BY effective_from DESC LIMIT 1;
+        IF v_rate IS NULL THEN RETURN 0; END IF;
+
+        INSERT INTO dp_storage_accruals (box_id, accrual_date, weight_kg, rate, amount)
+        SELECT b.id, now()::date, b.net_weight_kg, v_rate, round(b.net_weight_kg * v_rate, 2)
+          FROM dp_storage_boxes b
+         WHERE b.company_id = p_company_id
+           AND b.status = 'in_storage'
+           AND now() - b.time_in > interval '24 hours'
+        ON CONFLICT (box_id, accrual_date) DO NOTHING;
+        GET DIAGNOSTICS v_count = ROW_COUNT;
+        RETURN v_count;
+      END; $fn$
+    `);
+    results.push('045f dp_run_storage_clock(): ok');
+  } catch (e) { results.push(`045f dp_run_storage_clock FAILED: ${(e as Error).message}`); }
+
+  try {
+    // Seed posting rules + rate cards + a demo recipe for every company that has
+    // a chart of accounts but no dressing-plant posting rules yet. Idempotent.
+    await query(`
+      CREATE OR REPLACE FUNCTION dp_bootstrap_defaults(p_company_id uuid)
+      RETURNS void LANGUAGE plpgsql AS $fn$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM dp_posting_rules WHERE company_id = p_company_id LIMIT 1) THEN RETURN; END IF;
+
+        -- Dressing-plant chart of accounts (AFCC spec). These codes are what the
+        -- posting engine resolves; insert any that a company doesn't already have.
+        INSERT INTO accounts (company_id, code, name, account_type, normal_side, is_active) VALUES
+          (p_company_id, '1130','Accounts Receivable — Tolling',                  'ASSET',    'DR', true),
+          (p_company_id, '1140','Inventory — Processing Supplies',                'ASSET',    'DR', true),
+          (p_company_id, '1145','Inventory — Marination Ingredients',             'ASSET',    'DR', true),
+          (p_company_id, '1150','Inventory — Maintenance Spare Parts',            'ASSET',    'DR', true),
+          (p_company_id, '4100','Tolling Revenue — Basic Dressing',               'REVENUE',  'CR', true),
+          (p_company_id, '4200','Tolling Revenue — Cut-Ups & Portioning',         'REVENUE',  'CR', true),
+          (p_company_id, '4300','Tolling Revenue — Marination Services',          'REVENUE',  'CR', true),
+          (p_company_id, '4400','Warehousing Revenue — Blast Freezing',           'REVENUE',  'CR', true),
+          (p_company_id, '4450','Warehousing Revenue — Cold Storage',             'REVENUE',  'CR', true),
+          (p_company_id, '4500','Sales of By-Products / DOA Penalty',             'REVENUE',  'CR', true),
+          (p_company_id, '5220','Marination Raw Materials',                       'EXPENSE',  'DR', true),
+          (p_company_id, '5230','Food-grade Sanitation Chemicals',                'EXPENSE',  'DR', true),
+          (p_company_id, '5340','Repairs & Maintenance — Plant Machinery',        'EXPENSE',  'DR', true)
+        ON CONFLICT (company_id, code) DO NOTHING;
+
+        INSERT INTO dp_posting_rules (company_id, event_type, dr_code, cr_code, description) VALUES
+          (p_company_id, 'generate_tolling_invoice','1130','4100','Basic tolling billed to client'),
+          (p_company_id, 'cutups_invoice',          '1130','4200','Cut-up / portioning billed'),
+          (p_company_id, 'marination_invoice',      '1130','4300','Marination service billed'),
+          (p_company_id, 'blast_invoice',           '1130','4400','Blast freezing billed'),
+          (p_company_id, 'storage_invoice',         '1130','4450','Cold storage billed'),
+          (p_company_id, 'doa_penalty',             '1130','4500','Transit mortality penalty'),
+          (p_company_id, 'marination_consumption',  '5220','1145','Marination ingredients consumed into batch'),
+          (p_company_id, 'sanitation_consumption',  '5230','1140','Sanitation chemicals consumed'),
+          (p_company_id, 'maintenance_completed',   '5340','1150','Maintenance parts + labor')
+        ON CONFLICT (company_id, event_type) DO NOTHING;
+
+        INSERT INTO dp_rate_cards (company_id, service, unit, amount, effective_from) VALUES
+          (p_company_id, 'basic_tolling','per_head',   18.0000, '2026-01-01'),
+          (p_company_id, 'cutups',       'per_kg',      6.5000, '2026-01-01'),
+          (p_company_id, 'marination',   'per_kg',      9.0000, '2026-01-01'),
+          (p_company_id, 'blast',        'per_kg',      2.2500, '2026-01-01'),
+          (p_company_id, 'storage',      'per_kg_day',  0.3500, '2026-01-01'),
+          (p_company_id, 'doa',          'per_head',   12.0000, '2026-01-01');
+      END; $fn$
+    `);
+    results.push('045f dp_bootstrap_defaults(): ok');
+  } catch (e) { results.push(`045f dp_bootstrap_defaults FAILED: ${(e as Error).message}`); }
+
+  // Bootstrap defaults for every company that already has a chart of accounts.
+  try {
+    await query(`DO $$ DECLARE c uuid; BEGIN
+      FOR c IN SELECT DISTINCT company_id FROM accounts LOOP
+        PERFORM dp_bootstrap_defaults(c);
+      END LOOP; END $$`);
+    results.push('045f bootstrap all companies: ok');
+  } catch (e) { results.push(`045f bootstrap all companies FAILED: ${(e as Error).message}`); }
+
+  // Feature flag (opt-in, like WMS — hidden until a superadmin turns it ON).
+  try {
+    await query(
+      `INSERT INTO feature_flags (name, enabled, description)
+       VALUES ('dressing_plant', false, 'Poultry Dressing Plant — tolling job orders, receiving/yield, marination, cold chain, invoicing, dispatch/gate-pass, sanitation & PM')
+       ON CONFLICT (name) DO NOTHING`,
+    );
+    results.push('045 dressing_plant feature flag: ok');
+  } catch (e) { results.push(`045 dressing_plant feature flag FAILED: ${(e as Error).message}`); }
 
   return ok({ results });
 }

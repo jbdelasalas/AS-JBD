@@ -9,8 +9,14 @@ interface NavItem {
   href: string;
   label: string;
   children?: { href: string; label: string }[];
-  // Optional feature-flag name; the group is hidden until the flag is enabled.
+  // Optional feature-flag name gating this group.
   flag?: string;
+  // How the flag gates the group:
+  //   'off' (default) — hidden until the flag is turned ON  (opt-in, e.g. WMS).
+  //   'on'            — shown unless the flag is turned OFF (the module ships
+  //                     visible; a superadmin disables it for deployments that
+  //                     don't use it, e.g. Poultry / Restaurant / Fuel).
+  flagDefault?: 'on' | 'off';
 }
 
 const NAV: NavItem[] = [
@@ -90,8 +96,35 @@ const NAV: NavItem[] = [
     ],
   },
   {
+    href: '/dashboard/fuel',
+    label: 'Fuel',
+    flag: 'fuel',
+    flagDefault: 'on',
+    children: [
+      { href: '/dashboard/fuel/tanks',      label: 'Tanks' },
+      { href: '/dashboard/fuel/deliveries', label: 'Deliveries' },
+    ],
+  },
+  {
+    href: '/dashboard/dressing-plant',
+    label: 'Dressing Plant',
+    flag: 'dressing_plant',
+    children: [
+      { href: '/dashboard/dressing-plant/job-orders',   label: 'Job Orders' },
+      { href: '/dashboard/dressing-plant/receiving',    label: 'Receiving' },
+      { href: '/dashboard/dressing-plant/yield',        label: 'Yield & WIP' },
+      { href: '/dashboard/dressing-plant/marination',   label: 'Marination' },
+      { href: '/dashboard/dressing-plant/cold-chain',   label: 'Cold Chain' },
+      { href: '/dashboard/dressing-plant/invoices',     label: 'Invoices' },
+      { href: '/dashboard/dressing-plant/dispatch',     label: 'Dispatch & Gate' },
+      { href: '/dashboard/dressing-plant/maintenance',  label: 'Sanitation & PM' },
+    ],
+  },
+  {
     href: '/dashboard/poultry',
     label: 'Poultry Operations',
+    flag: 'poultry',
+    flagDefault: 'on',
     children: [
       { href: '/dashboard/poultry/grow-cycles',   label: 'Grow Cycles' },
       { href: '/dashboard/poultry/tally-sheets',  label: 'Tally Sheets' },
@@ -102,6 +135,8 @@ const NAV: NavItem[] = [
   {
     href: '/dashboard/restaurant',
     label: 'Restaurant',
+    flag: 'restaurant',
+    flagDefault: 'on',
     children: [
       { href: '/dashboard/purchasing/purchase-orders', label: 'Purchase Orders' },
       { href: '/dashboard/ap/bills',                    label: 'Bills' },
@@ -127,9 +162,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const [isSandbox, setIsSandbox] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  // Names of feature flags that have resolved to ON. Flag-gated nav groups stay
-  // hidden until their flag appears here, so they never flash for users without it.
-  const [enabledFlags, setEnabledFlags] = useState<Set<string>>(new Set());
+  // Resolved enabled-state of every flag the nav references. Until a flag's real
+  // value arrives it is `undefined` — opt-in groups (flagDefault 'off') stay
+  // hidden so they never flash, while default-on groups stay visible and only
+  // hide once a confirmed `false` arrives.
+  const [flagStates, setFlagStates] = useState<Map<string, boolean>>(new Map());
 
   useEffect(() => {
     const name = localStorage.getItem('company_name');
@@ -143,15 +180,23 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       flagNames.map(async (f) => {
         try {
           const res = await api.get<{ data: { enabled: boolean } }>(`/flags?name=${encodeURIComponent(f)}`);
-          return res.data.enabled ? f : null;
+          return [f, res.data.enabled] as const;
         } catch {
           return null;
         }
       }),
-    ).then((on) => setEnabledFlags(new Set(on.filter((f): f is string => !!f))));
+    ).then((pairs) => {
+      setFlagStates(new Map(pairs.filter((p): p is readonly [string, boolean] => !!p)));
+    });
   }, []);
 
-  const navItems = NAV.filter((item) => !item.flag || enabledFlags.has(item.flag));
+  const navItems = NAV.filter((item) => {
+    if (!item.flag) return true;
+    const state = flagStates.get(item.flag);
+    // Default-on modules show unless a confirmed OFF arrives; default-off (opt-in)
+    // modules show only once a confirmed ON arrives.
+    return item.flagDefault === 'on' ? state !== false : state === true;
+  });
 
   async function confirmSwitch() {
     setShowConfirm(false);
