@@ -110,8 +110,8 @@ export async function POST(request: NextRequest) {
         [
           companyId, runId,
           JSON.stringify([
-            { code: '5220', dr: totalCost, cr: 0 },
-            { code: '1145', dr: 0, cr: totalCost },
+            { code: 'DP5220', dr: totalCost, cr: 0 },
+            { code: 'DP1145', dr: 0, cr: totalCost },
           ]),
           'Marination ingredients consumed',
           branchRow.rows[0]?.branch_id ?? null,

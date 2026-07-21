@@ -3662,9 +3662,26 @@ export async function POST(request: NextRequest) {
 
         -- Allocate an entry number from the journal_voucher series when present;
         -- otherwise synthesise a DP- number so entry_no (NOT NULL) is satisfied.
-        UPDATE document_series SET current_number = current_number + 1, updated_at = now()
-          WHERE company_id = p_company_id AND doc_type = 'journal_voucher' AND is_active = true
-          RETURNING prefix, current_number INTO v_prefix, v_seq;
+        -- Target exactly one series (there can be several active) so the
+        -- RETURNING ... INTO never sees more than one row, and sync it up to the
+        -- real max entry_no first so we never collide with a number another
+        -- module already issued against the same prefix.
+        UPDATE document_series ds SET
+          current_number = GREATEST(
+            ds.current_number,
+            COALESCE((
+              SELECT MAX(NULLIF(regexp_replace(substr(je.entry_no, length(ds.prefix) + 1), '\\D', '', 'g'), '')::bigint)
+                FROM journal_entries je
+               WHERE je.company_id = ds.company_id AND je.entry_no LIKE ds.prefix || '%'
+            ), 0)
+          ) + 1,
+          updated_at = now()
+          WHERE ds.id = (
+            SELECT id FROM document_series
+             WHERE company_id = p_company_id AND doc_type = 'journal_voucher' AND is_active = true
+             ORDER BY created_at LIMIT 1
+          )
+          RETURNING ds.prefix, ds.current_number INTO v_prefix, v_seq;
         IF v_prefix IS NOT NULL THEN
           v_entry_no := v_prefix || lpad(v_seq::text, 6, '0');
         ELSE
@@ -3754,8 +3771,8 @@ export async function POST(request: NextRequest) {
         v_entry := dp_post_journal(
           v_job.company_id, 'generate_tolling_invoice', p_job_order_id,
           jsonb_build_array(
-            jsonb_build_object('code','1130','dr', v_amount, 'cr', 0),
-            jsonb_build_object('code','4100','dr', 0, 'cr', v_amount)
+            jsonb_build_object('code','DP1130','dr', v_amount, 'cr', 0),
+            jsonb_build_object('code','DP4100','dr', 0, 'cr', v_amount)
           ),
           'Basic tolling — batch ' || v_job.batch_no,
           v_job.branch_id, p_user_id
@@ -3815,25 +3832,25 @@ export async function POST(request: NextRequest) {
       BEGIN
         IF EXISTS (SELECT 1 FROM dp_posting_rules WHERE company_id = p_company_id LIMIT 1) THEN RETURN; END IF;
 
-        -- Dressing-plant chart of accounts (AFCC spec). These codes are what the
-        -- posting engine resolves; insert any that a company doesn't already have.
-        -- Only guaranteed columns are set. normal_side is an optional column
-        -- added by a later migration that isn't present on every deployment, and
-        -- it is derivable from account_types; the posting engine keys on code.
+        -- Dressing-plant chart of accounts. Uses a dedicated DP#### code range so
+        -- it never collides with a company's existing chart (a plain 4100/5220
+        -- often already exists under a different name). The posting engine keys
+        -- on these codes. Only guaranteed columns are set; normal_side is an
+        -- optional later-migration column and is derivable from account_types.
         INSERT INTO accounts (company_id, code, name, account_type, is_active) VALUES
-          (p_company_id, '1130','Accounts Receivable — Tolling',                  'ASSET',    true),
-          (p_company_id, '1140','Inventory — Processing Supplies',                'ASSET',    true),
-          (p_company_id, '1145','Inventory — Marination Ingredients',             'ASSET',    true),
-          (p_company_id, '1150','Inventory — Maintenance Spare Parts',            'ASSET',    true),
-          (p_company_id, '4100','Tolling Revenue — Basic Dressing',               'REVENUE',  true),
-          (p_company_id, '4200','Tolling Revenue — Cut-Ups & Portioning',         'REVENUE',  true),
-          (p_company_id, '4300','Tolling Revenue — Marination Services',          'REVENUE',  true),
-          (p_company_id, '4400','Warehousing Revenue — Blast Freezing',           'REVENUE',  true),
-          (p_company_id, '4450','Warehousing Revenue — Cold Storage',             'REVENUE',  true),
-          (p_company_id, '4500','Sales of By-Products / DOA Penalty',             'REVENUE',  true),
-          (p_company_id, '5220','Marination Raw Materials',                       'EXPENSE',  true),
-          (p_company_id, '5230','Food-grade Sanitation Chemicals',                'EXPENSE',  true),
-          (p_company_id, '5340','Repairs & Maintenance — Plant Machinery',        'EXPENSE',  true)
+          (p_company_id, 'DP1130','Accounts Receivable — Tolling',                'ASSET',    true),
+          (p_company_id, 'DP1140','Inventory — Processing Supplies',              'ASSET',    true),
+          (p_company_id, 'DP1145','Inventory — Marination Ingredients',           'ASSET',    true),
+          (p_company_id, 'DP1150','Inventory — Maintenance Spare Parts',          'ASSET',    true),
+          (p_company_id, 'DP4100','Tolling Revenue — Basic Dressing',             'REVENUE',  true),
+          (p_company_id, 'DP4200','Tolling Revenue — Cut-Ups & Portioning',       'REVENUE',  true),
+          (p_company_id, 'DP4300','Tolling Revenue — Marination Services',        'REVENUE',  true),
+          (p_company_id, 'DP4400','Warehousing Revenue — Blast Freezing',         'REVENUE',  true),
+          (p_company_id, 'DP4450','Warehousing Revenue — Cold Storage',           'REVENUE',  true),
+          (p_company_id, 'DP4500','Sales of By-Products / DOA Penalty',           'REVENUE',  true),
+          (p_company_id, 'DP5220','Marination Raw Materials',                     'EXPENSE',  true),
+          (p_company_id, 'DP5230','Food-grade Sanitation Chemicals',             'EXPENSE',  true),
+          (p_company_id, 'DP5340','Repairs & Maintenance — Plant Machinery',      'EXPENSE',  true)
         ON CONFLICT (company_id, code) DO NOTHING;
 
         -- Backfill normal_side only where that optional column exists.
@@ -3842,20 +3859,20 @@ export async function POST(request: NextRequest) {
           UPDATE accounts a SET normal_side =
             CASE WHEN a.account_type IN ('ASSET','EXPENSE') THEN 'DR' ELSE 'CR' END
           WHERE a.company_id = p_company_id
-            AND a.code IN ('1130','1140','1145','1150','4100','4200','4300','4400','4450','4500','5220','5230','5340')
+            AND a.code IN ('DP1130','DP1140','DP1145','DP1150','DP4100','DP4200','DP4300','DP4400','DP4450','DP4500','DP5220','DP5230','DP5340')
             AND a.normal_side IS NULL;
         END IF;
 
         INSERT INTO dp_posting_rules (company_id, event_type, dr_code, cr_code, description) VALUES
-          (p_company_id, 'generate_tolling_invoice','1130','4100','Basic tolling billed to client'),
-          (p_company_id, 'cutups_invoice',          '1130','4200','Cut-up / portioning billed'),
-          (p_company_id, 'marination_invoice',      '1130','4300','Marination service billed'),
-          (p_company_id, 'blast_invoice',           '1130','4400','Blast freezing billed'),
-          (p_company_id, 'storage_invoice',         '1130','4450','Cold storage billed'),
-          (p_company_id, 'doa_penalty',             '1130','4500','Transit mortality penalty'),
-          (p_company_id, 'marination_consumption',  '5220','1145','Marination ingredients consumed into batch'),
-          (p_company_id, 'sanitation_consumption',  '5230','1140','Sanitation chemicals consumed'),
-          (p_company_id, 'maintenance_completed',   '5340','1150','Maintenance parts + labor')
+          (p_company_id, 'generate_tolling_invoice','DP1130','DP4100','Basic tolling billed to client'),
+          (p_company_id, 'cutups_invoice',          'DP1130','DP4200','Cut-up / portioning billed'),
+          (p_company_id, 'marination_invoice',      'DP1130','DP4300','Marination service billed'),
+          (p_company_id, 'blast_invoice',           'DP1130','DP4400','Blast freezing billed'),
+          (p_company_id, 'storage_invoice',         'DP1130','DP4450','Cold storage billed'),
+          (p_company_id, 'doa_penalty',             'DP1130','DP4500','Transit mortality penalty'),
+          (p_company_id, 'marination_consumption',  'DP5220','DP1145','Marination ingredients consumed into batch'),
+          (p_company_id, 'sanitation_consumption',  'DP5230','DP1140','Sanitation chemicals consumed'),
+          (p_company_id, 'maintenance_completed',   'DP5340','DP1150','Maintenance parts + labor')
         ON CONFLICT (company_id, event_type) DO NOTHING;
 
         INSERT INTO dp_rate_cards (company_id, service, unit, amount, effective_from) VALUES

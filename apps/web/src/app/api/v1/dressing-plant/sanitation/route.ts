@@ -61,8 +61,8 @@ export async function POST(request: NextRequest) {
         [
           companyId, logId,
           JSON.stringify([
-            { code: '5230', dr: amount, cr: 0 },
-            { code: '1140', dr: 0, cr: amount },
+            { code: 'DP5230', dr: amount, cr: 0 },
+            { code: 'DP1140', dr: 0, cr: amount },
           ]),
           'Sanitation chemical consumed',
           auth.userId,
