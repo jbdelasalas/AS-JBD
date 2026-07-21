@@ -3889,5 +3889,14 @@ export async function POST(request: NextRequest) {
     results.push('045 dressing_plant feature flag: ok');
   } catch (e) { results.push(`045 dressing_plant feature flag FAILED: ${(e as Error).message}`); }
 
+  // --- 046: Booking intake fields on the job order (matches the LBRS booking form) ---
+  try {
+    await query(`ALTER TABLE dp_job_orders ADD COLUMN IF NOT EXISTS farm_location       text`);
+    await query(`ALTER TABLE dp_job_orders ADD COLUMN IF NOT EXISTS expected_arrival     timestamptz`);
+    await query(`ALTER TABLE dp_job_orders ADD COLUMN IF NOT EXISTS expected_truck_plate varchar(30)`);
+    await query(`ALTER TABLE dp_job_orders ADD COLUMN IF NOT EXISTS expected_heads       int`);
+    results.push('046 dp_job_orders booking fields: ok');
+  } catch (e) { results.push(`046 dp_job_orders booking fields FAILED: ${(e as Error).message}`); }
+
   return ok({ results });
 }

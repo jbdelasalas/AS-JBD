@@ -11,6 +11,11 @@ interface JobOrder {
   status: string;
   received_at: string;
   locked: boolean;
+  notes: string | null;
+  farm_location: string | null;
+  expected_arrival: string | null;
+  expected_truck_plate: string | null;
+  expected_heads: number | null;
   client_name: string;
   client_code: string;
   net_live_weight_kg: string | null;
@@ -28,15 +33,26 @@ const STATUS_STYLE: Record<string, string> = {
   cancelled: 'bg-red-100 text-red-700',
 };
 
+const labelCls = 'mb-1 block text-sm text-slate-700 dark:text-slate-300';
+const fieldCls = 'w-full rounded border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100';
+const roCls = 'w-full rounded border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/60';
+
 export default function JobOrdersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [orders, setOrders] = useState<JobOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const [customerId, setCustomerId] = useState('');
-  const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Booking form
+  const [lastBookingNo, setLastBookingNo] = useState('');
+  const [lastStatus, setLastStatus] = useState('');
+  const [customerId, setCustomerId] = useState('');
+  const [farmLocation, setFarmLocation] = useState('');
+  const [expectedArrival, setExpectedArrival] = useState('');
+  const [truckPlate, setTruckPlate] = useState('');
+  const [expectedHeads, setExpectedHeads] = useState('');
+  const [remarks, setRemarks] = useState('');
 
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('company_id') : null;
 
@@ -51,7 +67,7 @@ export default function JobOrdersPage() {
 
   const loadCustomers = useCallback(() => {
     if (!companyId) return;
-    // The tolling-client list is the ERP customer master.
+    // Bill To list is the ERP customer master.
     api.get<{ data: Customer[] }>(`/ar/customers?company_id=${companyId}&limit=500`)
       .then((r) => { setCustomers(r.data); setCustomerId((prev) => prev || r.data[0]?.id || ''); })
       .catch(() => {});
@@ -59,14 +75,28 @@ export default function JobOrdersPage() {
 
   useEffect(() => { loadCustomers(); load(); }, [loadCustomers, load]);
 
+  function resetForm() {
+    setFarmLocation(''); setExpectedArrival(''); setTruckPlate(''); setExpectedHeads(''); setRemarks('');
+  }
+
   async function addOrder(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!companyId || !customerId) { setError('Select a customer first'); return; }
+    if (!companyId || !customerId) { setError('Select a Bill To customer first'); return; }
     setSaving(true);
     try {
-      await api.post('/dressing-plant/job-orders', { company_id: companyId, customer_id: customerId, notes: notes || null });
-      setNotes('');
+      const r = await api.post<{ batch_no: string; status: string }>('/dressing-plant/job-orders', {
+        company_id: companyId,
+        customer_id: customerId,
+        farm_location: farmLocation || null,
+        expected_arrival: expectedArrival || null,
+        expected_truck_plate: truckPlate || null,
+        expected_heads: expectedHeads || null,
+        notes: remarks || null,
+      });
+      setLastBookingNo(r.batch_no);
+      setLastStatus(r.status);
+      resetForm();
       load();
     } catch (e) { setError((e as Error).message); }
     finally { setSaving(false); }
@@ -75,56 +105,94 @@ export default function JobOrdersPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <div className="mb-4">
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Job Orders</h1>
-        <p className="text-sm text-slate-600 dark:text-slate-400">The batch. A batch number is allocated automatically; everything downstream keys off it.</p>
+        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Job Orders — Live Bird Receiving Booking</h1>
+        <p className="text-sm text-slate-600 dark:text-slate-400">Book an incoming batch. The Booking # is allocated automatically on save; everything downstream keys off it.</p>
       </div>
 
       {error && <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
 
-      <form onSubmit={addOrder} className="mb-5 grid grid-cols-12 gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-        <div className="col-span-12 sm:col-span-4">
-          <label className="mb-1 block text-xs text-slate-600 dark:text-slate-400">Customer (tolling client) *</label>
-          <select value={customerId} onChange={(e) => setCustomerId(e.target.value)}
-            className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
-            {customers.length === 0 && <option value="">No customers found</option>}
-            {customers.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
-          </select>
+      <form onSubmit={addOrder} className="mb-6 rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+        {/* Booking # + Status (read-only, populated after save) */}
+        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className={labelCls}>Booking #:</label>
+            <input value={lastBookingNo} readOnly placeholder="—" className={roCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Status:</label>
+            <input value={lastStatus} readOnly placeholder="—" className={roCls} />
+          </div>
         </div>
-        <div className="col-span-8 sm:col-span-5">
-          <label className="mb-1 block text-xs text-slate-600 dark:text-slate-400">Notes</label>
-          <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="optional"
-            className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+
+        {/* Bill To / Farm Location / Expected Arrival */}
+        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <label className={labelCls}>Bill To:</label>
+            <select value={customerId} onChange={(e) => setCustomerId(e.target.value)} className={fieldCls}>
+              {customers.length === 0 && <option value="">Select Customer</option>}
+              {customers.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Farm Location:</label>
+            <input value={farmLocation} onChange={(e) => setFarmLocation(e.target.value)} className={fieldCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Expected Arrival Date Time</label>
+            <input type="datetime-local" value={expectedArrival} onChange={(e) => setExpectedArrival(e.target.value)} className={fieldCls} />
+          </div>
         </div>
-        <div className="col-span-4 sm:col-span-3 flex items-end">
+
+        {/* Expected Truck Plate / Expected Farm Count Heads */}
+        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className={labelCls}>Expected Truck Plate:</label>
+            <input value={truckPlate} onChange={(e) => setTruckPlate(e.target.value)} className={fieldCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Expected Farm Count Heads:</label>
+            <input type="number" min="0" value={expectedHeads} onChange={(e) => setExpectedHeads(e.target.value)} className={fieldCls} />
+          </div>
+        </div>
+
+        {/* Booking Remarks */}
+        <div className="mb-4 sm:max-w-md">
+          <label className={labelCls}>Booking Remarks:</label>
+          <input value={remarks} onChange={(e) => setRemarks(e.target.value)} className={fieldCls} />
+        </div>
+
+        <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
           <button type="submit" disabled={saving || !customerId}
-            className="w-full rounded bg-brand-600 px-2 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
-            {saving ? '…' : '+ New batch'}
+            className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+            {saving ? 'Saving…' : '+ Create Booking'}
           </button>
+          {customers.length === 0 && (
+            <span className="ml-3 text-xs text-slate-500 dark:text-slate-400">
+              No customers yet — add them under Receivables → Customers.
+            </span>
+          )}
         </div>
-        {customers.length === 0 && (
-          <p className="col-span-12 text-xs text-slate-500 dark:text-slate-400">
-            No customers yet. Add customers under Receivables → Customers, then create a batch here.
-          </p>
-        )}
       </form>
 
+      <h2 className="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-200">Bookings</h2>
       <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
             <tr>
-              <th className="px-3 py-2 text-left">Batch</th>
-              <th className="px-3 py-2 text-left">Client</th>
+              <th className="px-3 py-2 text-left">Booking #</th>
+              <th className="px-3 py-2 text-left">Bill To</th>
+              <th className="px-3 py-2 text-left">Farm</th>
+              <th className="px-3 py-2 text-right">Exp. heads</th>
               <th className="px-3 py-2 text-right">Live wt</th>
-              <th className="px-3 py-2 text-right">Heads</th>
               <th className="px-3 py-2 text-right">Recovery</th>
               <th className="px-3 py-2 text-left">Status</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="px-3 py-6 text-center text-xs text-slate-400">Loading…</td></tr>
+              <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-slate-400">Loading…</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={6} className="px-3 py-6 text-center text-xs text-slate-400">No job orders yet. Create one above.</td></tr>
+              <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-slate-400">No bookings yet. Create one above.</td></tr>
             ) : orders.map((o) => (
               <tr key={o.id} className="border-t border-slate-100 dark:border-slate-800">
                 <td className="px-3 py-2">
@@ -132,8 +200,9 @@ export default function JobOrdersPage() {
                   {o.locked && <span className="ml-2 text-[11px] text-slate-400">🔒</span>}
                 </td>
                 <td className="px-3 py-2 text-xs text-slate-700 dark:text-slate-300">{o.client_name}</td>
+                <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{o.farm_location ?? '—'}</td>
+                <td className="px-3 py-2 text-right text-xs text-slate-600 dark:text-slate-400">{o.expected_heads ?? '—'}</td>
                 <td className="px-3 py-2 text-right text-xs text-slate-700 dark:text-slate-300">{o.net_live_weight_kg ? `${Number(o.net_live_weight_kg).toLocaleString()} kg` : '—'}</td>
-                <td className="px-3 py-2 text-right text-xs text-slate-700 dark:text-slate-300">{o.head_count ?? '—'}{o.doa_count ? <span className="text-red-500"> (−{o.doa_count})</span> : null}</td>
                 <td className="px-3 py-2 text-right text-xs text-slate-700 dark:text-slate-300">{o.recovery_pct != null ? `${Number(o.recovery_pct).toFixed(1)}%` : '—'}</td>
                 <td className="px-3 py-2">
                   <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLE[o.status] ?? 'bg-slate-200 text-slate-600'}`}>{o.status.replace(/_/g, ' ')}</span>
