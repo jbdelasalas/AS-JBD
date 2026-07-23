@@ -99,6 +99,15 @@ export default function ProductionPage() {
   }
 
   const untransferred = lines.filter((l) => Number(l.transferred_kg) === 0);
+  const totals = lines.reduce(
+    (a, l) => {
+      a.packs += Number(l.pack_count || 0);
+      a.heads += Number(l.head_count || 0);
+      a.weight += Number(l.weight_kg || 0);
+      return a;
+    },
+    { packs: 0, heads: 0, weight: 0 },
+  );
   const inputCls = 'w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100';
 
   return (
@@ -157,6 +166,17 @@ export default function ProductionPage() {
               </tr>
             ))}
           </tbody>
+          {lines.length > 0 && (
+            <tfoot className="border-t-2 border-slate-200 bg-slate-50 text-xs font-semibold dark:border-slate-700 dark:bg-slate-800">
+              <tr>
+                <td className="px-3 py-2 text-slate-700 dark:text-slate-300" colSpan={2}>TOTAL — batch</td>
+                <td className="px-3 py-2 text-right text-slate-900 dark:text-slate-100">{totals.packs.toLocaleString()}</td>
+                <td className="px-3 py-2 text-right text-slate-900 dark:text-slate-100">{totals.heads.toLocaleString()}</td>
+                <td className="px-3 py-2 text-right text-slate-900 dark:text-slate-100">{totals.weight.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                <td className="px-3 py-2" />
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
 
