@@ -3915,5 +3915,68 @@ export async function POST(request: NextRequest) {
     results.push('046 dp_job_orders booking fields: ok');
   } catch (e) { results.push(`046 dp_job_orders booking fields FAILED: ${(e as Error).message}`); }
 
+  // --- 047: Processed-output detail (per product + per size) + WMS transfer ---
+  const client047 = await getPool().connect();
+  try {
+    await client047.query('BEGIN');
+
+    // Managed size list per company (XS/S/M/L/XL or weight bands).
+    await client047.query(`
+      CREATE TABLE IF NOT EXISTS dp_sizes (
+        id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        code       varchar(20) NOT NULL,
+        name       varchar(60) NOT NULL,
+        sort_order int NOT NULL DEFAULT 0,
+        is_active  boolean NOT NULL DEFAULT true,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, code)
+      )
+    `);
+
+    // One row per (batch, product item, size). Product = an ERP item so a WMS
+    // transfer maps cleanly. Tracks how much has been transferred to WMS.
+    await client047.query(`
+      CREATE TABLE IF NOT EXISTS dp_processed_output (
+        id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        company_id   uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        job_order_id uuid NOT NULL REFERENCES dp_job_orders(id) ON DELETE CASCADE,
+        item_id      uuid NOT NULL REFERENCES items(id),
+        size_id      uuid REFERENCES dp_sizes(id),
+        pack_count   int NOT NULL DEFAULT 0,        -- boxes/packs produced
+        head_count   int NOT NULL DEFAULT 0,        -- birds represented
+        weight_kg    numeric(14,2) NOT NULL DEFAULT 0,
+        transferred_kg numeric(14,2) NOT NULL DEFAULT 0,
+        transferred_at timestamptz,
+        created_by   uuid REFERENCES users(id),
+        created_at   timestamptz NOT NULL DEFAULT now(),
+        updated_at   timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client047.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='dp_processed_output_updated') THEN CREATE TRIGGER dp_processed_output_updated BEFORE UPDATE ON dp_processed_output FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+    await client047.query(`CREATE INDEX IF NOT EXISTS idx_dp_output_job ON dp_processed_output (job_order_id)`);
+    await client047.query(`CREATE INDEX IF NOT EXISTS idx_dp_output_item ON dp_processed_output (item_id)`);
+
+    // Seed a default size list for every company that has none yet.
+    await client047.query(`DO $$ DECLARE cc uuid; BEGIN
+      FOR cc IN SELECT DISTINCT company_id FROM accounts LOOP
+        IF NOT EXISTS (SELECT 1 FROM dp_sizes WHERE company_id = cc) THEN
+          INSERT INTO dp_sizes (company_id, code, name, sort_order) VALUES
+            (cc,'XS','Extra Small',1),
+            (cc,'S','Small',2),
+            (cc,'M','Medium',3),
+            (cc,'L','Large',4),
+            (cc,'XL','Extra Large',5),
+            (cc,'JUMBO','Jumbo',6);
+        END IF;
+      END LOOP; END $$`);
+
+    await client047.query('COMMIT');
+    results.push('047 dp_sizes + dp_processed_output: ok');
+  } catch (e) {
+    await client047.query('ROLLBACK');
+    results.push(`047 FAILED: ${(e as Error).message}`);
+  } finally { client047.release(); }
+
   return ok({ results });
 }

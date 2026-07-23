@@ -6,6 +6,7 @@ const CARDS = [
   { href: '/dashboard/dressing-plant/job-orders',  title: 'Job Orders', desc: 'The batch. Every operation and bill keys off a job order (batch) and its tolling client.' },
   { href: '/dashboard/dressing-plant/receiving',   title: 'Receiving & Weighing', desc: 'Live-bird receiving: gross/tare, head & coop counts, DOA. Recording it locks the batch.' },
   { href: '/dashboard/dressing-plant/yield',       title: 'Yield & WIP', desc: 'Dressed recovery, offal, condemned. Live recovery % with mass-balance & recovery alerts.' },
+  { href: '/dashboard/dressing-plant/production',  title: 'Production Detail', desc: 'Processed output per product and per size. Transfer to WMS for bin stock + cold-storage billing.' },
   { href: '/dashboard/dressing-plant/marination',  title: 'Marination', desc: 'Recipe BOM explosion consumes ingredient inventory and posts Dr 5220 / Cr 1145.' },
   { href: '/dashboard/dressing-plant/cold-chain',  title: 'Cold Chain', desc: 'Storage boxes with barcode UUIDs. Hourly storage clock accrues daily rental.' },
   { href: '/dashboard/dressing-plant/invoices',    title: 'Invoices', desc: 'Basic-tolling invoicing through the posting engine — idempotent Dr 1130 AR / Cr 4100.' },

@@ -32,6 +32,7 @@ into balanced, idempotent double-entry postings in the shared General Ledger.
 | A | **Job Orders** | Book an incoming batch (LBRS): Bill To, farm location, expected arrival, truck plate, expected heads, remarks. Booking # is auto-assigned. | No |
 | B | **Receiving** | Live-bird receiving: gross/tare, head & coop counts, DOA. Recording it **locks the batch**. | No |
 | C | **Yield & WIP** | Dressed recovery, offal, condemned. Live recovery %; fires **mass-balance** (>1.5% loss) and **low-recovery** (<75%) alerts. | No |
+| C+ | **Production Detail** | Processed output **per product (ERP item) and per size**. A **Transfer to WMS** button pushes it into bin stock and creates cold-storage boxes for billing. | No (moves stock) |
 | D | **Marination** | Recipe BOM explosion consumes ingredient inventory. | **Yes** — Dr DP5220 / Cr DP1145 |
 | E | **Cold Chain** | Storage boxes with a barcode UUID (CCPT). Hourly storage clock accrues daily rental. | (accruals; invoice on billing) |
 | F | **Invoices** | Generate the basic-tolling invoice for a batch (idempotent). | **Yes** — Dr DP1130 / Cr DP4100 |
@@ -106,6 +107,20 @@ POSTGRES_URL="…:6543/postgres" node db/seeds/dressing_plant_demo.cjs
 1. Go to **Yield & WIP**, pick the batch. Net live prefills.
 2. Enter Dressed, Offal, Condemned. *(Demo: dressed 2730 → **78% recovery**.)*
 3. Save. Alerts appear if unaccounted loss > 1.5% or recovery < 75%.
+
+### Step 3b — Production detail + Transfer to WMS (Production Detail)
+1. Go to **Production Detail**, pick the batch.
+2. Add lines: **Product** (an ERP item, e.g. Dressed Chicken), **Size**
+   (XS/S/M/L/XL/Jumbo), packs, heads, weight. Save.
+   *(Demo: M = 400 kg, L = 300 kg.)*
+3. Under **Transfer to WMS**, pick a warehouse + bin and click
+   **→ Transfer to WMS**. Each line becomes:
+   - a **lot** `<batch>-<size>` (e.g. `DEMO-DP-0001-M`) for traceability,
+   - **bin stock** in the chosen bin,
+   - a **cold-storage box** so the storage clock/billing starts.
+   Re-running is idempotent — transferred lines are skipped.
+   *Sizes are managed under the size list (seeded XS…Jumbo); products are your
+   inventory items, so stock maps straight into WMS.*
 
 ### Step 4 — Store product (Cold Chain)
 1. Go to **Cold Chain**, pick the batch. Enter Product, Net kg, Pallet, Room.
