@@ -5,7 +5,6 @@ import Link from 'next/link';
 const CARDS = [
   { href: '/dashboard/dressing-plant/job-orders',  title: 'Job Orders', desc: 'The batch. Every operation and bill keys off a job order (batch) and its tolling client.' },
   { href: '/dashboard/dressing-plant/receiving',   title: 'Receiving & Weighing', desc: 'Live-bird receiving: gross/tare, head & coop counts, DOA. Recording it locks the batch.' },
-  { href: '/dashboard/dressing-plant/yield',       title: 'Yield & WIP', desc: 'Dressed recovery, offal, condemned. Live recovery % with mass-balance & recovery alerts.' },
   { href: '/dashboard/dressing-plant/production',  title: 'Production Detail', desc: 'Processed output per product and per size. Transfer to WMS for bin stock + cold-storage billing.' },
   { href: '/dashboard/dressing-plant/production-report', title: 'Production Report', desc: 'Detailed production log — Date, Time, Batch, Product code, Head, Weight. Date-range filter + CSV export.' },
   { href: '/dashboard/dressing-plant/marination',  title: 'Marination', desc: 'Recipe BOM explosion consumes ingredient inventory and posts Dr 5220 / Cr 1145.' },

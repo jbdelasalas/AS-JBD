@@ -112,7 +112,6 @@ const NAV: NavItem[] = [
     children: [
       { href: '/dashboard/dressing-plant/job-orders',   label: 'Job Orders' },
       { href: '/dashboard/dressing-plant/receiving',    label: 'Receiving' },
-      { href: '/dashboard/dressing-plant/yield',        label: 'Yield & WIP' },
       { href: '/dashboard/dressing-plant/production',   label: 'Production Detail' },
       { href: '/dashboard/dressing-plant/production-report', label: 'Production Report' },
       { href: '/dashboard/dressing-plant/marination',   label: 'Marination' },
