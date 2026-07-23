@@ -9,7 +9,7 @@ interface Size { id: string; code: string; name: string; }
 interface Warehouse { id: string; name: string; }
 interface Bin { id: string; code: string; bin_type: string; }
 interface OutputLine {
-  id: string; item_id: string; item_name: string; size_id: string | null;
+  id: string; batch_no: string; item_id: string; item_name: string; size_id: string | null;
   size_code: string | null; size_name: string | null;
   pack_count: number; head_count: number; weight_kg: string;
   transferred_kg: string; transferred_at: string | null;
@@ -138,6 +138,7 @@ export default function ProductionPage() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
             <tr>
+              <th className="px-3 py-2 text-left">Batch</th>
               <th className="px-3 py-2 text-left">Product</th>
               <th className="px-3 py-2 text-left">Size</th>
               <th className="px-3 py-2 text-right">Packs</th>
@@ -148,11 +149,12 @@ export default function ProductionPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="px-3 py-6 text-center text-xs text-slate-400">Loading…</td></tr>
+              <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-slate-400">Loading…</td></tr>
             ) : lines.length === 0 ? (
-              <tr><td colSpan={6} className="px-3 py-6 text-center text-xs text-slate-400">No production lines yet. Add below.</td></tr>
+              <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-slate-400">No production lines yet. Add below.</td></tr>
             ) : lines.map((l) => (
               <tr key={l.id} className="border-t border-slate-100 dark:border-slate-800">
+                <td className="px-3 py-2 text-xs font-medium text-slate-800 dark:text-slate-200">{l.batch_no}</td>
                 <td className="px-3 py-2 text-xs text-slate-800 dark:text-slate-200">{l.item_name}</td>
                 <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{l.size_code ?? '—'}</td>
                 <td className="px-3 py-2 text-right text-xs text-slate-700 dark:text-slate-300">{l.pack_count || '—'}</td>
@@ -169,7 +171,7 @@ export default function ProductionPage() {
           {lines.length > 0 && (
             <tfoot className="border-t-2 border-slate-200 bg-slate-50 text-xs font-semibold dark:border-slate-700 dark:bg-slate-800">
               <tr>
-                <td className="px-3 py-2 text-slate-700 dark:text-slate-300" colSpan={2}>TOTAL — batch</td>
+                <td className="px-3 py-2 text-slate-700 dark:text-slate-300" colSpan={3}>TOTAL — batch</td>
                 <td className="px-3 py-2 text-right text-slate-900 dark:text-slate-100">{totals.packs.toLocaleString()}</td>
                 <td className="px-3 py-2 text-right text-slate-900 dark:text-slate-100">{totals.heads.toLocaleString()}</td>
                 <td className="px-3 py-2 text-right text-slate-900 dark:text-slate-100">{totals.weight.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
