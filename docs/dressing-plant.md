@@ -33,6 +33,7 @@ into balanced, idempotent double-entry postings in the shared General Ledger.
 | B | **Receiving** | Live-bird receiving: gross/tare, head & coop counts, DOA. Recording it **locks the batch**. | No |
 | C | **Yield & WIP** | Dressed recovery, offal, condemned. Live recovery %; fires **mass-balance** (>1.5% loss) and **low-recovery** (<75%) alerts. | No |
 | C+ | **Production Detail** | Processed output **per product (ERP item) and per size**. A **Transfer to WMS** button pushes it into bin stock and creates cold-storage boxes for billing. | No (moves stock) |
+| C+ | **Production Report** | Detailed processed-production log: **Date · Time · Batch Number · Product Code · Head · Weight(kg)**. Date-range filter, totals, CSV export. | No |
 | D | **Marination** | Recipe BOM explosion consumes ingredient inventory. | **Yes** — Dr DP5220 / Cr DP1145 |
 | E | **Cold Chain** | Storage boxes with a barcode UUID (CCPT). Hourly storage clock accrues daily rental. | (accruals; invoice on billing) |
 | F | **Invoices** | Generate the basic-tolling invoice for a batch (idempotent). | **Yes** — Dr DP1130 / Cr DP4100 |
