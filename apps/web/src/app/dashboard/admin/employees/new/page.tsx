@@ -6,11 +6,15 @@ import { api } from '@/lib/api';
 
 interface UserOption { id: string; full_name: string; email: string; }
 interface DeptOption { id: string; name: string; }
+interface WarehouseOption { id: string; name: string; }
+interface CostCenterOption { id: string; code: string; name: string; }
 
 export default function NewEmployeePage() {
   const router = useRouter();
   const [users, setUsers] = useState<UserOption[]>([]);
   const [departments, setDepartments] = useState<DeptOption[]>([]);
+  const [locations, setLocations] = useState<WarehouseOption[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenterOption[]>([]);
   const [form, setForm] = useState({
     employee_no: '',
     full_name: '',
@@ -21,6 +25,8 @@ export default function NewEmployeePage() {
     hire_date: '',
     end_date: '',
     department_id: '',
+    location_id: '',
+    cost_center_id: '',
     user_id: '',
     is_active: true,
     notes: '',
@@ -33,7 +39,13 @@ export default function NewEmployeePage() {
     Promise.all([
       api.get<UserOption[]>(`/admin/users?company_id=${companyId}`),
       api.get<DeptOption[]>(`/admin/departments?company_id=${companyId}`),
-    ]).then(([u, d]) => { setUsers(u); setDepartments(d); }).catch(() => {});
+      api.get<{ data: WarehouseOption[] }>(`/wms/warehouses?company_id=${companyId}`),
+      api.get<CostCenterOption[]>(`/admin/cost-centers?company_id=${companyId}`),
+    ]).then(([u, d, w, cc]) => {
+      setUsers(u); setDepartments(d);
+      setLocations(w.data ?? []);
+      setCostCenters(Array.isArray(cc) ? cc : []);
+    }).catch(() => {});
   }, []);
 
   function pickUser(userId: string) {
@@ -56,6 +68,8 @@ export default function NewEmployeePage() {
         ...form,
         company_id: companyId,
         department_id: form.department_id || null,
+        location_id: form.location_id || null,
+        cost_center_id: form.cost_center_id || null,
         user_id: form.user_id || null,
         hire_date: form.hire_date || null,
         end_date: form.end_date || null,
@@ -134,6 +148,20 @@ export default function NewEmployeePage() {
               <select value={form.department_id} onChange={(e) => setForm((f) => ({ ...f, department_id: e.target.value }))} className={field}>
                 <option value="">— None —</option>
                 {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={label}>Location</label>
+              <select value={form.location_id} onChange={(e) => setForm((f) => ({ ...f, location_id: e.target.value }))} className={field}>
+                <option value="">— None —</option>
+                {locations.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={label}>Class</label>
+              <select value={form.cost_center_id} onChange={(e) => setForm((f) => ({ ...f, cost_center_id: e.target.value }))} className={field}>
+                <option value="">— None —</option>
+                {costCenters.map((cc) => <option key={cc.id} value={cc.id}>{cc.code} — {cc.name}</option>)}
               </select>
             </div>
             <div>

@@ -10,9 +10,14 @@ export async function GET(req: NextRequest, { params }: Ctx) {
   try { await requireAuth(req); } catch (e) { return e as Response; }
   try {
     const [emp] = await query(
-      `SELECT e.*, d.name AS department_name, u.email AS user_email, u.full_name AS user_full_name
+      `SELECT e.*, d.name AS department_name,
+              w.name AS location_name,
+              cc.name AS cost_center_name, cc.code AS cost_center_code,
+              u.email AS user_email, u.full_name AS user_full_name
          FROM employees e
          LEFT JOIN departments d ON d.id = e.department_id
+         LEFT JOIN warehouses w ON w.id = e.location_id
+         LEFT JOIN cost_centers cc ON cc.id = e.cost_center_id
          LEFT JOIN users u ON u.id = e.user_id
         WHERE e.id = $1`,
       [params.id],
@@ -27,7 +32,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   try {
     const body = await req.json() as Record<string, unknown>;
     const allowed = [
-      'full_name','email','phone','department_id','position',
+      'full_name','email','phone','department_id','location_id','cost_center_id','position',
       'employment_type','hire_date','end_date','user_id','is_active','notes',
     ];
     const fields: string[] = [];

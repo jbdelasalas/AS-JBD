@@ -14,10 +14,14 @@ export async function GET(req: NextRequest) {
     const rows = await query(
       `SELECT e.id, e.employee_no, e.full_name, e.email, e.phone,
               e.position, e.employment_type, e.hire_date, e.is_active,
-              d.name AS department_name,
+              e.department_id, d.name AS department_name,
+              e.location_id, w.name AS location_name,
+              e.cost_center_id, cc.name AS cost_center_name, cc.code AS cost_center_code,
               u.email AS user_email
          FROM employees e
          LEFT JOIN departments d ON d.id = e.department_id
+         LEFT JOIN warehouses w ON w.id = e.location_id
+         LEFT JOIN cost_centers cc ON cc.id = e.cost_center_id
          LEFT JOIN users u ON u.id = e.user_id
         WHERE e.company_id = $1
           AND ($2 = '' OR e.full_name ILIKE '%' || $2 || '%'
@@ -38,7 +42,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
     const {
       employee_no, full_name, email, phone,
-      department_id, position, employment_type, hire_date, end_date,
+      department_id, location_id, cost_center_id,
+      position, employment_type, hire_date, end_date,
       user_id, is_active = true, notes,
     } = body;
     const company_id = body.company_id
@@ -56,11 +61,13 @@ export async function POST(req: NextRequest) {
     const [emp] = await query<{ id: string }>(
       `INSERT INTO employees
          (company_id, user_id, employee_no, full_name, email, phone,
-          department_id, position, employment_type, hire_date, end_date, is_active, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+          department_id, location_id, cost_center_id,
+          position, employment_type, hire_date, end_date, is_active, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        RETURNING id`,
       [company_id, user_id ?? null, employee_no, full_name,
        email ?? null, phone ?? null, department_id ?? null,
+       location_id ?? null, cost_center_id ?? null,
        position ?? null, employment_type ?? 'full_time',
        hire_date ?? null, end_date ?? null, is_active, notes ?? null],
     );

@@ -3994,5 +3994,14 @@ export async function POST(request: NextRequest) {
     } catch (e) { results.push(`employee_expense_reports.${col}: ${(e as Error).message}`); }
   }
 
+  // --- 049: Employee Location (warehouse) + Class (cost center) links ---
+  // Employee form gets Location and Class as dropdowns from the current master
+  // lists: Location -> warehouses, Class -> cost_centers.
+  try {
+    await query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS location_id    uuid REFERENCES warehouses(id)`);
+    await query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS cost_center_id uuid REFERENCES cost_centers(id)`);
+    results.push('049 employees location + cost_center: ok');
+  } catch (e) { results.push(`049 employees location + cost_center FAILED: ${(e as Error).message}`); }
+
   return ok({ results });
 }

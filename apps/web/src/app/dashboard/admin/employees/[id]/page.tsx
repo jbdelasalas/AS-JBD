@@ -9,10 +9,14 @@ interface Employee {
   phone: string | null; position: string | null; employment_type: string;
   hire_date: string | null; end_date: string | null; is_active: boolean;
   notes: string | null; department_id: string | null; department_name: string | null;
+  location_id: string | null; location_name: string | null;
+  cost_center_id: string | null; cost_center_name: string | null; cost_center_code: string | null;
   user_id: string | null; user_email: string | null; user_full_name: string | null;
 }
 interface UserOption { id: string; full_name: string; email: string; }
 interface DeptOption { id: string; name: string; }
+interface WarehouseOption { id: string; name: string; }
+interface CostCenterOption { id: string; code: string; name: string; }
 
 export default function EmployeeDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +24,8 @@ export default function EmployeeDetailPage() {
   const [emp, setEmp] = useState<Employee | null>(null);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [departments, setDepartments] = useState<DeptOption[]>([]);
+  const [locations, setLocations] = useState<WarehouseOption[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenterOption[]>([]);
   const [form, setForm] = useState<Partial<Employee>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -31,14 +37,20 @@ export default function EmployeeDetailPage() {
       api.get<Employee>(`/admin/employees/${id}`),
       api.get<UserOption[]>(`/admin/users?company_id=${companyId}`),
       api.get<DeptOption[]>(`/admin/departments?company_id=${companyId}`),
-    ]).then(([e, u, d]) => {
+      api.get<{ data: WarehouseOption[] }>(`/wms/warehouses?company_id=${companyId}`),
+      api.get<CostCenterOption[]>(`/admin/cost-centers?company_id=${companyId}`),
+    ]).then(([e, u, d, w, cc]) => {
       setEmp(e); setUsers(u); setDepartments(d);
+      setLocations(w.data ?? []);
+      setCostCenters(Array.isArray(cc) ? cc : []);
       setForm({
         full_name: e.full_name, email: e.email ?? '', phone: e.phone ?? '',
         position: e.position ?? '', employment_type: e.employment_type,
         hire_date: e.hire_date ? e.hire_date.slice(0, 10) : '',
         end_date: e.end_date ? e.end_date.slice(0, 10) : '',
-        department_id: e.department_id ?? '', user_id: e.user_id ?? '',
+        department_id: e.department_id ?? '',
+        location_id: e.location_id ?? '', cost_center_id: e.cost_center_id ?? '',
+        user_id: e.user_id ?? '',
         is_active: e.is_active, notes: e.notes ?? '',
       });
     }).catch((e) => setError(e.message));
@@ -50,6 +62,8 @@ export default function EmployeeDetailPage() {
       await api.patch(`/admin/employees/${id}`, {
         ...form,
         department_id: form.department_id || null,
+        location_id: form.location_id || null,
+        cost_center_id: form.cost_center_id || null,
         user_id: form.user_id || null,
         hire_date: form.hire_date || null,
         end_date: form.end_date || null,
@@ -124,6 +138,20 @@ export default function EmployeeDetailPage() {
               <select value={form.department_id ?? ''} onChange={(e) => setForm((f) => ({ ...f, department_id: e.target.value }))} className={field}>
                 <option value="">— None —</option>
                 {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={label}>Location</label>
+              <select value={form.location_id ?? ''} onChange={(e) => setForm((f) => ({ ...f, location_id: e.target.value }))} className={field}>
+                <option value="">— None —</option>
+                {locations.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={label}>Class</label>
+              <select value={form.cost_center_id ?? ''} onChange={(e) => setForm((f) => ({ ...f, cost_center_id: e.target.value }))} className={field}>
+                <option value="">— None —</option>
+                {costCenters.map((cc) => <option key={cc.id} value={cc.id}>{cc.code} — {cc.name}</option>)}
               </select>
             </div>
             <div>
