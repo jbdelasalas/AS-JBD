@@ -4003,5 +4003,82 @@ export async function POST(request: NextRequest) {
     results.push('049 employees location + cost_center: ok');
   } catch (e) { results.push(`049 employees location + cost_center FAILED: ${(e as Error).message}`); }
 
+  // --- 050: Expense report tables (create if missing) + cash-count fields ---
+  // The employee expense-report schema lived only in supabase/schema.sql and was
+  // never applied to the live DB. Create it here, then add the cash-count /
+  // fund-accountability fields. cash_count holds the denomination breakdown +
+  // reconciliation inputs: { denoms:{"1000":30,...}, check_on_process,
+  // unliquidated_cash_advance, total_coh, total_fund_accounted, over_short }.
+  const client050 = await getPool().connect();
+  try {
+    await client050.query('BEGIN');
+    await client050.query(`
+      CREATE TABLE IF NOT EXISTS employee_expense_reports (
+        id               uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id       uuid NOT NULL REFERENCES companies(id),
+        branch_id        uuid REFERENCES branches(id),
+        er_no            varchar(50) NOT NULL,
+        employee_id      uuid NOT NULL REFERENCES employees(id),
+        report_date      date NOT NULL,
+        period_from      date,
+        period_to        date,
+        purpose          text,
+        notes            text,
+        department        varchar(200),
+        fund_class        varchar(200),
+        report_class      varchar(200),
+        location_text     varchar(200),
+        external_id_code  varchar(100),
+        pcf_series        varchar(100),
+        location_id       uuid REFERENCES branches(id),
+        cost_center_id    uuid REFERENCES cost_centers(id),
+        total            numeric(18,2) NOT NULL DEFAULT 0,
+        status           varchar(30) NOT NULL DEFAULT 'draft'
+                           CHECK (status IN ('draft','pending_approval','approved','cancelled')),
+        approved_by      uuid REFERENCES users(id),
+        approved_at      timestamptz,
+        cancelled_by     uuid REFERENCES users(id),
+        cancelled_at     timestamptz,
+        cancel_reason    text,
+        je_id            uuid REFERENCES journal_entries(id),
+        cash_count          jsonb,
+        fund_accountability numeric(18,2),
+        created_by       uuid NOT NULL REFERENCES users(id),
+        created_at       timestamptz NOT NULL DEFAULT now(),
+        updated_at       timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, er_no)
+      )
+    `);
+    await client050.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='employee_expense_reports_updated') THEN CREATE TRIGGER employee_expense_reports_updated BEFORE UPDATE ON employee_expense_reports FOR EACH ROW EXECUTE FUNCTION set_updated_at(); END IF; END $$`);
+    await client050.query(`CREATE INDEX IF NOT EXISTS idx_eer_employee ON employee_expense_reports (employee_id)`);
+    await client050.query(`CREATE INDEX IF NOT EXISTS idx_eer_company  ON employee_expense_reports (company_id)`);
+    // In case the table already existed without the new columns:
+    await client050.query(`ALTER TABLE employee_expense_reports ADD COLUMN IF NOT EXISTS cash_count jsonb`);
+    await client050.query(`ALTER TABLE employee_expense_reports ADD COLUMN IF NOT EXISTS fund_accountability numeric(18,2)`);
+
+    await client050.query(`
+      CREATE TABLE IF NOT EXISTS expense_report_lines (
+        id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        er_id               uuid NOT NULL REFERENCES employee_expense_reports(id) ON DELETE CASCADE,
+        line_no             int NOT NULL,
+        expense_account_id  uuid REFERENCES accounts(id),
+        description         text NOT NULL,
+        receipt_date        date NOT NULL,
+        amount              numeric(18,2) NOT NULL,
+        notes               text,
+        location_id         uuid REFERENCES branches(id),
+        cost_center_id      uuid REFERENCES cost_centers(id),
+        UNIQUE (er_id, line_no)
+      )
+    `);
+    await client050.query(`CREATE INDEX IF NOT EXISTS idx_erl_er ON expense_report_lines (er_id)`);
+
+    await client050.query('COMMIT');
+    results.push('050 expense reports + cash_count: ok');
+  } catch (e) {
+    await client050.query('ROLLBACK');
+    results.push(`050 expense reports FAILED: ${(e as Error).message}`);
+  } finally { client050.release(); }
+
   return ok({ results });
 }

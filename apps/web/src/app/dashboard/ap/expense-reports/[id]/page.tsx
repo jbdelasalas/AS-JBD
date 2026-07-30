@@ -49,6 +49,39 @@ export default function ExpenseReportDetailPage() {
   const [showCancel, setShowCancel]     = useState(false);
   const [cancelReason, setCancelReason] = useState('');
 
+  // Cash-count / fund accountability
+  const DENOMS = [1000, 500, 200, 100, 50, 20, 10, 5, 1, 0.25];
+  const [counts, setCounts] = useState<Record<string, string>>({});
+  const [checkOnProcess, setCheckOnProcess] = useState('');
+  const [unliquidatedCA, setUnliquidatedCA] = useState('');
+  const [fundAccountability, setFundAccountability] = useState('');
+  const [savingCash, setSavingCash] = useState(false);
+
+  const num = (v: string) => (v === '' || isNaN(Number(v)) ? 0 : Number(v));
+  const totalCOH = DENOMS.reduce((s, d) => s + d * num(counts[String(d)] ?? ''), 0);
+  const totalFundAccounted = totalCOH + num(checkOnProcess) + num(unliquidatedCA);
+  const overShort = totalFundAccounted - num(fundAccountability);
+
+  async function saveCashCount() {
+    setSavingCash(true); setMsg(null);
+    try {
+      await api.patch(`/ap/expense-reports/${id}`, {
+        cash_count: {
+          denoms: Object.fromEntries(DENOMS.map((d) => [String(d), num(counts[String(d)] ?? '')])),
+          check_on_process: num(checkOnProcess),
+          unliquidated_cash_advance: num(unliquidatedCA),
+          total_coh: totalCOH,
+          total_fund_accounted: totalFundAccounted,
+          over_short: overShort,
+        },
+        fund_accountability: num(fundAccountability),
+      });
+      setMsg('Cash count saved.');
+      load();
+    } catch (e) { setMsg((e as Error).message ?? 'Failed to save cash count'); }
+    finally { setSavingCash(false); }
+  }
+
   const load = useCallback(() => {
     setLoading(true);
     api.get<EmployeeExpenseReport>(`/ap/expense-reports/${id}`)
@@ -57,6 +90,22 @@ export default function ExpenseReportDetailPage() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Hydrate the cash-count form from the loaded report.
+  useEffect(() => {
+    if (!er) return;
+    const cc = (er as unknown as { cash_count?: {
+      denoms?: Record<string, number>; check_on_process?: number; unliquidated_cash_advance?: number;
+    }; fund_accountability?: number });
+    if (cc.cash_count?.denoms) {
+      const m: Record<string, string> = {};
+      for (const [k, v] of Object.entries(cc.cash_count.denoms)) m[k] = v ? String(v) : '';
+      setCounts(m);
+    }
+    if (cc.cash_count?.check_on_process != null) setCheckOnProcess(String(cc.cash_count.check_on_process || ''));
+    if (cc.cash_count?.unliquidated_cash_advance != null) setUnliquidatedCA(String(cc.cash_count.unliquidated_cash_advance || ''));
+    if (cc.fund_accountability != null) setFundAccountability(String(cc.fund_accountability || ''));
+  }, [er]);
 
   async function doAction(path: string, body?: object) {
     setBusy(true);
@@ -203,6 +252,94 @@ export default function ExpenseReportDetailPage() {
               </tr>
             </tfoot>
           </table>
+        </div>
+      </div>
+
+      {/* Cash count / Fund Accountability */}
+      <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+        <h2 className="mb-4 text-center text-sm font-semibold text-slate-800 dark:text-slate-200">Cash Count &amp; Fund Accountability</h2>
+        <div className="mx-auto max-w-lg">
+          {/* Denomination table */}
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-slate-500 dark:text-slate-400">
+                <th className="py-1 text-center font-semibold">Denom</th>
+                <th className="py-1 text-center font-semibold">Count</th>
+                <th className="py-1 text-right font-semibold">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {DENOMS.map((d) => {
+                const cnt = num(counts[String(d)] ?? '');
+                const editable = ['draft', 'pending_approval'].includes(er.status);
+                return (
+                  <tr key={d} className="border-t border-slate-100 dark:border-slate-800">
+                    <td className="py-1 text-center font-mono text-xs text-slate-700 dark:text-slate-300">{d.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="py-1 text-center">
+                      <input
+                        type="number" min="0" value={counts[String(d)] ?? ''}
+                        disabled={!editable}
+                        onChange={(e) => setCounts((c) => ({ ...c, [String(d)]: e.target.value }))}
+                        className="w-24 rounded border border-slate-300 px-2 py-0.5 text-center text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 disabled:opacity-60"
+                      />
+                    </td>
+                    <td className="py-1 text-right font-mono text-xs text-slate-800 dark:text-slate-200">{(d * cnt).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Reconciliation */}
+          {(() => {
+            const editable = ['draft', 'pending_approval'].includes(er.status);
+            const rowLabel = 'text-right text-xs font-semibold text-slate-600 dark:text-slate-400';
+            const rowVal = 'w-40 border px-2 py-1 text-right font-mono text-sm border-slate-200 bg-slate-50 text-slate-900 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-100';
+            const inp = 'w-40 rounded border border-slate-300 px-2 py-1 text-right text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 disabled:opacity-60';
+            return (
+              <div className="mt-4 space-y-1.5">
+                <div className="flex items-center justify-end gap-3">
+                  <span className={rowLabel}>Total COH</span>
+                  <div className={rowVal}>{totalCOH.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                </div>
+                <div className="flex items-center justify-end gap-3">
+                  <span className={rowLabel}>Check on Process</span>
+                  <input type="number" step="0.01" value={checkOnProcess} disabled={!editable}
+                    onChange={(e) => setCheckOnProcess(e.target.value)} className={inp} />
+                </div>
+                <div className="flex items-center justify-end gap-3">
+                  <span className={rowLabel}>Unliquidated Cash Advance</span>
+                  <input type="number" step="0.01" value={unliquidatedCA} disabled={!editable}
+                    onChange={(e) => setUnliquidatedCA(e.target.value)} className={inp} />
+                </div>
+                <div className="flex items-center justify-end gap-3">
+                  <span className={rowLabel}>Total Fund Accounted</span>
+                  <div className={`${rowVal} font-semibold`}>{totalFundAccounted.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                </div>
+                <div className="flex items-center justify-end gap-3">
+                  <span className={rowLabel}>Fund Accountability</span>
+                  <input type="number" step="0.01" value={fundAccountability} disabled={!editable}
+                    onChange={(e) => setFundAccountability(e.target.value)} className={inp} />
+                </div>
+                <div className="flex items-center justify-end gap-3">
+                  <span className={rowLabel}>Over/(Short)</span>
+                  <div className={`${rowVal} font-bold ${overShort < 0 ? 'text-red-600 dark:text-red-400' : overShort > 0 ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+                    {overShort < 0
+                      ? `(${Math.abs(overShort).toLocaleString(undefined, { minimumFractionDigits: 2 })})`
+                      : overShort.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+                {editable && (
+                  <div className="flex justify-end pt-2">
+                    <button onClick={saveCashCount} disabled={savingCash}
+                      className="rounded bg-brand-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                      {savingCash ? 'Saving…' : 'Save cash count'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
 

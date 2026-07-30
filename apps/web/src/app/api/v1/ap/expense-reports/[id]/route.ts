@@ -37,3 +37,32 @@ export async function GET(
 
   return ok({ ...mapRow(headers[0] as Record<string, unknown>), lines });
 }
+
+// Save the cash-count / fund-accountability reconciliation on the report header.
+// Body: { cash_count: {...}, fund_accountability: number }
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  try { await requireAuth(request); } catch (e) { return e as Response; }
+
+  let body: Record<string, unknown>;
+  try { body = await request.json(); } catch { return err('Invalid request body', 400); }
+
+  const cashCount = body.cash_count ?? null;
+  const fundAcct = body.fund_accountability != null && body.fund_accountability !== ''
+    ? Number(body.fund_accountability) : null;
+
+  try {
+    const [row] = await query<{ id: string }>(
+      `UPDATE employee_expense_reports
+          SET cash_count = $1::jsonb, fund_accountability = $2
+        WHERE id = $3 RETURNING id`,
+      [cashCount != null ? JSON.stringify(cashCount) : null, fundAcct, params.id],
+    );
+    if (!row) return err('Expense report not found', 404);
+    return ok(row);
+  } catch (e: unknown) {
+    return err((e as Error).message ?? 'Failed to save cash count', 500);
+  }
+}
