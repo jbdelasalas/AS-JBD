@@ -14,11 +14,28 @@ const STATUS_STYLES: Record<string, string> = {
   cancelled:        'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
 };
 
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
+/** Header row styled like the "PPC - Replenishment Report" template:
+ *  right-aligned label, value shown in a subtle bordered box.
+ *  `highlight` renders the box with a filled/emphasised background
+ *  (used for the External ID Code style fields). */
+function HeaderRow({
+  label, value, highlight = false,
+}: { label: string; value: React.ReactNode; highlight?: boolean }) {
   return (
-    <div>
-      <div className="mb-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">{label}</div>
-      <div className="text-sm text-slate-900 dark:text-slate-100">{value || <span className="text-slate-400">—</span>}</div>
+    <div className="flex items-center gap-2">
+      <div className="w-40 shrink-0 text-right text-xs font-semibold text-slate-600 dark:text-slate-400">
+        {label}
+      </div>
+      <div
+        className={
+          'min-w-0 flex-1 border px-2 py-1 text-sm ' +
+          (highlight
+            ? 'border-slate-400 bg-slate-200 font-semibold text-slate-900 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-100'
+            : 'border-slate-200 bg-slate-50 text-slate-900 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-100')
+        }
+      >
+        {value || <span className="text-slate-400">—</span>}
+      </div>
     </div>
   );
 }
@@ -58,6 +75,9 @@ export default function ExpenseReportDetailPage() {
   if (!er)     return <div className="py-10 text-center text-sm text-red-600">Expense report not found</div>;
 
   const jeId = (er as unknown as Record<string, unknown>).je_id as string | null;
+  const companyName = typeof window !== 'undefined'
+    ? (localStorage.getItem('company_name') ?? '')
+    : '';
 
   return (
     <div className="space-y-5">
@@ -86,27 +106,36 @@ export default function ExpenseReportDetailPage() {
         </div>
       )}
 
-      {/* Details card */}
+      {/* Report header — styled like the PPC Replenishment Report template */}
       <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
-        <div className="mb-4 text-sm font-medium text-slate-700 dark:text-slate-300">Report Details</div>
-        <div className="grid grid-cols-4 gap-x-6 gap-y-4">
-          <div className="col-span-2">
-            <Field label="Employee" value={`${er.employee_no} — ${er.employee_name}`} />
-          </div>
-          <Field label="Report Date" value={formatDate(er.report_date)} />
-          <Field
-            label="Period"
-            value={er.period_from
-              ? `${formatDate(er.period_from)}${er.period_to ? ` – ${formatDate(er.period_to)}` : ''}`
-              : null}
-          />
-          <div className="col-span-2">
-            <Field label="Purpose" value={er.purpose} />
-          </div>
-          <div className="col-span-2">
-            <Field label="Notes" value={er.notes} />
-          </div>
+        <div className="mb-4 text-center text-base font-semibold text-slate-900 dark:text-slate-100">
+          Expense Report
         </div>
+        <div className="grid grid-cols-1 gap-x-8 gap-y-2 md:grid-cols-2">
+          {/* Left column */}
+          <HeaderRow label="Name:" value={er.employee_name} />
+          <HeaderRow
+            label="Date:"
+            value={formatDate(er.report_date)}
+          />
+          <HeaderRow label="Employee No.:" value={er.employee_no} />
+          <HeaderRow
+            label="Period Covered From:"
+            value={er.period_from ? formatDate(er.period_from) : null}
+          />
+          <HeaderRow label="Company:" value={companyName} />
+          <HeaderRow
+            label="Period Covered to:"
+            value={er.period_to ? formatDate(er.period_to) : null}
+          />
+          <HeaderRow label="Purpose:" value={er.purpose} />
+          <HeaderRow label="External ID Code:" value={er.er_no} highlight />
+        </div>
+        {er.notes && (
+          <div className="mt-2">
+            <HeaderRow label="Notes:" value={er.notes} />
+          </div>
+        )}
       </div>
 
       {/* Summary KPIs */}
