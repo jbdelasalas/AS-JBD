@@ -33,19 +33,25 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   let auth: Awaited<ReturnType<typeof requireAuth>>;
   try { auth = await requireAuth(req); } catch (e) { return e as Response; }
-  const companyId = new URL(req.url).searchParams.get('company_id')
-    ?? (await req.json().then((b: Record<string,unknown>) => b.company_id).catch(() => null));
 
   try {
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
     const {
-      company_id, employee_no, full_name, email, phone,
+      employee_no, full_name, email, phone,
       department_id, position, employment_type, hire_date, end_date,
       user_id, is_active = true, notes,
     } = body;
+    const company_id = body.company_id
+      ?? new URL(req.url).searchParams.get('company_id');
 
-    if (!company_id || !employee_no || !full_name)
-      return err('company_id, employee_no, and full_name are required', 400);
+    if (!company_id || !employee_no || !full_name) {
+      const missing = [
+        !company_id && 'company_id',
+        !employee_no && 'employee_no',
+        !full_name && 'full_name',
+      ].filter(Boolean).join(', ');
+      return err(`Missing required field(s): ${missing}`, 400);
+    }
 
     const [emp] = await query<{ id: string }>(
       `INSERT INTO employees
