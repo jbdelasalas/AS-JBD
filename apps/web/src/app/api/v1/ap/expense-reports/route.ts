@@ -105,12 +105,15 @@ export async function POST(request: NextRequest) {
     const headerRows = await client.query(
       `INSERT INTO employee_expense_reports
          (company_id, branch_id, er_no, employee_id, report_date, period_from, period_to,
-          purpose, notes, total, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'draft',$11) RETURNING *`,
+          purpose, notes, department, fund_class, report_class, location_text,
+          external_id_code, pcf_series, total, status, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'draft',$17) RETURNING *`,
       [
         companyId, dto.branch_id ?? null, erNo, employeeId,
         dto.report_date, dto.period_from ?? null, dto.period_to ?? null,
         dto.purpose ?? null, dto.notes ?? null,
+        dto.department ?? null, dto.fund_class ?? null, dto.report_class ?? null,
+        dto.location_text ?? null, dto.external_id_code ?? null, dto.pcf_series ?? null,
         total.toFixed(2), auth.userId,
       ],
     );

@@ -1027,6 +1027,12 @@ export interface EmployeeExpenseReport {
   period_to: string | null;
   purpose: string | null;
   notes: string | null;
+  department: string | null;
+  fund_class: string | null;
+  report_class: string | null;
+  location_text: string | null;
+  external_id_code: string | null;
+  pcf_series: string | null;
   total: number;
   status: ExpenseReportStatus;
   approved_by: string | null;
@@ -1050,6 +1056,12 @@ export interface CreateExpenseReportDto {
   period_to?: string;
   purpose?: string;
   notes?: string;
+  department?: string;
+  fund_class?: string;
+  report_class?: string;
+  location_text?: string;
+  external_id_code?: string;
+  pcf_series?: string;
   lines: Array<{
     expense_account_id?: string;
     description: string;

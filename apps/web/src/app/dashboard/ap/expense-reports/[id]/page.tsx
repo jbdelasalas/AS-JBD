@@ -111,29 +111,40 @@ export default function ExpenseReportDetailPage() {
         <div className="mb-4 text-center text-base font-semibold text-slate-900 dark:text-slate-100">
           Expense Report
         </div>
-        <div className="grid grid-cols-1 gap-x-8 gap-y-2 md:grid-cols-2">
-          {/* Left column */}
+        <div className="grid grid-cols-1 gap-x-8 gap-y-2 lg:grid-cols-3">
+          {/* Column 1 */}
           <HeaderRow label="Name:" value={er.employee_name} />
-          <HeaderRow
-            label="Date:"
-            value={formatDate(er.report_date)}
-          />
-          <HeaderRow label="Employee No.:" value={er.employee_no} />
+          {/* Column 2 */}
+          <HeaderRow label="Fund - Class:" value={er.fund_class} />
+          {/* Column 3 */}
+          <HeaderRow label="Date:" value={formatDate(er.report_date)} />
+
+          <HeaderRow label="Dept.:" value={er.department} />
+          <HeaderRow label="Class:" value={er.report_class} />
           <HeaderRow
             label="Period Covered From:"
             value={er.period_from ? formatDate(er.period_from) : null}
           />
+
           <HeaderRow label="Company:" value={companyName} />
+          <HeaderRow label="Location:" value={er.location_text} />
           <HeaderRow
             label="Period Covered to:"
             value={er.period_to ? formatDate(er.period_to) : null}
           />
-          <HeaderRow label="Purpose:" value={er.purpose} />
-          <HeaderRow label="External ID Code:" value={er.er_no} highlight />
+
+          <div className="hidden lg:block" />
+          <div className="hidden lg:block" />
+          <HeaderRow label="External ID Code:" value={er.external_id_code || er.er_no} highlight />
+
+          <div className="hidden lg:block" />
+          <div className="hidden lg:block" />
+          <HeaderRow label="PCF Series:" value={er.pcf_series} highlight />
         </div>
-        {er.notes && (
-          <div className="mt-2">
-            <HeaderRow label="Notes:" value={er.notes} />
+        {(er.purpose || er.notes) && (
+          <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+            {er.purpose && <HeaderRow label="Purpose:" value={er.purpose} />}
+            {er.notes && <HeaderRow label="Notes:" value={er.notes} />}
           </div>
         )}
       </div>

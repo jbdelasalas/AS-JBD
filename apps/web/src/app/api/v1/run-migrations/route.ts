@@ -3978,5 +3978,21 @@ export async function POST(request: NextRequest) {
     results.push(`047 FAILED: ${(e as Error).message}`);
   } finally { client047.release(); }
 
+  // --- 048: Expense report header fields (PPC-style header) ---
+  const erHeaderCols: [string, string][] = [
+    ['department',       'varchar(200)'],
+    ['fund_class',       'varchar(200)'],
+    ['report_class',     'varchar(200)'],
+    ['location_text',    'varchar(200)'],
+    ['external_id_code', 'varchar(100)'],
+    ['pcf_series',       'varchar(100)'],
+  ];
+  for (const [col, type] of erHeaderCols) {
+    try {
+      await query(`ALTER TABLE employee_expense_reports ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+      results.push(`employee_expense_reports.${col}: ok`);
+    } catch (e) { results.push(`employee_expense_reports.${col}: ${(e as Error).message}`); }
+  }
+
   return ok({ results });
 }
