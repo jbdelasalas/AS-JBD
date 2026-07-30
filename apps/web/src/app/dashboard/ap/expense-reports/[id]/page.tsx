@@ -59,7 +59,11 @@ export default function ExpenseReportDetailPage() {
 
   const num = (v: string) => (v === '' || isNaN(Number(v)) ? 0 : Number(v));
   const totalCOH = DENOMS.reduce((s, d) => s + d * num(counts[String(d)] ?? ''), 0);
-  const totalFundAccounted = totalCOH + num(checkOnProcess) + num(unliquidatedCA);
+  // Expense total (sum of the report's lines).
+  const expenseTotal = Number(er?.total ?? 0);
+  // Total Fund Accounted = expenses + cash on hand + check on process + unliquidated CA.
+  const totalFundAccounted = expenseTotal + totalCOH + num(checkOnProcess) + num(unliquidatedCA);
+  // Over/(Short) = Total Fund Accounted − Fund Accountability.
   const overShort = totalFundAccounted - num(fundAccountability);
 
   async function saveCashCount() {
@@ -68,6 +72,7 @@ export default function ExpenseReportDetailPage() {
       await api.patch(`/ap/expense-reports/${id}`, {
         cash_count: {
           denoms: Object.fromEntries(DENOMS.map((d) => [String(d), num(counts[String(d)] ?? '')])),
+          expense_total: expenseTotal,
           check_on_process: num(checkOnProcess),
           unliquidated_cash_advance: num(unliquidatedCA),
           total_coh: totalCOH,
@@ -298,6 +303,10 @@ export default function ExpenseReportDetailPage() {
             const inp = 'w-40 rounded border border-slate-300 px-2 py-1 text-right text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 disabled:opacity-60';
             return (
               <div className="mt-4 space-y-1.5">
+                <div className="flex items-center justify-end gap-3">
+                  <span className={rowLabel}>Total Amount (Expenses)</span>
+                  <div className={rowVal}>{expenseTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                </div>
                 <div className="flex items-center justify-end gap-3">
                   <span className={rowLabel}>Total COH</span>
                   <div className={rowVal}>{totalCOH.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
