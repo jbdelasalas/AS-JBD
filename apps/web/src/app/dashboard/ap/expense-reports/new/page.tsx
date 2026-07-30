@@ -91,6 +91,15 @@ function NewExpenseReportForm() {
   const inp = 'w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100';
   const lbl = 'mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400';
 
+  // Right-aligned bold label + boxed field, matching the PPC Replenishment
+  // Report header layout.
+  const hlbl = 'w-40 shrink-0 text-right text-xs font-semibold text-slate-600 dark:text-slate-400';
+  const hbox = 'min-w-0 flex-1 rounded border border-slate-300 bg-slate-50 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100';
+
+  const companyName = typeof window !== 'undefined'
+    ? (localStorage.getItem('company_name') ?? '')
+    : '';
+
   return (
     <div>
       <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">New Expense Report</h1>
@@ -103,15 +112,18 @@ function NewExpenseReportForm() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Header */}
+        {/* Header — styled like the PPC Replenishment Report template */}
         <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
-          <div className="mb-4 text-sm font-medium text-slate-700 dark:text-slate-300">Report Details</div>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="col-span-2">
-              <label className={lbl}>Employee *</label>
+          <div className="mb-4 text-center text-base font-semibold text-slate-900 dark:text-slate-100">
+            Expense Report
+          </div>
+          <div className="grid grid-cols-1 gap-x-8 gap-y-3 md:grid-cols-2">
+            {/* Name */}
+            <div className="flex items-center gap-2">
+              <div className={hlbl}>Name:</div>
               <select required value={form.employee_id}
                 onChange={e => setForm(f => ({ ...f, employee_id: e.target.value }))}
-                className={inp}>
+                className={hbox}>
                 <option value="">Select employee…</option>
                 {employees.map(em => (
                   <option key={em.id} value={em.id}>{em.employee_no} — {em.full_name}</option>
@@ -119,41 +131,54 @@ function NewExpenseReportForm() {
               </select>
             </div>
 
-            <div>
-              <label className={lbl}>Report Date *</label>
+            {/* Date */}
+            <div className="flex items-center gap-2">
+              <div className={hlbl}>Date:</div>
               <input required type="date" value={form.report_date}
                 onChange={e => setForm(f => ({ ...f, report_date: e.target.value }))}
-                className={inp} />
+                className={hbox} />
             </div>
 
-            <div>
-              <label className={lbl}>Period From</label>
+            {/* Company (read-only, from session) */}
+            <div className="flex items-center gap-2">
+              <div className={hlbl}>Company:</div>
+              <div className={hbox + ' bg-slate-100 dark:bg-slate-700/60'}>
+                {companyName || <span className="text-slate-400">—</span>}
+              </div>
+            </div>
+
+            {/* Period Covered From */}
+            <div className="flex items-center gap-2">
+              <div className={hlbl}>Period Covered From:</div>
               <input type="date" value={form.period_from}
                 onChange={e => setForm(f => ({ ...f, period_from: e.target.value }))}
-                className={inp} />
+                className={hbox} />
             </div>
 
-            <div>
-              <label className={lbl}>Period To</label>
-              <input type="date" value={form.period_to}
-                onChange={e => setForm(f => ({ ...f, period_to: e.target.value }))}
-                className={inp} />
-            </div>
-
-            <div>
-              <label className={lbl}>Purpose</label>
+            {/* Purpose */}
+            <div className="flex items-center gap-2">
+              <div className={hlbl}>Purpose:</div>
               <input type="text" value={form.purpose}
                 onChange={e => setForm(f => ({ ...f, purpose: e.target.value }))}
                 placeholder="Business travel, office supplies…"
-                className={inp} />
+                className={hbox} />
             </div>
 
-            <div className="col-span-3">
-              <label className={lbl}>Notes</label>
-              <textarea rows={2} value={form.notes}
-                onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                className={inp} />
+            {/* Period Covered to */}
+            <div className="flex items-center gap-2">
+              <div className={hlbl}>Period Covered to:</div>
+              <input type="date" value={form.period_to}
+                onChange={e => setForm(f => ({ ...f, period_to: e.target.value }))}
+                className={hbox} />
             </div>
+          </div>
+
+          {/* Notes — full width */}
+          <div className="mt-3">
+            <label className={lbl}>Notes</label>
+            <textarea rows={2} value={form.notes}
+              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+              className={inp} />
           </div>
         </div>
 
