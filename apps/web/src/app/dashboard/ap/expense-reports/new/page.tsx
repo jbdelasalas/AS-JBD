@@ -31,8 +31,6 @@ function NewExpenseReportForm() {
     report_date: today,
     period_from: '',
     period_to: '',
-    purpose: '',
-    notes: '',
     department: '',
     fund_class: '',
     report_class: '',
@@ -78,8 +76,6 @@ function NewExpenseReportForm() {
         report_date: form.report_date,
         period_from:  form.period_from  || undefined,
         period_to:    form.period_to    || undefined,
-        purpose:      form.purpose      || undefined,
-        notes:        form.notes        || undefined,
         department:       form.department       || undefined,
         fund_class:       form.fund_class       || undefined,
         report_class:     form.report_class     || undefined,
@@ -105,7 +101,7 @@ function NewExpenseReportForm() {
 
   // Right-aligned bold label + boxed field, matching the PPC Replenishment
   // Report header layout.
-  const hlbl = 'w-28 shrink-0 text-right text-xs font-semibold text-slate-600 dark:text-slate-400';
+  const hlbl = 'w-28 shrink-0 text-left text-xs font-semibold text-slate-600 dark:text-slate-400';
   const hbox = 'min-w-0 flex-1 rounded border border-slate-300 bg-slate-50 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100';
 
   const companyName = typeof window !== 'undefined'
@@ -225,22 +221,6 @@ function NewExpenseReportForm() {
             </div>
           </div>
 
-          {/* Purpose + Notes — full width */}
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div>
-              <label className={lbl}>Purpose</label>
-              <input type="text" value={form.purpose}
-                onChange={e => setForm(f => ({ ...f, purpose: e.target.value }))}
-                placeholder="Business travel, office supplies…"
-                className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Notes</label>
-              <textarea rows={1} value={form.notes}
-                onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                className={inp} />
-            </div>
-          </div>
         </div>
 
         {/* Lines */}
