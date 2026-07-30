@@ -4080,5 +4080,13 @@ export async function POST(request: NextRequest) {
     results.push(`050 expense reports FAILED: ${(e as Error).message}`);
   } finally { client050.release(); }
 
+  // --- 051: Supplier / TIN / tax code on expense report lines ---
+  try {
+    await query(`ALTER TABLE expense_report_lines ADD COLUMN IF NOT EXISTS supplier_id  uuid REFERENCES suppliers(id)`);
+    await query(`ALTER TABLE expense_report_lines ADD COLUMN IF NOT EXISTS supplier_tin varchar(30)`);
+    await query(`ALTER TABLE expense_report_lines ADD COLUMN IF NOT EXISTS tax_code_id  uuid REFERENCES tax_codes(id)`);
+    results.push('051 expense_report_lines supplier + tin + tax_code: ok');
+  } catch (e) { results.push(`051 expense line supplier fields FAILED: ${(e as Error).message}`); }
+
   return ok({ results });
 }

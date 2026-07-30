@@ -6,9 +6,14 @@ import { api } from '@/lib/api';
 
 interface Employee { id: string; employee_no: string; full_name: string; }
 interface Account  { id: string; code: string; name: string; account_type: string; }
+interface Supplier { id: string; code: string; name: string; tin: string | null; is_vat_registered: boolean; }
+interface TaxCode  { id: string; code: string; name: string; }
 
 interface Line {
   expense_account_id: string;
+  supplier_id: string;
+  supplier_tin: string;
+  tax_code_id: string;
   description: string;
   receipt_date: string;
   amount: number;
@@ -16,13 +21,18 @@ interface Line {
 }
 
 const today = new Date().toISOString().split('T')[0];
-const EMPTY_LINE: Line = { expense_account_id: '', description: '', receipt_date: today, amount: 0, notes: '' };
+const EMPTY_LINE: Line = {
+  expense_account_id: '', supplier_id: '', supplier_tin: '', tax_code_id: '',
+  description: '', receipt_date: today, amount: 0, notes: '',
+};
 
 function NewExpenseReportForm() {
   const router = useRouter();
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [accounts, setAccounts]   = useState<Account[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [taxCodes, setTaxCodes]   = useState<TaxCode[]>([]);
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState<string | null>(null);
 
@@ -47,11 +57,25 @@ function NewExpenseReportForm() {
     Promise.all([
       api.get<Employee[]>(`/admin/employees?company_id=${cid}`),
       api.get<Account[]>(`/gl/accounts?company_id=${cid}&limit=500`),
-    ]).then(([emps, accs]) => {
+      api.get<{ data: Supplier[] }>(`/ap/suppliers?company_id=${cid}&limit=1000`),
+      api.get<TaxCode[]>(`/bir/tax-codes?company_id=${cid}`),
+    ]).then(([emps, accs, sups, tcs]) => {
       setEmployees(Array.isArray(emps) ? emps.filter(e => (e as unknown as Record<string,unknown>).is_active !== false) : []);
       setAccounts(Array.isArray(accs) ? accs.filter(a => a.account_type === 'EXPENSE') : []);
+      setSuppliers(sups?.data ?? []);
+      setTaxCodes(Array.isArray(tcs) ? tcs : []);
     }).catch(() => {});
   }, []);
+
+  // Pick a supplier on a line → auto-fill its TIN.
+  function pickSupplier(idx: number, supplierId: string) {
+    const s = suppliers.find((x) => x.id === supplierId);
+    setLines(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], supplier_id: supplierId, supplier_tin: s?.tin ?? '' };
+      return next;
+    });
+  }
 
   function updateLine(idx: number, field: keyof Line, val: string | number) {
     setLines(prev => {
@@ -85,6 +109,9 @@ function NewExpenseReportForm() {
         lines: lines.map(l => ({
           ...l,
           expense_account_id: l.expense_account_id || undefined,
+          supplier_id: l.supplier_id || undefined,
+          supplier_tin: l.supplier_tin || undefined,
+          tax_code_id: l.tax_code_id || undefined,
           notes: l.notes || undefined,
         })),
       });
@@ -152,7 +179,13 @@ function NewExpenseReportForm() {
             <div className="flex items-center gap-2">
               <div className={hlbl}>Date:</div>
               <input required type="date" value={form.report_date}
-                onChange={e => setForm(f => ({ ...f, report_date: e.target.value }))}
+                onChange={e => {
+                  const d = e.target.value;
+                  const prev = form.report_date;
+                  setForm(f => ({ ...f, report_date: d }));
+                  // Auto-fill every line date that still matched the old header date.
+                  setLines(ls => ls.map(l => (!l.receipt_date || l.receipt_date === prev ? { ...l, receipt_date: d } : l)));
+                }}
                 className={hbox} />
             </div>
 
@@ -228,7 +261,7 @@ function NewExpenseReportForm() {
           <div className="mb-3 flex items-center justify-between">
             <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Expense Lines</div>
             <button type="button"
-              onClick={() => setLines(l => [...l, { ...EMPTY_LINE }])}
+              onClick={() => setLines(l => [...l, { ...EMPTY_LINE, receipt_date: form.report_date }])}
               className="text-xs text-brand-600 hover:underline dark:text-brand-400">
               + Add line
             </button>
@@ -240,6 +273,9 @@ function NewExpenseReportForm() {
                 <tr>
                   <th className="px-2 py-1.5 text-left font-medium w-48">Expense Account</th>
                   <th className="px-2 py-1.5 text-left font-medium">Description *</th>
+                  <th className="px-2 py-1.5 text-left font-medium w-44">Supplier</th>
+                  <th className="px-2 py-1.5 text-left font-medium w-36">TIN</th>
+                  <th className="px-2 py-1.5 text-left font-medium w-36">VAT Code</th>
                   <th className="px-2 py-1.5 text-left font-medium w-32">Receipt Date *</th>
                   <th className="px-2 py-1.5 text-right font-medium w-28">Amount *</th>
                   <th className="px-2 py-1.5 text-left font-medium w-40">Notes</th>
@@ -261,6 +297,27 @@ function NewExpenseReportForm() {
                       <input required type="text" value={l.description}
                         onChange={e => updateLine(idx, 'description', e.target.value)}
                         className="w-full rounded border border-slate-300 px-1 py-1 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+                    </td>
+                    <td className="px-2 py-1">
+                      <select value={l.supplier_id}
+                        onChange={e => pickSupplier(idx, e.target.value)}
+                        className="w-full rounded border border-slate-300 px-1 py-1 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                        <option value="">— select —</option>
+                        {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    </td>
+                    <td className="px-2 py-1">
+                      <input type="text" value={l.supplier_tin} readOnly
+                        placeholder="—"
+                        className="w-full rounded border border-slate-200 bg-slate-50 px-1 py-1 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300" />
+                    </td>
+                    <td className="px-2 py-1">
+                      <select value={l.tax_code_id}
+                        onChange={e => updateLine(idx, 'tax_code_id', e.target.value)}
+                        className="w-full rounded border border-slate-300 px-1 py-1 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                        <option value="">—</option>
+                        {taxCodes.map(t => <option key={t.id} value={t.id}>{t.code}</option>)}
+                      </select>
                     </td>
                     <td className="px-2 py-1">
                       <input required type="date" value={l.receipt_date}
@@ -290,7 +347,7 @@ function NewExpenseReportForm() {
               </tbody>
               <tfoot>
                 <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-                  <td colSpan={3} className="px-2 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Total</td>
+                  <td colSpan={6} className="px-2 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Total</td>
                   <td className="px-2 py-2 text-right font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">
                     ₱{grandTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                   </td>

@@ -123,8 +123,9 @@ export async function POST(request: NextRequest) {
       const l = lines[i];
       await client.query(
         `INSERT INTO expense_report_lines
-           (er_id, line_no, expense_account_id, description, receipt_date, amount, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+           (er_id, line_no, expense_account_id, description, receipt_date, amount, notes,
+            supplier_id, supplier_tin, tax_code_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
         [
           header.id, i + 1,
           l.expense_account_id ?? null,
@@ -132,6 +133,9 @@ export async function POST(request: NextRequest) {
           l.receipt_date,
           Number(l.amount ?? 0).toFixed(2),
           l.notes ?? null,
+          l.supplier_id ?? null,
+          l.supplier_tin ?? null,
+          l.tax_code_id ?? null,
         ],
       );
     }
