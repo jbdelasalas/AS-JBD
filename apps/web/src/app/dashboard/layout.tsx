@@ -21,8 +21,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const here = window.location.pathname + window.location.search;
       router.replace(`/login?next=${encodeURIComponent(here)}`);
     } else {
-      // Default open on desktop, closed on mobile
-      setSidebarOpen(window.innerWidth >= 768);
+      // Default hidden — the sidebar only shows when the user opens it.
+      setSidebarOpen(false);
       setReady(true);
     }
   }, [router]);

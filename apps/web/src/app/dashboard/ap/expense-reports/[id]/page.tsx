@@ -148,30 +148,181 @@ export default function ExpenseReportDetailPage() {
 
   return (
     <div className="space-y-5 er-print-root">
-      {/* Print styles — render the report on paper exactly as shown on screen (light mode). */}
+      {/* Print styles — render the PPC Replenishment Report template (landscape, light mode). */}
       <style>{`
+        .ppc-print { display: none; }
         @media print {
-          /* Preserve box/badge background colors when printing */
           html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          html, body, main { background: #fff !important; }
-          /* Hide the dashboard chrome: sidebar (<aside>) and topbar (<header>) */
-          aside, header { display: none !important; }
-          /* Unclip the app shell so the full report flows across pages */
-          html, body { height: auto !important; overflow: visible !important; }
+          html, body, main { background: #fff !important; height: auto !important; overflow: visible !important; }
           .h-screen { height: auto !important; }
           .overflow-hidden, .overflow-y-auto { overflow: visible !important; }
+          aside, header { display: none !important; }
           main { padding: 0 !important; }
-          /* Use the wide (lg) 3-column layout even on paper */
-          .er-print-root .lg\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
-          .er-print-root .lg\\:flex-row { flex-direction: row !important; }
-          .er-print-root .lg\\:col-span-3 { grid-column: span 3 / span 3 !important; }
-          .er-print-root .lg\\:block { display: block !important; }
-          /* Keep each card from splitting across a page break */
-          .er-print-root > * { break-inside: avoid; }
           .print\\:hidden { display: none !important; }
-          @page { size: Letter portrait; margin: 10mm; }
+          /* Show the print-only template and fill the page */
+          .ppc-print { display: block !important; }
+          .ppc-print table { border-collapse: collapse; width: 100%; }
+          .ppc-print .grid td, .ppc-print .grid th { border: 0.5pt solid #000; padding: 1px 3px; height: 16px; }
+          @page { size: A4 landscape; margin: 8mm; }
         }
       `}</style>
+
+      {/* ── PPC - Replenishment Report: print-only template (landscape, single page) ── */}
+      {(() => {
+        const lines = er.lines ?? [];
+        const MIN_ROWS = 22;
+        const blanks = Math.max(0, MIN_ROWS - lines.length);
+        const u = 'inline-block min-w-[120px] border-b border-black px-1';        // underlined value
+        const lbl = 'whitespace-nowrap pr-1 text-right';                          // header label
+        return (
+          <div className="ppc-print text-[9px] text-black" style={{ fontFamily: 'Arial, sans-serif' }}>
+            <div className="mb-2 text-center text-[11px] font-bold">PPC - Replenishment Report</div>
+
+            {/* Header fields */}
+            <table className="mb-1 w-full">
+              <tbody>
+                <tr>
+                  <td className={`${lbl} w-[70px]`}>Name:</td>
+                  <td className="w-[26%]"><span className={`${u} font-semibold`}>{er.employee_name}</span></td>
+                  <td className={`${lbl} w-[80px]`}>Fund - Class:</td>
+                  <td className="w-[20%]"><span className={u}>{er.fund_class || ' '}</span></td>
+                  <td className={`${lbl} w-[120px]`}>Date:</td>
+                  <td><span className={u}>{formatDate(er.report_date)}</span></td>
+                </tr>
+                <tr>
+                  <td className={lbl}>Dept.:</td>
+                  <td><span className={u}>{er.department || ' '}</span></td>
+                  <td className={lbl}>Class:</td>
+                  <td><span className={u}>{er.report_class || ' '}</span></td>
+                  <td className={lbl}>Period Covered From:</td>
+                  <td><span className={u}>{er.period_from ? formatDate(er.period_from) : ' '}</span></td>
+                </tr>
+                <tr>
+                  <td className={lbl}>Company:</td>
+                  <td><span className={u}>{companyName || ' '}</span></td>
+                  <td className={lbl}>Location:</td>
+                  <td><span className={u}>{er.location_text || ' '}</span></td>
+                  <td className={lbl}>Period Covered to:</td>
+                  <td><span className={u}>{er.period_to ? formatDate(er.period_to) : ' '}</span></td>
+                </tr>
+                <tr>
+                  <td />
+                  <td />
+                  <td />
+                  <td />
+                  <td className={lbl}>External ID Code:</td>
+                  <td><span className={u}>{er.external_id_code || er.er_no}</span></td>
+                </tr>
+                <tr>
+                  <td />
+                  <td />
+                  <td />
+                  <td />
+                  <td className={lbl}>PCF Series:</td>
+                  <td><span className={u}>{er.pcf_series || ' '}</span></td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* Expense grid */}
+            <table className="grid w-full">
+              <thead>
+                <tr className="font-bold text-center">
+                  <th className="w-[8%]">Date</th>
+                  <th className="w-[12%]">Payee</th>
+                  <th className="w-[14%]">Supplier</th>
+                  <th className="w-[11%]">TIN</th>
+                  <th>Particulars</th>
+                  <th className="w-[14%]">Expense Account</th>
+                  <th className="w-[9%]">Amount</th>
+                  <th className="w-[8%]">Vat Code</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lines.map((l) => {
+                  const ln = l as unknown as Record<string, unknown>;
+                  return (
+                    <tr key={l.id}>
+                      <td className="text-center">{l.receipt_date ? formatDate(l.receipt_date) : ''}</td>
+                      <td>{(ln.payee as string) ?? ''}</td>
+                      <td>{(ln.supplier_name as string) ?? ''}</td>
+                      <td className="text-center">{(ln.supplier_tin as string) ?? ''}</td>
+                      <td>{l.description ?? ''}</td>
+                      <td>{[l.account_code, l.account_name].filter(Boolean).join(' — ')}</td>
+                      <td className="text-right">{l.amount != null ? formatPHP(l.amount) : ''}</td>
+                      <td className="text-center">{(ln.tax_code as string) ?? ''}</td>
+                    </tr>
+                  );
+                })}
+                {Array.from({ length: blanks }).map((_, i) => (
+                  <tr key={`b${i}`}>
+                    <td>&nbsp;</td><td /><td /><td /><td /><td /><td /><td />
+                  </tr>
+                ))}
+                <tr className="font-bold">
+                  <td>Total:</td>
+                  <td /><td /><td /><td /><td />
+                  <td className="text-right">{formatPHP(er.total)}</td>
+                  <td />
+                </tr>
+              </tbody>
+            </table>
+
+            {/* Footer: signatures (left) + cash count (right) */}
+            <div className="mt-3 flex items-start justify-between">
+              {/* Signatures */}
+              <div className="w-[55%] pt-6">
+                <div className="mb-6 flex items-end">
+                  <span className="pr-1">Prepare by:</span>
+                  <span className="flex flex-1 flex-col items-center">
+                    <span className="w-full border-b border-black">&nbsp;</span>
+                    <span className="text-[8px] italic">Custodian&rsquo;s Name and Signature</span>
+                  </span>
+                </div>
+                <div className="flex items-end">
+                  <span className="pr-1">Approved by:</span>
+                  <span className="flex-1 border-b border-black">&nbsp;</span>
+                </div>
+              </div>
+
+              {/* Cash count */}
+              <div className="w-[38%]">
+                <table className="w-full">
+                  <thead>
+                    <tr className="text-center font-bold text-blue-700">
+                      <th className="text-left">Denom</th><th>Count</th><th className="text-right">&nbsp;</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {DENOMS.map((d) => {
+                      const cnt = num(counts[String(d)] ?? '');
+                      return (
+                        <tr key={d}>
+                          <td className="text-right text-blue-700">{d.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                          <td className="text-center text-blue-700">{cnt || 0}</td>
+                          <td className="text-right">{cnt ? (d * cnt).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <table className="mt-1 w-full">
+                  <tbody>
+                    <tr className="font-bold"><td className="text-right pr-2">Total Amount</td><td className="text-right border-b border-black w-[90px]">{expenseTotal ? expenseTotal.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-'}</td></tr>
+                    <tr className="font-bold"><td className="text-right pr-2">Total COH</td><td className="text-right border-b border-black">{totalCOH.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>
+                    <tr className="font-bold"><td className="text-right pr-2">Check on Process</td><td className="text-right border-b border-black">{num(checkOnProcess) ? num(checkOnProcess).toLocaleString(undefined, { minimumFractionDigits: 2 }) : ' '}</td></tr>
+                    <tr className="font-bold"><td className="text-right pr-2">Unliquidated Cash Advance</td><td className="text-right border-b border-black">{num(unliquidatedCA) ? num(unliquidatedCA).toLocaleString(undefined, { minimumFractionDigits: 2 }) : ' '}</td></tr>
+                    <tr className="font-bold"><td className="text-right pr-2">Total Fund Accounted</td><td className="text-right border-b border-black">{totalFundAccounted.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>
+                    <tr className="font-bold"><td className="text-right pr-2">Fund Accountability</td><td className="text-right border-b border-black">{num(fundAccountability).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>
+                    <tr className="font-bold"><td className="text-right pr-2">Over(Short)</td><td className="text-right border-b border-black">{overShort.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Page header (screen only — the report card already shows this info) */}
       <div className="flex items-start justify-between print:hidden">
         <div>
@@ -204,7 +355,7 @@ export default function ExpenseReportDetailPage() {
       )}
 
       {/* Report header — styled like the PPC Replenishment Report template */}
-      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 print:hidden">
         <div className="mb-4 text-center text-base font-semibold text-slate-900 dark:text-slate-100">
           Expense Report
         </div>
@@ -255,7 +406,7 @@ export default function ExpenseReportDetailPage() {
       </div>
 
       {/* Expense lines */}
-      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 print:hidden">
         <div className="border-b border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300">
           Expense Lines
         </div>
@@ -308,7 +459,7 @@ export default function ExpenseReportDetailPage() {
       </div>
 
       {/* Cash count / Fund Accountability */}
-      <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900 print:hidden">
         <h2 className="mb-4 text-right text-xs font-semibold text-slate-800 dark:text-slate-200">Cash Count &amp; Fund Accountability</h2>
         <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
         {/* Signature block — left */}
