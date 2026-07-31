@@ -169,6 +169,8 @@ export default function ExpenseReportDetailPage() {
           .er-print-root .lg\\:col-span-3 { grid-column: span 3 / span 3 !important; }
           .er-print-root .lg\\:block { display: block !important; }
           .er-print-root .lg\\:w-auto { width: auto !important; }
+          /* Expense line table spans the full paper width, columns auto-fit to content */
+          .er-lines-table { width: 100% !important; min-width: 0 !important; table-layout: auto !important; }
           /* Tighten vertical spacing between and inside cards */
           .er-print-root.space-y-5 > * + * { margin-top: 8px !important; }
           .er-print-root .p-5 { padding: 8px !important; }
@@ -186,9 +188,13 @@ export default function ExpenseReportDetailPage() {
           .er-cashcount .space-y-1\\.5 > * + * { margin-top: 1px !important; }
           .er-cashcount .w-40 { width: 7rem !important; }
           .er-cashcount .text-\\[11px\\], .er-cashcount .text-xs { font-size: 10px !important; }
-          /* Push the cash count block to the far right of the page */
-          .er-cashcount .gap-8 { width: 100% !important; }
-          .er-cc-right { margin-left: auto !important; }
+          /* Keep both blocks on one row, right-aligned as a pair. An auto left
+             margin on the cash count used to absorb every spare pixel, which
+             stranded the signature block far to the left with dead space
+             between them. Let the signature block take the slack instead. */
+          .er-cashcount .gap-8 { width: 100% !important; gap: 24px !important; }
+          .er-cashcount .lg\\:justify-end { justify-content: flex-end !important; }
+          .er-cc-right { margin-left: 0 !important; flex: 0 0 auto !important; }
           /* Scale the whole report down so it fits on a single page.
              Do NOT use break-inside:avoid — it forces the cash count onto page 2. */
           .er-print-root { transform: scale(0.82); transform-origin: top left; width: 122%; }
@@ -285,17 +291,17 @@ export default function ExpenseReportDetailPage() {
           Expense Lines
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
+          <table className="er-lines-table w-full text-sm">
             <thead className="bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
               <tr>
-                <th className="px-3 py-2 text-left font-medium w-8">#</th>
-                <th className="px-3 py-2 text-left font-medium w-36">Account</th>
-                <th className="px-3 py-2 text-left font-medium w-56">Description</th>
-                <th className="px-3 py-2 text-left font-medium w-64">Supplier</th>
-                <th className="px-3 py-2 text-left font-medium w-32">TIN</th>
-                <th className="px-3 py-2 text-left font-medium w-28">VAT Code</th>
-                <th className="px-3 py-2 text-left font-medium w-28">Receipt Date</th>
-                <th className="px-3 py-2 text-right font-medium w-28">Amount</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">#</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Account</th>
+                <th className="px-3 py-2 text-left font-medium">Description</th>
+                <th className="px-3 py-2 text-left font-medium">Supplier</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">TIN</th>
+                <th className="px-3 py-2 text-center font-medium whitespace-nowrap">VAT Code</th>
+                <th className="px-3 py-2 text-center font-medium whitespace-nowrap">Receipt Date</th>
+                <th className="px-3 py-2 text-right font-medium whitespace-nowrap">Amount</th>
               </tr>
             </thead>
             <tbody>
@@ -303,8 +309,8 @@ export default function ExpenseReportDetailPage() {
                 const ln = l as unknown as Record<string, unknown>;
                 return (
                 <tr key={l.id} className="border-t border-slate-100 dark:border-slate-700">
-                  <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.line_no}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2 text-xs whitespace-nowrap text-slate-500 dark:text-slate-400">{l.line_no}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
                     {l.account_code
                       ? <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{l.account_code}</span>
                       : <span className="text-xs text-slate-400">—</span>}
@@ -312,10 +318,10 @@ export default function ExpenseReportDetailPage() {
                   </td>
                   <td className="px-3 py-2 dark:text-slate-300">{l.description}</td>
                   <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{(ln.supplier_name as string) ?? '—'}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-slate-600 dark:text-slate-400">{(ln.supplier_tin as string) ?? '—'}</td>
-                  <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{(ln.tax_code as string) ?? '—'}</td>
-                  <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{formatDate(l.receipt_date)}</td>
-                  <td className="px-3 py-2 text-right font-mono text-xs font-semibold dark:text-slate-300">{formatPHP(l.amount)}</td>
+                  <td className="px-3 py-2 font-mono text-xs whitespace-nowrap text-slate-600 dark:text-slate-400">{(ln.supplier_tin as string) ?? '—'}</td>
+                  <td className="px-3 py-2 text-center text-xs whitespace-nowrap text-slate-600 dark:text-slate-400">{(ln.tax_code as string) ?? '—'}</td>
+                  <td className="px-3 py-2 text-center text-xs whitespace-nowrap text-slate-600 dark:text-slate-400">{formatDate(l.receipt_date)}</td>
+                  <td className="px-3 py-2 text-right font-mono text-xs font-semibold whitespace-nowrap dark:text-slate-300">{formatPHP(l.amount)}</td>
                 </tr>
               );})}
             </tbody>
@@ -332,9 +338,9 @@ export default function ExpenseReportDetailPage() {
       {/* Cash count / Fund Accountability */}
       <div className="er-cashcount rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
         <h2 className="mb-4 text-right text-xs font-semibold text-slate-800 dark:text-slate-200">Cash Count &amp; Fund Accountability</h2>
-        <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
-        {/* Signature block — shifted toward the center/right */}
-        <div className="w-full max-w-md space-y-10 pt-2 lg:ml-40 lg:w-auto">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-end">
+        {/* Signature block — sits directly left of the cash count, no dead gap */}
+        <div className="w-full max-w-md space-y-10 pt-2 lg:w-auto lg:flex-1">
           <div className="flex items-end gap-3">
             <span className="whitespace-nowrap text-xs text-slate-700 dark:text-slate-300">Prepare by:</span>
             <div className="flex flex-1 flex-col items-center">
