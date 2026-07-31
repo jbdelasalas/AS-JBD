@@ -209,7 +209,7 @@ function NewExpenseReportForm() {
             </div>
 
             <div className="flex items-center gap-2">
-              <div className={hlbl}>Dept.:</div>
+              <div className={hlbl}>Dept.: {isRequired('department') && <span className="text-red-500">*</span>}</div>
               <select value={form.department}
                 onChange={e => setForm(f => ({ ...f, department: e.target.value }))}
                 className={hbox}>
@@ -219,7 +219,7 @@ function NewExpenseReportForm() {
             </div>
 
             <div className="flex items-center gap-2">
-              <div className={hlbl}>Class:</div>
+              <div className={hlbl}>Class: {isRequired('report_class') && <span className="text-red-500">*</span>}</div>
               <select value={form.report_class}
                 onChange={e => setForm(f => ({ ...f, report_class: e.target.value }))}
                 className={hbox}>
@@ -296,7 +296,7 @@ function NewExpenseReportForm() {
                 <tr>
                   <th className="px-2 py-1.5 text-left font-medium w-48">Expense Account</th>
                   <th className="px-2 py-1.5 text-left font-medium">Description *</th>
-                  <th className="px-2 py-1.5 text-left font-medium w-44">Supplier</th>
+                  <th className="px-2 py-1.5 text-left font-medium w-44">Supplier {isLineRequired('supplier_id') && <span className="text-red-500">*</span>}</th>
                   <th className="px-2 py-1.5 text-left font-medium w-36">TIN</th>
                   <th className="px-2 py-1.5 text-left font-medium w-36">VAT Code</th>
                   <th className="px-2 py-1.5 text-left font-medium w-32">Receipt Date *</th>
