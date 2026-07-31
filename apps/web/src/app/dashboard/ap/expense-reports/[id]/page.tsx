@@ -169,6 +169,25 @@ export default function ExpenseReportDetailPage() {
           .er-print-root .lg\\:col-span-3 { grid-column: span 3 / span 3 !important; }
           .er-print-root .lg\\:block { display: block !important; }
           .er-print-root .lg\\:w-auto { width: auto !important; }
+          /* Header rows: the label is a fixed w-40 (10rem) with shrink-0, so at
+             print width it eats most of the column and the value box is left
+             too narrow — "ART FRESH CHICKEN CORP." wrapped onto four lines.
+             Shrink the label to what it needs and give the rest to the value.
+             Scoped to the header grid so the cash-count w-40 rule is untouched. */
+          .er-print-root .grid .w-40 {
+            width: auto !important; min-width: 0 !important; max-width: 7em !important;
+          }
+          .er-print-root .grid { column-gap: 10px !important; }
+          .er-print-root .grid .flex.items-center > div:last-child {
+            flex: 1 1 auto !important; min-width: 0 !important;
+            /* Wrap rather than ellipsis — truncating a company name on a
+               financial document loses data. The wider box means most values
+               now fit on one line anyway. */
+            overflow-wrap: normal !important;
+            word-break: normal !important;
+            padding: 1px 4px !important;
+          }
+          .er-print-root .grid .flex.items-center { gap: 4px !important; }
           /* Expense line table spans the full paper width (column widths are
              assigned further down, under table-layout: fixed). */
           .er-lines-table { width: 100% !important; min-width: 0 !important; }
