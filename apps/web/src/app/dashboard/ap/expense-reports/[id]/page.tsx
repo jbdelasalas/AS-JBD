@@ -193,26 +193,24 @@ export default function ExpenseReportDetailPage() {
             value={er.period_to ? formatDate(er.period_to) : null}
           />
 
-          {/* External ID Code · PCF Series · Status — one line spanning full width */}
-          <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 lg:col-span-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">External ID Code:</span>
-              <span className="border border-slate-400 bg-slate-200 px-2 py-1 text-sm font-semibold text-slate-900 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-100">
-                {er.external_id_code || er.er_no}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">PCF Series:</span>
-              <span className="border border-slate-400 bg-slate-200 px-2 py-1 text-sm font-semibold text-slate-900 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-100">
-                {er.pcf_series || <span className="font-normal text-slate-400">—</span>}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Status:</span>
-              <span className={`rounded px-2 py-1 text-xs font-medium ${STATUS_STYLES[er.status] ?? STATUS_STYLES.draft}`}>
-                {er.status.replace(/_/g, ' ')}
-              </span>
-            </div>
+          {/* External ID Code · PCF Series · Status — aligned under Company / Location / Period */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">External ID Code:</span>
+            <span className="border border-slate-400 bg-slate-200 px-2 py-1 text-sm font-semibold text-slate-900 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-100">
+              {er.external_id_code || er.er_no}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">PCF Series:</span>
+            <span className="border border-slate-400 bg-slate-200 px-2 py-1 text-sm font-semibold text-slate-900 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-100">
+              {er.pcf_series || <span className="font-normal text-slate-400">—</span>}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Status:</span>
+            <span className={`rounded px-2 py-1 text-xs font-medium ${STATUS_STYLES[er.status] ?? STATUS_STYLES.draft}`}>
+              {er.status.replace(/_/g, ' ')}
+            </span>
           </div>
         </div>
       </div>
@@ -272,8 +270,25 @@ export default function ExpenseReportDetailPage() {
 
       {/* Cash count / Fund Accountability */}
       <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
-        <h2 className="mb-4 text-center text-xs font-semibold text-slate-800 dark:text-slate-200">Cash Count &amp; Fund Accountability</h2>
-        <div className="ml-auto max-w-lg">
+        <h2 className="mb-4 text-right text-xs font-semibold text-slate-800 dark:text-slate-200">Cash Count &amp; Fund Accountability</h2>
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+        {/* Signature block — left */}
+        <div className="w-full max-w-md space-y-10 pb-2 lg:w-auto">
+          <div className="flex items-end gap-3">
+            <span className="whitespace-nowrap text-xs text-slate-700 dark:text-slate-300">Prepare by:</span>
+            <div className="flex flex-1 flex-col items-center">
+              <div className="h-5 w-full min-w-[16rem] border-b border-slate-500 dark:border-slate-400" />
+              <span className="mt-0.5 text-[10px] italic text-amber-700 dark:text-amber-500">Custodian&rsquo;s Name and Signature</span>
+            </div>
+          </div>
+          <div className="flex items-end gap-3">
+            <span className="whitespace-nowrap text-xs text-slate-700 dark:text-slate-300">Approved by:</span>
+            <div className="h-5 flex-1 min-w-[16rem] border-b border-slate-500 dark:border-slate-400" />
+          </div>
+        </div>
+
+        {/* Cash count — right */}
+        <div className="w-full max-w-lg lg:w-auto">
           {/* Denomination table */}
           <table className="w-full text-xs">
             <thead>
@@ -359,6 +374,7 @@ export default function ExpenseReportDetailPage() {
               </div>
             );
           })()}
+        </div>
         </div>
       </div>
 
