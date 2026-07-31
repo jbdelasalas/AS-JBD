@@ -182,10 +182,11 @@ export default function ExpenseReportDetailPage() {
           .er-cashcount .space-y-1\\.5 > * + * { margin-top: 1px !important; }
           .er-cashcount .w-40 { width: 6rem !important; }
           .er-cashcount .text-\\[11px\\], .er-cashcount .text-xs { font-size: 8px !important; }
-          /* Scale the whole report down so it fits on a single page */
-          .er-print-root { transform: scale(0.7); transform-origin: top left; width: 143%; }
-          .er-print-root > * { break-inside: avoid; }
-          @page { size: A4 landscape; margin: 8mm; }
+          /* Scale the whole report down so it fits on a single page.
+             Do NOT use break-inside:avoid — it forces the cash count onto page 2. */
+          .er-print-root { transform: scale(0.62); transform-origin: top left; width: 161%; }
+          .er-print-root, .er-print-root * { break-inside: auto !important; }
+          @page { size: A4 landscape; margin: 6mm; }
         }
       `}</style>
 
@@ -439,7 +440,7 @@ export default function ExpenseReportDetailPage() {
       )}
 
       {/* Action buttons */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 print:hidden">
         {er.status === 'draft' && (
           <button onClick={() => doAction('submit')} disabled={busy}
             className="rounded bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">
