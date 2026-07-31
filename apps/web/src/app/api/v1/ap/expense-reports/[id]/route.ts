@@ -28,9 +28,12 @@ export async function GET(
   if (!headers[0]) return err(`Expense report ${params.id} not found`, 404);
 
   const lines = await query(
-    `SELECT erl.*, a.code AS account_code, a.name AS account_name
+    `SELECT erl.*, a.code AS account_code, a.name AS account_name,
+            s.name AS supplier_name, tc.code AS tax_code
        FROM expense_report_lines erl
        LEFT JOIN accounts a ON a.id = erl.expense_account_id
+       LEFT JOIN suppliers s ON s.id = erl.supplier_id
+       LEFT JOIN tax_codes tc ON tc.id = erl.tax_code_id
       WHERE erl.er_id = $1 ORDER BY erl.line_no`,
     [params.id],
   );

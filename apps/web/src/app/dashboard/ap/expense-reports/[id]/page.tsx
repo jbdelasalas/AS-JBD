@@ -195,12 +195,6 @@ export default function ExpenseReportDetailPage() {
           <div className="hidden lg:block" />
           <HeaderRow label="PCF Series:" value={er.pcf_series} highlight />
         </div>
-        {(er.purpose || er.notes) && (
-          <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-            {er.purpose && <HeaderRow label="Purpose:" value={er.purpose} />}
-            {er.notes && <HeaderRow label="Notes:" value={er.notes} />}
-          </div>
-        )}
       </div>
 
       {/* Summary KPIs */}
@@ -227,13 +221,18 @@ export default function ExpenseReportDetailPage() {
                 <th className="px-3 py-2 text-left font-medium w-8">#</th>
                 <th className="px-3 py-2 text-left font-medium w-36">Account</th>
                 <th className="px-3 py-2 text-left font-medium">Description</th>
+                <th className="px-3 py-2 text-left font-medium w-40">Supplier</th>
+                <th className="px-3 py-2 text-left font-medium w-32">TIN</th>
+                <th className="px-3 py-2 text-left font-medium w-28">VAT Code</th>
                 <th className="px-3 py-2 text-left font-medium w-28">Receipt Date</th>
                 <th className="px-3 py-2 text-right font-medium w-28">Amount</th>
                 <th className="px-3 py-2 text-left font-medium">Notes</th>
               </tr>
             </thead>
             <tbody>
-              {er.lines?.map(l => (
+              {er.lines?.map(l => {
+                const ln = l as unknown as Record<string, unknown>;
+                return (
                 <tr key={l.id} className="border-t border-slate-100 dark:border-slate-700">
                   <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.line_no}</td>
                   <td className="px-3 py-2">
@@ -243,15 +242,18 @@ export default function ExpenseReportDetailPage() {
                     {l.account_name && <span className="ml-1 text-xs text-slate-400">({l.account_name})</span>}
                   </td>
                   <td className="px-3 py-2 dark:text-slate-300">{l.description}</td>
+                  <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{(ln.supplier_name as string) ?? '—'}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-slate-600 dark:text-slate-400">{(ln.supplier_tin as string) ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{(ln.tax_code as string) ?? '—'}</td>
                   <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{formatDate(l.receipt_date)}</td>
                   <td className="px-3 py-2 text-right font-mono text-xs font-semibold dark:text-slate-300">{formatPHP(l.amount)}</td>
                   <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.notes ?? '—'}</td>
                 </tr>
-              ))}
+              );})}
             </tbody>
             <tfoot>
               <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-                <td colSpan={4} className="px-3 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">Total</td>
+                <td colSpan={7} className="px-3 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">Total</td>
                 <td className="px-3 py-2 text-right font-mono text-sm font-bold text-slate-900 dark:text-slate-100">{formatPHP(er.total)}</td>
                 <td />
               </tr>
