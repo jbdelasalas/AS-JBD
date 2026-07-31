@@ -174,24 +174,24 @@ export default function ExpenseReportDetailPage() {
           .er-print-root .p-5 { padding: 8px !important; }
           /* Shrink the cash count block: small fonts, compact rows, plain inputs */
           .er-cashcount h2 { margin-bottom: 4px !important; }
-          .er-cashcount { font-size: 8px !important; }
+          .er-cashcount { font-size: 10px !important; }
           .er-cashcount .gap-8 { gap: 16px !important; }
           .er-cashcount .space-y-10 > * + * { margin-top: 16px !important; }
-          .er-cashcount table { font-size: 8px !important; }
+          .er-cashcount table { font-size: 10px !important; }
           .er-cashcount td, .er-cashcount th { padding-top: 0 !important; padding-bottom: 0 !important; }
           .er-cashcount input {
             width: 3.5rem !important; border: none !important; background: transparent !important;
-            padding: 0 !important; font-size: 8px !important; text-align: right !important;
+            padding: 0 !important; font-size: 10px !important; text-align: right !important;
           }
           .er-cashcount .space-y-1\\.5 > * + * { margin-top: 1px !important; }
-          .er-cashcount .w-40 { width: 6rem !important; }
-          .er-cashcount .text-\\[11px\\], .er-cashcount .text-xs { font-size: 8px !important; }
+          .er-cashcount .w-40 { width: 7rem !important; }
+          .er-cashcount .text-\\[11px\\], .er-cashcount .text-xs { font-size: 10px !important; }
           /* Push the cash count block to the far right of the page */
           .er-cashcount .gap-8 { width: 100% !important; }
           .er-cc-right { margin-left: auto !important; }
           /* Scale the whole report down so it fits on a single page.
              Do NOT use break-inside:avoid — it forces the cash count onto page 2. */
-          .er-print-root { transform: scale(0.62); transform-origin: top left; width: 161%; }
+          .er-print-root { transform: scale(0.82); transform-origin: top left; width: 122%; }
           .er-print-root, .er-print-root * { break-inside: auto !important; }
           @page { size: A4 landscape; margin: 6mm; }
         }
@@ -338,8 +338,8 @@ export default function ExpenseReportDetailPage() {
           <div className="flex items-end gap-3">
             <span className="whitespace-nowrap text-xs text-slate-700 dark:text-slate-300">Prepare by:</span>
             <div className="flex flex-1 flex-col items-center">
-              <div className="h-5 w-full min-w-[16rem] border-b border-slate-500 dark:border-slate-400" />
-              <span className="mt-0.5 text-[10px] italic text-amber-700 dark:text-amber-500">Custodian&rsquo;s Name and Signature</span>
+              <span className="mb-0.5 text-xs font-semibold text-slate-800 dark:text-slate-200">{er.employee_name}</span>
+              <div className="w-full min-w-[16rem] border-b border-slate-500 dark:border-slate-400" />
             </div>
           </div>
           <div className="flex items-end gap-3">
@@ -364,7 +364,7 @@ export default function ExpenseReportDetailPage() {
                 const cnt = num(counts[String(d)] ?? '');
                 const editable = ['draft', 'pending_approval'].includes(er.status);
                 return (
-                  <tr key={d} className="border-t border-slate-100 dark:border-slate-800">
+                  <tr key={d}>
                     <td className="py-1 text-center font-mono text-xs text-slate-700 dark:text-slate-300">{d.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     <td className="py-1 text-center">
                       <input
