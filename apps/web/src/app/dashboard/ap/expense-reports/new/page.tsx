@@ -8,6 +8,8 @@ interface Employee { id: string; employee_no: string; full_name: string; }
 interface Account  { id: string; code: string; name: string; account_type: string; }
 interface Supplier { id: string; code: string; name: string; tin: string | null; is_vat_registered: boolean; }
 interface TaxCode  { id: string; code: string; name: string; tax_type: string; }
+interface Dept     { id: string; name: string; }
+interface CostCenter { id: string; code: string; name: string; }
 
 interface Line {
   expense_account_id: string;
@@ -33,6 +35,8 @@ function NewExpenseReportForm() {
   const [accounts, setAccounts]   = useState<Account[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [taxCodes, setTaxCodes]   = useState<TaxCode[]>([]);
+  const [departments, setDepartments] = useState<Dept[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState<string | null>(null);
 
@@ -59,12 +63,16 @@ function NewExpenseReportForm() {
       api.get<Account[]>(`/gl/accounts?company_id=${cid}&limit=500`),
       api.get<{ data: Supplier[] }>(`/ap/suppliers?company_id=${cid}&limit=1000`),
       api.get<TaxCode[]>(`/bir/tax-codes?company_id=${cid}`),
-    ]).then(([emps, accs, sups, tcs]) => {
+      api.get<Dept[]>(`/admin/departments?company_id=${cid}`),
+      api.get<CostCenter[]>(`/admin/cost-centers?company_id=${cid}`),
+    ]).then(([emps, accs, sups, tcs, depts, ccs]) => {
       setEmployees(Array.isArray(emps) ? emps.filter(e => (e as unknown as Record<string,unknown>).is_active !== false) : []);
       setAccounts(Array.isArray(accs) ? accs.filter(a => a.account_type === 'EXPENSE') : []);
       setSuppliers(sups?.data ?? []);
       // Expense lines are purchases → only Input VAT codes apply.
       setTaxCodes(Array.isArray(tcs) ? tcs.filter(t => t.tax_type === 'vat_input') : []);
+      setDepartments(Array.isArray(depts) ? depts : []);
+      setCostCenters(Array.isArray(ccs) ? ccs : []);
     }).catch(() => {});
   }, []);
 
@@ -192,18 +200,22 @@ function NewExpenseReportForm() {
 
             <div className="flex items-center gap-2">
               <div className={hlbl}>Dept.:</div>
-              <input type="text" value={form.department}
+              <select value={form.department}
                 onChange={e => setForm(f => ({ ...f, department: e.target.value }))}
-                placeholder="Operation"
-                className={hbox} />
+                className={hbox}>
+                <option value="">— select —</option>
+                {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+              </select>
             </div>
 
             <div className="flex items-center gap-2">
               <div className={hlbl}>Class:</div>
-              <input type="text" value={form.report_class}
+              <select value={form.report_class}
                 onChange={e => setForm(f => ({ ...f, report_class: e.target.value }))}
-                placeholder="Chicken Trading"
-                className={hbox} />
+                className={hbox}>
+                <option value="">— select —</option>
+                {costCenters.map(cc => <option key={cc.id} value={cc.name}>{cc.code} — {cc.name}</option>)}
+              </select>
             </div>
 
             <div className="flex items-center gap-2">
