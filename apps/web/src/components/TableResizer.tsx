@@ -25,7 +25,11 @@ export function TableResizer() {
         const ths = table.querySelectorAll<HTMLElement>(':scope > thead > tr > th');
         ths.forEach((th, colIdx) => {
           const w = saved[String(colIdx)];
-          if (w) { th.style.width = `${w}px`; th.style.minWidth = `${w}px`; }
+          if (w) {
+            th.style.width = `${w}px`;
+            th.style.minWidth = `${w}px`;
+            th.style.maxWidth = `${w}px`;
+          }
         });
       } catch { /**/ }
     }
@@ -35,9 +39,31 @@ export function TableResizer() {
       if ((table as HTMLElement & { _resizable?: boolean })._resizable) return;
       (table as HTMLElement & { _resizable?: boolean })._resizable = true;
 
-      // Make the table use fixed layout so column widths are respected
-      table.style.tableLayout = 'fixed';
+      // Make the table use fixed layout so column widths are respected.
+      // `min-width: 100%` (Tailwind's min-w-full) fights fixed layout: the
+      // browser keeps the mandated total width and redistributes it across the
+      // other columns, so a dragged column springs back. Pin the table to its
+      // own column widths and let the wrapper scroll instead.
+      // Freeze the auto-layout widths first: under fixed layout a <th> with no
+      // explicit width collapses to an even share of the table, so measure what
+      // the browser already computed and pin it before switching modes.
+      const headers = table.querySelectorAll<HTMLElement>(':scope > thead > tr > th');
+      const measured = Array.from(headers, th => th.offsetWidth);
 
+      table.style.tableLayout = 'fixed';
+      table.style.minWidth = '0';
+      table.style.width = 'auto';
+
+      headers.forEach((th, i) => {
+        const w = measured[i];
+        if (w) {
+          th.style.width = `${w}px`;
+          th.style.minWidth = `${w}px`;
+          th.style.maxWidth = `${w}px`;
+        }
+      });
+
+      // Saved widths win over the measured defaults.
       restoreWidths(table, tableIdx);
 
       const ths = table.querySelectorAll<HTMLElement>(':scope > thead > tr > th');
@@ -78,6 +104,7 @@ export function TableResizer() {
             const next = Math.max(40, startW + mv.clientX - startX);
             th.style.width = `${next}px`;
             th.style.minWidth = `${next}px`;
+            th.style.maxWidth = `${next}px`;
           }
 
           function onUp() {
