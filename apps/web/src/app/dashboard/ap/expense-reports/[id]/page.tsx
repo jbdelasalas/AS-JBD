@@ -134,7 +134,25 @@ export default function ExpenseReportDetailPage() {
     : '';
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 er-print-root">
+      {/* Print styles — render the report on paper exactly as shown on screen. */}
+      <style>{`
+        @media print {
+          /* Preserve box/badge background colors when printing */
+          html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          /* Hide the dashboard chrome: sidebar (<aside>) and topbar (<header>) */
+          aside, header { display: none !important; }
+          /* Unclip the app shell so the full report flows across pages */
+          html, body { height: auto !important; overflow: visible !important; }
+          .h-screen { height: auto !important; }
+          .overflow-hidden, .overflow-y-auto { overflow: visible !important; }
+          main { padding: 0 !important; background: #fff !important; }
+          /* Keep each card from splitting across a page break */
+          .er-print-root > * { break-inside: avoid; }
+          .print\\:hidden { display: none !important; }
+          @page { size: Letter portrait; margin: 10mm; }
+        }
+      `}</style>
       {/* Page header */}
       <div className="flex items-start justify-between">
         <div>
@@ -196,14 +214,14 @@ export default function ExpenseReportDetailPage() {
           {/* External ID Code · PCF Series · Status — aligned under Company / Location / Period */}
           <div className="flex items-center gap-2">
             <div className="w-40 shrink-0 text-left text-xs font-semibold text-slate-600 dark:text-slate-400">External ID Code:</div>
-            <div className="min-w-0 flex-1 border border-slate-400 bg-slate-200 px-2 py-1 text-sm font-semibold text-slate-900 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-100">
+            <div className="min-w-0 flex-1 border border-slate-200 bg-slate-50 px-2 py-1 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-100">
               {er.external_id_code || er.er_no}
             </div>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-40 shrink-0 text-left text-xs font-semibold text-slate-600 dark:text-slate-400">PCF Series:</div>
-            <div className="min-w-0 flex-1 border border-slate-400 bg-slate-200 px-2 py-1 text-sm font-semibold text-slate-900 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-100">
-              {er.pcf_series || <span className="font-normal text-slate-400">—</span>}
+            <div className="min-w-0 flex-1 border border-slate-200 bg-slate-50 px-2 py-1 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-100">
+              {er.pcf_series || <span className="text-slate-400">—</span>}
             </div>
           </div>
           <div className="flex items-center gap-2">
