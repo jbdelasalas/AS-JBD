@@ -4,8 +4,21 @@ import { headers } from 'next/headers';
 let _prodPool: Pool | undefined;
 let _sandboxPool: Pool | undefined;
 
+// Supabase's Supavisor exposes two ports: 6543 = transaction mode (correct for
+// serverless — a client is only held for the duration of a query/transaction),
+// 5432 = session mode (holds a backend for the whole connection, and is what
+// raises `EMAXCONNSESSION … pool_size: 15`). Force the transaction port so a
+// misconfigured env var can't route us onto the session pooler.
+function normalizeUrl(raw: string): string {
+  let url = raw.replace(/([?&])sslmode=[^&]*/g, '$1').replace(/[?&]$/, '');
+  if (/\.pooler\.supabase\.com:5432\b/.test(url)) {
+    url = url.replace('.pooler.supabase.com:5432', '.pooler.supabase.com:6543');
+  }
+  return url;
+}
+
 function makePool(raw: string, schema: 'public' | 'sandbox'): Pool {
-  const url = raw.replace(/([?&])sslmode=[^&]*/g, '$1').replace(/[?&]$/, '');
+  const url = normalizeUrl(raw);
   // On serverless, every warm instance keeps its own Pool. A session-mode
   // pooler caps total clients (pool_size: 15), so keep each instance to a
   // single client and release it quickly to avoid EMAXCONNSESSION.
