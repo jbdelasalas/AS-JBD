@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useRequiredFields } from '@/lib/use-required-fields';
 
-interface Employee { id: string; employee_no: string; full_name: string; }
+interface Employee { id: string; employee_no: string; full_name: string; user_id?: string | null; email?: string | null; user_email?: string | null; }
 interface Account  { id: string; code: string; name: string; account_type: string; }
 interface Supplier { id: string; code: string; name: string; tin: string | null; is_vat_registered: boolean; }
 interface TaxCode  { id: string; code: string; name: string; tax_type: string; }
@@ -67,7 +67,20 @@ function NewExpenseReportForm() {
       api.get<Dept[]>(`/admin/departments?company_id=${cid}`),
       api.get<CostCenter[]>(`/admin/cost-centers?company_id=${cid}`),
     ]).then(([emps, accs, sups, tcs, depts, ccs]) => {
-      setEmployees(Array.isArray(emps) ? emps.filter(e => (e as unknown as Record<string,unknown>).is_active !== false) : []);
+      const activeEmps = Array.isArray(emps) ? emps.filter(e => (e as unknown as Record<string,unknown>).is_active !== false) : [];
+      setEmployees(activeEmps);
+      // Auto-fill Name from the logged-in user: match by linked user_id, then email, then name.
+      try {
+        const u = JSON.parse(localStorage.getItem('user') ?? 'null');
+        if (u) {
+          const uEmail = (u.email ?? '').toLowerCase();
+          const uName  = (u.full_name ?? '').trim().toLowerCase();
+          const me = activeEmps.find(e => u.id && e.user_id === u.id)
+            ?? activeEmps.find(e => uEmail && ((e.user_email ?? '').toLowerCase() === uEmail || (e.email ?? '').toLowerCase() === uEmail))
+            ?? activeEmps.find(e => uName && e.full_name.trim().toLowerCase() === uName);
+          if (me) setForm(f => (f.employee_id ? f : { ...f, employee_id: me.id }));
+        }
+      } catch { /* ignore */ }
       setAccounts(Array.isArray(accs) ? accs.filter(a => a.account_type === 'EXPENSE') : []);
       setSuppliers(sups?.data ?? []);
       // Expense lines are purchases → only Input VAT codes apply.
