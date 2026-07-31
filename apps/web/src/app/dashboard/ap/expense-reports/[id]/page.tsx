@@ -154,7 +154,7 @@ export default function ExpenseReportDetailPage() {
           html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           html, body, main { background: #fff !important; height: auto !important; overflow: visible !important; }
           .h-screen { height: auto !important; }
-          .overflow-hidden, .overflow-y-auto { overflow: visible !important; }
+          .overflow-hidden, .overflow-y-auto, .overflow-x-auto { overflow: visible !important; }
           aside, header { display: none !important; }
           main { padding: 0 !important; }
           .print\\:hidden { display: none !important; }
@@ -169,8 +169,9 @@ export default function ExpenseReportDetailPage() {
           .er-print-root .lg\\:col-span-3 { grid-column: span 3 / span 3 !important; }
           .er-print-root .lg\\:block { display: block !important; }
           .er-print-root .lg\\:w-auto { width: auto !important; }
-          /* Expense line table spans the full paper width, columns auto-fit to content */
-          .er-lines-table { width: 100% !important; min-width: 0 !important; table-layout: auto !important; }
+          /* Expense line table spans the full paper width (column widths are
+             assigned further down, under table-layout: fixed). */
+          .er-lines-table { width: 100% !important; min-width: 0 !important; }
           /* Tighten vertical spacing between and inside cards */
           .er-print-root.space-y-5 > * + * { margin-top: 8px !important; }
           .er-print-root .p-5 { padding: 8px !important; }
@@ -190,14 +191,17 @@ export default function ExpenseReportDetailPage() {
           .er-cashcount .space-y-1\\.5 > * + * { margin-top: 1px !important; }
           .er-cashcount .w-40 { width: 7rem !important; }
           .er-cashcount .text-\\[11px\\], .er-cashcount .text-xs { font-size: 10px !important; }
-          /* Portrait is too narrow to keep the signature block and the cash
-             count side by side, so stack them: signatures first, cash count
-             below and right-aligned. (In landscape these sat on one row.) */
-          /* Signatures sit beside the cash count, as a pair on one row. */
+          /* Match the on-screen layout: the signature block sits immediately
+             left of the cash count and the pair is right-aligned, leaving the
+             empty space on the far left. space-between would instead shove the
+             signatures against the left edge. */
           .er-cashcount .gap-8 { width: 100% !important; gap: 16px !important; }
           .er-cashcount .lg\\:flex-row { flex-direction: row !important; }
-          .er-cashcount .lg\\:justify-end { justify-content: space-between !important; }
+          .er-cashcount .lg\\:justify-end { justify-content: flex-end !important; }
           .er-cc-right { margin-left: 0 !important; flex: 0 0 auto !important; }
+          /* Let the signature column size to its content rather than absorbing
+             all the slack, so it stays snug against the cash count. */
+          .er-cashcount .lg\\:flex-1 { flex: 0 0 auto !important; }
           /* The dashboard shell wraps <main> in two nested flex containers. A
              flex item defaults to min-width:auto, so it refuses to shrink below
              its content's intrinsic width — the wide lines table forced the
@@ -221,8 +225,34 @@ export default function ExpenseReportDetailPage() {
              sheet without needing a transform. */
           .er-print-root { font-size: 9px !important; }
           .er-print-root .text-sm, .er-print-root .text-xs { font-size: 9px !important; }
-          .er-lines-table { table-layout: auto !important; }
+          /* The lines table sits in an overflow-x-auto wrapper. On paper that
+             wrapper scrolls instead of fitting, so the right-hand columns
+             (VAT Code, Receipt Date, Amount) and the Total row fall off the
+             sheet. Let it overflow visibly and force the table to the page. */
+          .er-lines-table { table-layout: fixed !important; width: 100% !important; }
           .er-lines-table th, .er-lines-table td { padding: 2px 4px !important; font-size: 8px !important; }
+          /* whitespace-nowrap on six of the eight columns keeps the table wider
+             than the sheet no matter how narrow the container is — let every
+             cell wrap and break long values instead. */
+          .er-lines-table th, .er-lines-table td {
+            white-space: normal !important;
+            overflow-wrap: anywhere !important;
+            word-break: break-word !important;
+          }
+          /* table-layout:fixed splits columns evenly unless told otherwise, so
+             hand the width to the two text columns that actually need it. */
+          .er-lines-table th:nth-child(1) { width: 3% !important; }
+          .er-lines-table th:nth-child(2) { width: 13% !important; }
+          .er-lines-table th:nth-child(3) { width: 20% !important; }
+          .er-lines-table th:nth-child(4) { width: 24% !important; }
+          .er-lines-table th:nth-child(5) { width: 13% !important; }
+          .er-lines-table th:nth-child(6) { width: 8% !important; }
+          .er-lines-table th:nth-child(7) { width: 9% !important; }
+          .er-lines-table th:nth-child(8) { width: 10% !important; }
+          /* TableResizer writes inline px widths on the headers; those would
+             otherwise beat the percentages above and re-widen the table. */
+          .er-lines-table th { min-width: 0 !important; max-width: none !important; }
+          .er-lines-table .col-resize-handle { display: none !important; }
           .er-print-root, .er-print-root * { break-inside: auto !important; }
           @page { size: A4 portrait; margin: 6mm; }
         }
