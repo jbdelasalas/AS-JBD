@@ -23,7 +23,7 @@ function HeaderRow({
 }: { label: string; value: React.ReactNode; highlight?: boolean }) {
   return (
     <div className="flex items-center gap-2">
-      <div className="w-40 shrink-0 text-right text-xs font-semibold text-slate-600 dark:text-slate-400">
+      <div className="w-40 shrink-0 text-left text-xs font-semibold text-slate-600 dark:text-slate-400">
         {label}
       </div>
       <div
@@ -194,18 +194,6 @@ export default function ExpenseReportDetailPage() {
           <div className="hidden lg:block" />
           <div className="hidden lg:block" />
           <HeaderRow label="PCF Series:" value={er.pcf_series} highlight />
-        </div>
-      </div>
-
-      {/* Summary KPIs */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
-          <div className="text-xs text-slate-500 dark:text-slate-400">Total Amount</div>
-          <div className="mt-0.5 text-xl font-semibold text-slate-900 dark:text-slate-100 font-mono">{formatPHP(er.total)}</div>
-        </div>
-        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
-          <div className="text-xs text-slate-500 dark:text-slate-400">Lines</div>
-          <div className="mt-0.5 text-xl font-semibold text-slate-900 dark:text-slate-100">{er.lines?.length ?? 0}</div>
         </div>
       </div>
 
