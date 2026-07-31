@@ -316,8 +316,8 @@ function NewExpenseReportForm() {
               <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                 <tr>
                   <th className="px-2 py-1.5 text-left font-medium w-48">Expense Account</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Description *</th>
-                  <th className="px-2 py-1.5 text-left font-medium w-44">Supplier {isLineRequired('supplier_id') && <span className="text-red-500">*</span>}</th>
+                  <th className="px-2 py-1.5 text-left font-medium w-56">Description *</th>
+                  <th className="px-2 py-1.5 text-left font-medium w-64">Supplier {isLineRequired('supplier_id') && <span className="text-red-500">*</span>}</th>
                   <th className="px-2 py-1.5 text-left font-medium w-36">TIN</th>
                   <th className="px-2 py-1.5 text-left font-medium w-36">VAT Code</th>
                   <th className="px-2 py-1.5 text-left font-medium w-32">Receipt Date *</th>

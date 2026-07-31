@@ -290,8 +290,8 @@ export default function ExpenseReportDetailPage() {
               <tr>
                 <th className="px-3 py-2 text-left font-medium w-8">#</th>
                 <th className="px-3 py-2 text-left font-medium w-36">Account</th>
-                <th className="px-3 py-2 text-left font-medium">Description</th>
-                <th className="px-3 py-2 text-left font-medium w-40">Supplier</th>
+                <th className="px-3 py-2 text-left font-medium w-56">Description</th>
+                <th className="px-3 py-2 text-left font-medium w-64">Supplier</th>
                 <th className="px-3 py-2 text-left font-medium w-32">TIN</th>
                 <th className="px-3 py-2 text-left font-medium w-28">VAT Code</th>
                 <th className="px-3 py-2 text-left font-medium w-28">Receipt Date</th>
