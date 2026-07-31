@@ -148,7 +148,7 @@ export default function ExpenseReportDetailPage() {
 
   return (
     <div className="space-y-5 er-print-root">
-      {/* Print styles — print the on-screen layout, scaled to fit one landscape page. */}
+      {/* Print styles — print the on-screen layout, scaled to fit one portrait page. */}
       <style>{`
         @media print {
           html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -178,7 +178,11 @@ export default function ExpenseReportDetailPage() {
           .er-cashcount h2 { margin-bottom: 4px !important; }
           .er-cashcount { font-size: 10px !important; }
           .er-cashcount .gap-8 { gap: 16px !important; }
-          .er-cashcount .space-y-10 > * + * { margin-top: 16px !important; }
+          /* Signature rows: portrait stacks the blocks, so reclaim the tall
+             landscape gaps to keep everything on one page. */
+          .er-cashcount .space-y-10 > * + * { margin-top: 10px !important; }
+          .er-cashcount .pt-6 { padding-top: 10px !important; }
+          .er-cashcount .space-y-10 { max-width: 20rem !important; }
           .er-cashcount table { font-size: 10px !important; }
           .er-cashcount td, .er-cashcount th { padding-top: 0 !important; padding-bottom: 0 !important; }
           .er-cashcount input {
@@ -188,18 +192,21 @@ export default function ExpenseReportDetailPage() {
           .er-cashcount .space-y-1\\.5 > * + * { margin-top: 1px !important; }
           .er-cashcount .w-40 { width: 7rem !important; }
           .er-cashcount .text-\\[11px\\], .er-cashcount .text-xs { font-size: 10px !important; }
-          /* Keep both blocks on one row, right-aligned as a pair. An auto left
-             margin on the cash count used to absorb every spare pixel, which
-             stranded the signature block far to the left with dead space
-             between them. Let the signature block take the slack instead. */
-          .er-cashcount .gap-8 { width: 100% !important; gap: 24px !important; }
-          .er-cashcount .lg\\:justify-end { justify-content: flex-end !important; }
-          .er-cc-right { margin-left: 0 !important; flex: 0 0 auto !important; }
+          /* Portrait is too narrow to keep the signature block and the cash
+             count side by side, so stack them: signatures first, cash count
+             below and right-aligned. (In landscape these sat on one row.) */
+          .er-cashcount .gap-8 { width: 100% !important; gap: 12px !important; }
+          .er-cashcount .lg\\:flex-row { flex-direction: column !important; }
+          .er-cashcount .lg\\:justify-end { justify-content: flex-start !important; }
+          .er-cc-right { margin-left: auto !important; flex: 0 0 auto !important; }
           /* Scale the whole report down so it fits on a single page.
-             Do NOT use break-inside:avoid — it forces the cash count onto page 2. */
-          .er-print-root { transform: scale(0.82); transform-origin: top left; width: 122%; }
+             Do NOT use break-inside:avoid — it forces the cash count onto page 2.
+             A4 portrait is 210mm wide against landscape's 297mm. Scale 0.68
+             (width 147% to recover the lost width) keeps the stacked layout
+             inside one portrait page without shrinking text past legibility. */
+          .er-print-root { transform: scale(0.68); transform-origin: top left; width: 147%; }
           .er-print-root, .er-print-root * { break-inside: auto !important; }
-          @page { size: A4 landscape; margin: 6mm; }
+          @page { size: A4 portrait; margin: 6mm; }
         }
       `}</style>
 
