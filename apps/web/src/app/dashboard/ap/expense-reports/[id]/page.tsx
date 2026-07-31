@@ -204,7 +204,14 @@ export default function ExpenseReportDetailPage() {
              A4 portrait is 210mm wide against landscape's 297mm. Scale 0.68
              (width 147% to recover the lost width) keeps the stacked layout
              inside one portrait page without shrinking text past legibility. */
-          .er-print-root { transform: scale(0.68); transform-origin: top left; width: 147%; }
+          /* No transform: a scaled box keeps its UNSCALED width in layout, so a
+             147%-wide root overhangs the sheet and everything past the page
+             edge (VAT Code, Receipt Date, Amount, Total, cash count) is clipped
+             off the print. Shrink the type instead and let the layout reflow to
+             the real page width. */
+          .er-print-root { width: 100% !important; max-width: 100% !important; font-size: 8px !important; }
+          .er-print-root .text-sm, .er-print-root .text-xs { font-size: 8px !important; }
+          .er-lines-table th, .er-lines-table td { padding: 2px 4px !important; font-size: 8px !important; }
           .er-print-root, .er-print-root * { break-inside: auto !important; }
           @page { size: A4 portrait; margin: 6mm; }
         }
