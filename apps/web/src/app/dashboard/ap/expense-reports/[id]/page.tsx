@@ -112,6 +112,19 @@ export default function ExpenseReportDetailPage() {
     if (cc.fund_accountability != null) setFundAccountability(String(cc.fund_accountability || ''));
   }, [er]);
 
+  // Print in light mode: dark backgrounds shouldn't carry onto paper.
+  function handlePrint() {
+    const root = document.documentElement;
+    const wasDark = root.classList.contains('dark');
+    if (wasDark) root.classList.remove('dark');
+    const restore = () => {
+      if (wasDark) root.classList.add('dark');
+      window.removeEventListener('afterprint', restore);
+    };
+    window.addEventListener('afterprint', restore);
+    window.print();
+  }
+
   async function doAction(path: string, body?: object) {
     setBusy(true);
     setMsg(null);
@@ -135,26 +148,32 @@ export default function ExpenseReportDetailPage() {
 
   return (
     <div className="space-y-5 er-print-root">
-      {/* Print styles — render the report on paper exactly as shown on screen. */}
+      {/* Print styles — render the report on paper exactly as shown on screen (light mode). */}
       <style>{`
         @media print {
           /* Preserve box/badge background colors when printing */
           html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          html, body, main { background: #fff !important; }
           /* Hide the dashboard chrome: sidebar (<aside>) and topbar (<header>) */
           aside, header { display: none !important; }
           /* Unclip the app shell so the full report flows across pages */
           html, body { height: auto !important; overflow: visible !important; }
           .h-screen { height: auto !important; }
           .overflow-hidden, .overflow-y-auto { overflow: visible !important; }
-          main { padding: 0 !important; background: #fff !important; }
+          main { padding: 0 !important; }
+          /* Use the wide (lg) 3-column layout even on paper */
+          .er-print-root .lg\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+          .er-print-root .lg\\:flex-row { flex-direction: row !important; }
+          .er-print-root .lg\\:col-span-3 { grid-column: span 3 / span 3 !important; }
+          .er-print-root .lg\\:block { display: block !important; }
           /* Keep each card from splitting across a page break */
           .er-print-root > * { break-inside: avoid; }
           .print\\:hidden { display: none !important; }
           @page { size: Letter portrait; margin: 10mm; }
         }
       `}</style>
-      {/* Page header */}
-      <div className="flex items-start justify-between">
+      {/* Page header (screen only — the report card already shows this info) */}
+      <div className="flex items-start justify-between print:hidden">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{er.er_no}</h1>
@@ -167,7 +186,7 @@ export default function ExpenseReportDetailPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => window.print()}
+          <button onClick={handlePrint}
             className="rounded border border-slate-300 px-3 py-1 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800 print:hidden">
             Print
           </button>
