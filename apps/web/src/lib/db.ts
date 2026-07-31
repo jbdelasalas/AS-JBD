@@ -6,12 +6,16 @@ let _sandboxPool: Pool | undefined;
 
 function makePool(raw: string, schema: 'public' | 'sandbox'): Pool {
   const url = raw.replace(/([?&])sslmode=[^&]*/g, '$1').replace(/[?&]$/, '');
+  // On serverless, every warm instance keeps its own Pool. A session-mode
+  // pooler caps total clients (pool_size: 15), so keep each instance to a
+  // single client and release it quickly to avoid EMAXCONNSESSION.
   const cfg: PoolConfig = {
     connectionString: url,
     ssl: { rejectUnauthorized: false },
-    max: 3,
+    max: 1,
     connectionTimeoutMillis: 20_000,
-    idleTimeoutMillis: 10_000,
+    idleTimeoutMillis: 5_000,
+    maxLifetimeSeconds: 30,
     allowExitOnIdle: true,
   };
   const pool = new Pool(cfg);
