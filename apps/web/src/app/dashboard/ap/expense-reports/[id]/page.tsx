@@ -158,6 +158,10 @@ export default function ExpenseReportDetailPage() {
           aside, header { display: none !important; }
           main { padding: 0 !important; }
           .print\\:hidden { display: none !important; }
+          /* All text prints black */
+          .er-print-root, .er-print-root * { color: #000 !important; }
+          /* Never print interactive controls (action buttons, save, etc.) */
+          .er-print-root button { display: none !important; }
           /* Force the wide (lg) layout on paper */
           .er-print-root .lg\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
           .er-print-root .lg\\:flex-row { flex-direction: row !important; }
@@ -182,6 +186,9 @@ export default function ExpenseReportDetailPage() {
           .er-cashcount .space-y-1\\.5 > * + * { margin-top: 1px !important; }
           .er-cashcount .w-40 { width: 6rem !important; }
           .er-cashcount .text-\\[11px\\], .er-cashcount .text-xs { font-size: 8px !important; }
+          /* Push the cash count block to the far right of the page */
+          .er-cashcount .gap-8 { width: 100% !important; }
+          .er-cc-right { margin-left: auto !important; }
           /* Scale the whole report down so it fits on a single page.
              Do NOT use break-inside:avoid — it forces the cash count onto page 2. */
           .er-print-root { transform: scale(0.62); transform-origin: top left; width: 161%; }
@@ -342,7 +349,7 @@ export default function ExpenseReportDetailPage() {
         </div>
 
         {/* Cash count — right */}
-        <div className="w-full max-w-lg lg:w-auto">
+        <div className="er-cc-right w-full max-w-lg lg:w-auto">
           {/* Denomination table */}
           <table className="w-full text-xs">
             <thead>
