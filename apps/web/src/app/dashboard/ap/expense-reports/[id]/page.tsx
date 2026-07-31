@@ -165,8 +165,25 @@ export default function ExpenseReportDetailPage() {
           .er-print-root .lg\\:col-span-3 { grid-column: span 3 / span 3 !important; }
           .er-print-root .lg\\:block { display: block !important; }
           .er-print-root .lg\\:w-auto { width: auto !important; }
+          /* Tighten vertical spacing between and inside cards */
+          .er-print-root.space-y-5 > * + * { margin-top: 8px !important; }
+          .er-print-root .p-5 { padding: 8px !important; }
+          /* Shrink the cash count block: small fonts, compact rows, plain inputs */
+          .er-cashcount h2 { margin-bottom: 4px !important; }
+          .er-cashcount { font-size: 8px !important; }
+          .er-cashcount .gap-8 { gap: 16px !important; }
+          .er-cashcount .space-y-10 > * + * { margin-top: 16px !important; }
+          .er-cashcount table { font-size: 8px !important; }
+          .er-cashcount td, .er-cashcount th { padding-top: 0 !important; padding-bottom: 0 !important; }
+          .er-cashcount input {
+            width: 3.5rem !important; border: none !important; background: transparent !important;
+            padding: 0 !important; font-size: 8px !important; text-align: right !important;
+          }
+          .er-cashcount .space-y-1\\.5 > * + * { margin-top: 1px !important; }
+          .er-cashcount .w-40 { width: 6rem !important; }
+          .er-cashcount .text-\\[11px\\], .er-cashcount .text-xs { font-size: 8px !important; }
           /* Scale the whole report down so it fits on a single page */
-          .er-print-root { transform: scale(0.78); transform-origin: top left; width: 128%; }
+          .er-print-root { transform: scale(0.7); transform-origin: top left; width: 143%; }
           .er-print-root > * { break-inside: avoid; }
           @page { size: A4 landscape; margin: 8mm; }
         }
@@ -271,7 +288,6 @@ export default function ExpenseReportDetailPage() {
                 <th className="px-3 py-2 text-left font-medium w-28">VAT Code</th>
                 <th className="px-3 py-2 text-left font-medium w-28">Receipt Date</th>
                 <th className="px-3 py-2 text-right font-medium w-28">Amount</th>
-                <th className="px-3 py-2 text-left font-medium">Notes</th>
               </tr>
             </thead>
             <tbody>
@@ -292,7 +308,6 @@ export default function ExpenseReportDetailPage() {
                   <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{(ln.tax_code as string) ?? '—'}</td>
                   <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{formatDate(l.receipt_date)}</td>
                   <td className="px-3 py-2 text-right font-mono text-xs font-semibold dark:text-slate-300">{formatPHP(l.amount)}</td>
-                  <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{l.notes ?? '—'}</td>
                 </tr>
               );})}
             </tbody>
@@ -300,7 +315,6 @@ export default function ExpenseReportDetailPage() {
               <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
                 <td colSpan={7} className="px-3 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">Total</td>
                 <td className="px-3 py-2 text-right font-mono text-sm font-bold text-slate-900 dark:text-slate-100">{formatPHP(er.total)}</td>
-                <td />
               </tr>
             </tfoot>
           </table>
@@ -308,7 +322,7 @@ export default function ExpenseReportDetailPage() {
       </div>
 
       {/* Cash count / Fund Accountability */}
-      <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+      <div className="er-cashcount rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
         <h2 className="mb-4 text-right text-xs font-semibold text-slate-800 dark:text-slate-200">Cash Count &amp; Fund Accountability</h2>
         <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
         {/* Signature block — left */}
