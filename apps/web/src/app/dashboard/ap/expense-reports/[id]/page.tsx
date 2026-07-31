@@ -148,10 +148,16 @@ export default function ExpenseReportDetailPage() {
             {er.employee_name} ({er.employee_no})
           </p>
         </div>
-        <Link href="/dashboard/ap/expense-reports"
-          className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
-          ← Back to list
-        </Link>
+        <div className="flex items-center gap-3">
+          <button onClick={() => window.print()}
+            className="rounded border border-slate-300 px-3 py-1 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800 print:hidden">
+            Print
+          </button>
+          <Link href="/dashboard/ap/expense-reports"
+            className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 print:hidden">
+            ← Back to list
+          </Link>
+        </div>
       </div>
 
       {msg && (
@@ -187,13 +193,27 @@ export default function ExpenseReportDetailPage() {
             value={er.period_to ? formatDate(er.period_to) : null}
           />
 
-          <div className="hidden lg:block" />
-          <div className="hidden lg:block" />
-          <HeaderRow label="External ID Code:" value={er.external_id_code || er.er_no} highlight />
-
-          <div className="hidden lg:block" />
-          <div className="hidden lg:block" />
-          <HeaderRow label="PCF Series:" value={er.pcf_series} highlight />
+          {/* External ID Code · PCF Series · Status — one line spanning full width */}
+          <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 lg:col-span-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">External ID Code:</span>
+              <span className="border border-slate-400 bg-slate-200 px-2 py-1 text-sm font-semibold text-slate-900 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-100">
+                {er.external_id_code || er.er_no}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">PCF Series:</span>
+              <span className="border border-slate-400 bg-slate-200 px-2 py-1 text-sm font-semibold text-slate-900 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-100">
+                {er.pcf_series || <span className="font-normal text-slate-400">—</span>}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Status:</span>
+              <span className={`rounded px-2 py-1 text-xs font-medium ${STATUS_STYLES[er.status] ?? STATUS_STYLES.draft}`}>
+                {er.status.replace(/_/g, ' ')}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -252,10 +272,10 @@ export default function ExpenseReportDetailPage() {
 
       {/* Cash count / Fund Accountability */}
       <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
-        <h2 className="mb-4 text-center text-sm font-semibold text-slate-800 dark:text-slate-200">Cash Count &amp; Fund Accountability</h2>
-        <div className="mx-auto max-w-lg">
+        <h2 className="mb-4 text-center text-xs font-semibold text-slate-800 dark:text-slate-200">Cash Count &amp; Fund Accountability</h2>
+        <div className="ml-auto max-w-lg">
           {/* Denomination table */}
-          <table className="w-full text-sm">
+          <table className="w-full text-xs">
             <thead>
               <tr className="text-xs text-slate-500 dark:text-slate-400">
                 <th className="py-1 text-center font-semibold">Denom</th>
@@ -288,9 +308,9 @@ export default function ExpenseReportDetailPage() {
           {/* Reconciliation */}
           {(() => {
             const editable = ['draft', 'pending_approval'].includes(er.status);
-            const rowLabel = 'text-right text-xs font-semibold text-slate-600 dark:text-slate-400';
-            const rowVal = 'w-40 border px-2 py-1 text-right font-mono text-sm border-slate-200 bg-slate-50 text-slate-900 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-100';
-            const inp = 'w-40 rounded border border-slate-300 px-2 py-1 text-right text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 disabled:opacity-60';
+            const rowLabel = 'text-right text-[11px] font-semibold text-slate-600 dark:text-slate-400';
+            const rowVal = 'w-40 border px-2 py-1 text-right font-mono text-xs border-slate-200 bg-slate-50 text-slate-900 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-100';
+            const inp = 'w-40 rounded border border-slate-300 px-2 py-1 text-right text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 disabled:opacity-60';
             return (
               <div className="mt-4 space-y-1.5">
                 <div className="flex items-center justify-end gap-3">
@@ -331,7 +351,7 @@ export default function ExpenseReportDetailPage() {
                 {editable && (
                   <div className="flex justify-end pt-2">
                     <button onClick={saveCashCount} disabled={savingCash}
-                      className="rounded bg-brand-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                      className="rounded bg-brand-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 print:hidden">
                       {savingCash ? 'Saving…' : 'Save cash count'}
                     </button>
                   </div>

@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { useRequiredFields } from '@/lib/use-required-fields';
 
 interface Employee { id: string; employee_no: string; full_name: string; }
 interface Account  { id: string; code: string; name: string; account_type: string; }
@@ -96,10 +97,19 @@ function NewExpenseReportForm() {
 
   const grandTotal = lines.reduce((s, l) => s + Number(l.amount || 0), 0);
 
+  const { isRequired, isLineRequired, validate, validateLine } =
+    useRequiredFields('expense_report', 'expense_report_line');
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     if (!form.employee_id) { setError('Select an employee'); return; }
+    // Enforce admin-configured required fields (Administration → Required Fields).
+    const missing = [
+      ...validate(form as unknown as Record<string, unknown>),
+      ...lines.flatMap((l, i) => validateLine(l as unknown as Record<string, unknown>, i + 1)),
+    ];
+    if (missing.length) { setError('Required: ' + missing.join(', ')); return; }
     setSaving(true);
     try {
       const cid = localStorage.getItem('company_id')!;
@@ -164,7 +174,7 @@ function NewExpenseReportForm() {
           <div className="grid grid-cols-1 gap-x-8 gap-y-3 lg:grid-cols-3">
             {/* ── Column 1: Name / Dept / Company ── */}
             <div className="flex items-center gap-2">
-              <div className={hlbl}>Name:</div>
+              <div className={hlbl}>Name: {isRequired('employee_id') && <span className="text-red-500">*</span>}</div>
               <select required value={form.employee_id}
                 onChange={e => setForm(f => ({ ...f, employee_id: e.target.value }))}
                 className={hbox}>

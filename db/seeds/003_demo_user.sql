@@ -7,13 +7,13 @@
 -- The password_hash below is a bcrypt hash with cost 10.
 --
 -- To regenerate:
---   node -e "console.log(require('bcryptjs').hashSync('Improtected@01', 10))"
+--   node -e "console.log(require('bcryptjs').hashSync('artfresh2026', 10))"
 
 INSERT INTO users (id, email, password_hash, full_name, is_active, is_superadmin)
 VALUES (
   '99999999-9999-9999-9999-999999999999',
   'admin@afcc.ph',
-  '$2a$10$hzStWyBukuNQF40GvUzt7uOAZ1u3cfRoL84QhGSSnRTCYYL34hc3W',  -- Improtected@01
+  '$2a$10$jCU6RjLNzqUqN/JC/wzVLuk1/JkUatFDdS9NM62Q78t65lf2Bq.Fy',  -- artfresh2026
   'System Administrator',
   true,
   true

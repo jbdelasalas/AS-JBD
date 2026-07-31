@@ -4088,5 +4088,64 @@ export async function POST(request: NextRequest) {
     results.push('051 expense_report_lines supplier + tin + tax_code: ok');
   } catch (e) { results.push(`051 expense line supplier fields FAILED: ${(e as Error).message}`); }
 
+  // --- 052: Configurable required fields ---
+  // A generic registry: per company + form_key + field_key, whether that field
+  // is required. Admin toggles these; forms read them and enforce on submit.
+  const client052 = await getPool().connect();
+  try {
+    await client052.query('BEGIN');
+    await client052.query(`
+      CREATE TABLE IF NOT EXISTS field_requirements (
+        id         uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        form_key   varchar(60) NOT NULL,   -- e.g. 'expense_report'
+        field_key  varchar(60) NOT NULL,   -- e.g. 'employee_id'
+        label      varchar(120) NOT NULL,  -- human label shown in admin
+        required   boolean NOT NULL DEFAULT false,
+        sort_order int NOT NULL DEFAULT 0,
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (company_id, form_key, field_key)
+      )
+    `);
+    await client052.query(`CREATE INDEX IF NOT EXISTS idx_field_req_form ON field_requirements (company_id, form_key)`);
+
+    // Seed the known fields for every company (idempotent). New fields can be
+    // added here later; existing rows keep their toggled value.
+    const seed: Array<[string, string, string, number]> = [
+      // form_key, field_key, label, sort
+      ['expense_report', 'employee_id',   'Name (Employee)',   1],
+      ['expense_report', 'report_date',   'Date',              2],
+      ['expense_report', 'department',    'Department',        3],
+      ['expense_report', 'report_class',  'Class',             4],
+      ['expense_report', 'fund_class',    'Fund - Class',      5],
+      ['expense_report', 'location_text', 'Location',          6],
+      ['expense_report', 'period_from',   'Period From',       7],
+      ['expense_report', 'period_to',     'Period To',         8],
+      ['expense_report', 'external_id_code', 'External ID Code', 9],
+      ['expense_report', 'pcf_series',    'PCF Series',        10],
+      // expense line fields
+      ['expense_report_line', 'expense_account_id', 'Expense Account', 1],
+      ['expense_report_line', 'description',        'Description',     2],
+      ['expense_report_line', 'supplier_id',        'Supplier',        3],
+      ['expense_report_line', 'tax_code_id',        'VAT Code',        4],
+      ['expense_report_line', 'receipt_date',       'Receipt Date',    5],
+      ['expense_report_line', 'amount',             'Amount',          6],
+    ];
+    for (const [fk, fld, label, sort] of seed) {
+      await client052.query(
+        `INSERT INTO field_requirements (company_id, form_key, field_key, label, sort_order, required)
+         SELECT c.id, $1, $2, $3, $4, false FROM companies c
+         ON CONFLICT (company_id, form_key, field_key) DO UPDATE
+           SET label = EXCLUDED.label, sort_order = EXCLUDED.sort_order`,
+        [fk, fld, label, sort],
+      );
+    }
+    await client052.query('COMMIT');
+    results.push('052 field_requirements: ok');
+  } catch (e) {
+    await client052.query('ROLLBACK');
+    results.push(`052 field_requirements FAILED: ${(e as Error).message}`);
+  } finally { client052.release(); }
+
   return ok({ results });
 }

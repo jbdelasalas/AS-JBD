@@ -177,6 +177,7 @@ export default function AdminHomePage() {
     { href: '/dashboard/admin/document-series', title: 'Document Series', desc: 'Configure document numbering and prefixes' },
     { href: '/dashboard/admin/cost-centers', title: 'Cost Centers', desc: 'Departments and cost allocation centers' },
     { href: '/dashboard/admin/feature-flags', title: 'Feature Flags', desc: 'Enable or disable features per company' },
+    { href: '/dashboard/admin/field-requirements', title: 'Required Fields', desc: 'Choose which fields are mandatory on each form' },
     { href: '/dashboard/admin/audit-log', title: 'Audit Log', desc: 'View all user activity and data changes' },
   ];
 
