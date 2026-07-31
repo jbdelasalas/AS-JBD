@@ -19,9 +19,11 @@ export async function GET(
   }
 
   const headers = await query(
-    `SELECT er.*, e.full_name AS employee_name, e.employee_no
+    `SELECT er.*, e.full_name AS employee_name, e.employee_no,
+            au.full_name AS approved_by_name
        FROM employee_expense_reports er
        JOIN employees e ON e.id = er.employee_id
+       LEFT JOIN users au ON au.id = er.approved_by
       WHERE er.id = $1 LIMIT 1`,
     [params.id],
   );

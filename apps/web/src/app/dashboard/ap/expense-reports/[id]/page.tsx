@@ -344,7 +344,12 @@ export default function ExpenseReportDetailPage() {
           </div>
           <div className="flex items-end gap-3 pt-6">
             <span className="whitespace-nowrap text-xs text-slate-700 dark:text-slate-300">Approved by:</span>
-            <div className="h-5 flex-1 min-w-[16rem] border-b border-slate-500 dark:border-slate-400" />
+            <div className="flex flex-1 flex-col items-center">
+              <span className="mb-0.5 h-4 text-xs font-semibold text-slate-800 dark:text-slate-200">
+                {(er as unknown as Record<string, unknown>).approved_by_name as string ?? ''}
+              </span>
+              <div className="w-full min-w-[16rem] border-b border-slate-500 dark:border-slate-400" />
+            </div>
           </div>
         </div>
 
