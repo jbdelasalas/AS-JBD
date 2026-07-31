@@ -11,6 +11,7 @@ interface Supplier { id: string; code: string; name: string; tin: string | null;
 interface TaxCode  { id: string; code: string; name: string; tax_type: string; }
 interface Dept     { id: string; name: string; }
 interface CostCenter { id: string; code: string; name: string; }
+interface Location { id: string; code: string; name: string; }
 
 interface Line {
   expense_account_id: string;
@@ -38,6 +39,7 @@ function NewExpenseReportForm() {
   const [taxCodes, setTaxCodes]   = useState<TaxCode[]>([]);
   const [departments, setDepartments] = useState<Dept[]>([]);
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState<string | null>(null);
 
@@ -66,7 +68,8 @@ function NewExpenseReportForm() {
       api.get<TaxCode[]>(`/bir/tax-codes?company_id=${cid}`),
       api.get<Dept[]>(`/admin/departments?company_id=${cid}`),
       api.get<CostCenter[]>(`/admin/cost-centers?company_id=${cid}`),
-    ]).then(([emps, accs, sups, tcs, depts, ccs]) => {
+      api.get<Location[]>(`/inventory/locations?company_id=${cid}`),
+    ]).then(([emps, accs, sups, tcs, depts, ccs, locs]) => {
       const activeEmps = Array.isArray(emps) ? emps.filter(e => (e as unknown as Record<string,unknown>).is_active !== false) : [];
       setEmployees(activeEmps);
       // Auto-fill Name from the logged-in user: match by linked user_id, then email, then name.
@@ -87,6 +90,7 @@ function NewExpenseReportForm() {
       setTaxCodes(Array.isArray(tcs) ? tcs.filter(t => t.tax_type === 'vat_input') : []);
       setDepartments(Array.isArray(depts) ? depts : []);
       setCostCenters(Array.isArray(ccs) ? ccs : []);
+      setLocations(Array.isArray(locs) ? locs : []);
     }).catch(() => {});
   }, []);
 
@@ -201,10 +205,12 @@ function NewExpenseReportForm() {
             {/* ── Column 2: Fund-Class / Class / Location ── */}
             <div className="flex items-center gap-2">
               <div className={hlbl}>Fund - Class:</div>
-              <input type="text" value={form.fund_class}
+              <select value={form.fund_class}
                 onChange={e => setForm(f => ({ ...f, fund_class: e.target.value }))}
-                placeholder="Operation - AFCC"
-                className={hbox} />
+                className={hbox}>
+                <option value="">— select —</option>
+                {costCenters.map(cc => <option key={cc.id} value={cc.name}>{cc.code} — {cc.name}</option>)}
+              </select>
             </div>
 
             {/* ── Column 3: Date / Period From / Period To / External ID / PCF Series ── */}
@@ -257,10 +263,12 @@ function NewExpenseReportForm() {
 
             <div className="flex items-center gap-2">
               <div className={hlbl}>Location:</div>
-              <input type="text" value={form.location_text}
+              <select value={form.location_text}
                 onChange={e => setForm(f => ({ ...f, location_text: e.target.value }))}
-                placeholder="CHICKEN TRADING - ALAM"
-                className={hbox} />
+                className={hbox}>
+                <option value="">— select —</option>
+                {locations.map(loc => <option key={loc.id} value={loc.name}>{loc.code} — {loc.name}</option>)}
+              </select>
             </div>
 
             <div className="flex items-center gap-2">

@@ -333,8 +333,8 @@ export default function ExpenseReportDetailPage() {
       <div className="er-cashcount rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
         <h2 className="mb-4 text-right text-xs font-semibold text-slate-800 dark:text-slate-200">Cash Count &amp; Fund Accountability</h2>
         <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
-        {/* Signature block — left */}
-        <div className="w-full max-w-md space-y-10 pt-2 lg:w-auto">
+        {/* Signature block — shifted toward the center/right */}
+        <div className="w-full max-w-md space-y-10 pt-2 lg:ml-40 lg:w-auto">
           <div className="flex items-end gap-3">
             <span className="whitespace-nowrap text-xs text-slate-700 dark:text-slate-300">Prepare by:</span>
             <div className="flex flex-1 flex-col items-center">
@@ -342,7 +342,7 @@ export default function ExpenseReportDetailPage() {
               <div className="w-full min-w-[16rem] border-b border-slate-500 dark:border-slate-400" />
             </div>
           </div>
-          <div className="flex items-end gap-3">
+          <div className="flex items-end gap-3 pt-6">
             <span className="whitespace-nowrap text-xs text-slate-700 dark:text-slate-300">Approved by:</span>
             <div className="h-5 flex-1 min-w-[16rem] border-b border-slate-500 dark:border-slate-400" />
           </div>
@@ -386,7 +386,7 @@ export default function ExpenseReportDetailPage() {
             const editable = ['draft', 'pending_approval'].includes(er.status);
             const rowLabel = 'text-right text-[11px] font-semibold text-slate-600 dark:text-slate-400';
             const rowVal = 'w-40 border px-2 py-1 text-right font-mono text-xs border-slate-200 bg-slate-50 text-slate-900 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-100';
-            const inp = 'w-40 rounded border border-slate-300 px-2 py-1 text-right text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 disabled:opacity-60';
+            const inp = 'w-40 rounded border border-slate-300 bg-white px-2 py-1 text-right font-mono text-xs shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 disabled:bg-slate-50 disabled:opacity-100 dark:disabled:bg-slate-800/60';
             return (
               <div className="mt-4 space-y-1.5">
                 <div className="flex items-center justify-end gap-3">
