@@ -178,11 +178,9 @@ export default function ExpenseReportDetailPage() {
           .er-cashcount h2 { margin-bottom: 4px !important; }
           .er-cashcount { font-size: 10px !important; }
           .er-cashcount .gap-8 { gap: 16px !important; }
-          /* Signature rows: portrait stacks the blocks, so reclaim the tall
-             landscape gaps to keep everything on one page. */
-          .er-cashcount .space-y-10 > * + * { margin-top: 10px !important; }
-          .er-cashcount .pt-6 { padding-top: 10px !important; }
-          .er-cashcount .space-y-10 { max-width: 20rem !important; }
+          /* Signature rows: keep the gaps tight so the pair fits one page. */
+          .er-cashcount .space-y-10 > * + * { margin-top: 14px !important; }
+          .er-cashcount .pt-6 { padding-top: 14px !important; }
           .er-cashcount table { font-size: 10px !important; }
           .er-cashcount td, .er-cashcount th { padding-top: 0 !important; padding-bottom: 0 !important; }
           .er-cashcount input {
@@ -195,22 +193,35 @@ export default function ExpenseReportDetailPage() {
           /* Portrait is too narrow to keep the signature block and the cash
              count side by side, so stack them: signatures first, cash count
              below and right-aligned. (In landscape these sat on one row.) */
-          .er-cashcount .gap-8 { width: 100% !important; gap: 12px !important; }
-          .er-cashcount .lg\\:flex-row { flex-direction: column !important; }
-          .er-cashcount .lg\\:justify-end { justify-content: flex-start !important; }
-          .er-cc-right { margin-left: auto !important; flex: 0 0 auto !important; }
-          /* Scale the whole report down so it fits on a single page.
-             Do NOT use break-inside:avoid — it forces the cash count onto page 2.
-             A4 portrait is 210mm wide against landscape's 297mm. Scale 0.68
-             (width 147% to recover the lost width) keeps the stacked layout
-             inside one portrait page without shrinking text past legibility. */
-          /* No transform: a scaled box keeps its UNSCALED width in layout, so a
-             147%-wide root overhangs the sheet and everything past the page
-             edge (VAT Code, Receipt Date, Amount, Total, cash count) is clipped
-             off the print. Shrink the type instead and let the layout reflow to
-             the real page width. */
-          .er-print-root { width: 100% !important; max-width: 100% !important; font-size: 8px !important; }
-          .er-print-root .text-sm, .er-print-root .text-xs { font-size: 8px !important; }
+          /* Signatures sit beside the cash count, as a pair on one row. */
+          .er-cashcount .gap-8 { width: 100% !important; gap: 16px !important; }
+          .er-cashcount .lg\\:flex-row { flex-direction: row !important; }
+          .er-cashcount .lg\\:justify-end { justify-content: space-between !important; }
+          .er-cc-right { margin-left: 0 !important; flex: 0 0 auto !important; }
+          /* The dashboard shell wraps <main> in two nested flex containers. A
+             flex item defaults to min-width:auto, so it refuses to shrink below
+             its content's intrinsic width — the wide lines table forced the
+             whole chain past the sheet and everything beyond the page edge was
+             clipped. Unwrap the shell for print and let the page be the only
+             thing that sets the width. */
+          .h-screen, .h-screen > .flex-1 {
+            display: block !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+          }
+          main, .er-print-root {
+            display: block !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            flex: none !important;
+          }
+          /* Shrink the type so the reflowed layout fits the narrower portrait
+             sheet without needing a transform. */
+          .er-print-root { font-size: 9px !important; }
+          .er-print-root .text-sm, .er-print-root .text-xs { font-size: 9px !important; }
+          .er-lines-table { table-layout: auto !important; }
           .er-lines-table th, .er-lines-table td { padding: 2px 4px !important; font-size: 8px !important; }
           .er-print-root, .er-print-root * { break-inside: auto !important; }
           @page { size: A4 portrait; margin: 6mm; }
