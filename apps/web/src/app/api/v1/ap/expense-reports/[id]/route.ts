@@ -12,14 +12,16 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
+  let auth: Awaited<ReturnType<typeof requireAuth>>;
   try {
-    await requireAuth(request);
+    auth = await requireAuth(request);
   } catch (e) {
     return e as Response;
   }
 
   const headers = await query(
     `SELECT er.*, e.full_name AS employee_name, e.employee_no,
+            e.user_id AS employee_user_id,
             au.full_name AS approved_by_name
        FROM employee_expense_reports er
        JOIN employees e ON e.id = er.employee_id
@@ -28,6 +30,14 @@ export async function GET(
     [params.id],
   );
   if (!headers[0]) return err(`Expense report ${params.id} not found`, 404);
+
+  // Scoping the list alone would still leave reports readable by direct URL,
+  // so enforce the same ownership rule here. 404 rather than 403 so the
+  // response does not confirm that someone else's report exists.
+  const owner = (headers[0] as Record<string, unknown>).employee_user_id as string | null;
+  if (!auth.isSuperadmin && owner !== auth.userId) {
+    return err(`Expense report ${params.id} not found`, 404);
+  }
 
   const lines = await query(
     `SELECT erl.*, a.code AS account_code, a.name AS account_name,

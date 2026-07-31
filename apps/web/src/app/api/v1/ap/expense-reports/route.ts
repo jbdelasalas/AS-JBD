@@ -9,8 +9,9 @@ function mapRow(r: Record<string, unknown>) {
 }
 
 export async function GET(request: NextRequest) {
+  let auth: Awaited<ReturnType<typeof requireAuth>>;
   try {
-    await requireAuth(request);
+    auth = await requireAuth(request);
   } catch (e) {
     return e as Response;
   }
@@ -28,6 +29,22 @@ export async function GET(request: NextRequest) {
   const employeeId = searchParams.get('employee_id');
   if (status) { params.push(status); where += ` AND er.status = $${params.length}`; }
   if (employeeId) { params.push(employeeId); where += ` AND er.employee_id = $${params.length}`; }
+
+  // Non-superadmins only ever see their own reports. Resolve the caller's
+  // employee row from the session — never from a query param, which the client
+  // controls and could use to widen the scope. A user with no linked employee
+  // record sees nothing (fail closed) rather than everyone's reports.
+  if (!auth.isSuperadmin) {
+    const [self] = await query<{ id: string }>(
+      `SELECT id FROM employees WHERE user_id = $1 AND company_id = $2 LIMIT 1`,
+      [auth.userId, companyId],
+    );
+    if (!self) {
+      return ok({ data: [], total: 0, page: 1, page_size: limit });
+    }
+    params.push(self.id);
+    where += ` AND er.employee_id = $${params.length}`;
+  }
 
   params.push(limit, offset);
   const rows = await query(
