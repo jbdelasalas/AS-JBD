@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
     return ok({ ...mapRow(fullHeader[0] as Record<string, unknown>), lines: erLines }, 201);
   } catch (e) {
     await client.query('ROLLBACK');
-    throw e;
+    return err(`Save failed: ${(e as Error).message}`, 500);
   } finally {
     client.release();
   }
