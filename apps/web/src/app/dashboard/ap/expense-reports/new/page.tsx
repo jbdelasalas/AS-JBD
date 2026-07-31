@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 interface Employee { id: string; employee_no: string; full_name: string; }
 interface Account  { id: string; code: string; name: string; account_type: string; }
 interface Supplier { id: string; code: string; name: string; tin: string | null; is_vat_registered: boolean; }
-interface TaxCode  { id: string; code: string; name: string; }
+interface TaxCode  { id: string; code: string; name: string; tax_type: string; }
 
 interface Line {
   expense_account_id: string;
@@ -63,7 +63,8 @@ function NewExpenseReportForm() {
       setEmployees(Array.isArray(emps) ? emps.filter(e => (e as unknown as Record<string,unknown>).is_active !== false) : []);
       setAccounts(Array.isArray(accs) ? accs.filter(a => a.account_type === 'EXPENSE') : []);
       setSuppliers(sups?.data ?? []);
-      setTaxCodes(Array.isArray(tcs) ? tcs : []);
+      // Expense lines are purchases → only Input VAT codes apply.
+      setTaxCodes(Array.isArray(tcs) ? tcs.filter(t => t.tax_type === 'vat_input') : []);
     }).catch(() => {});
   }, []);
 
