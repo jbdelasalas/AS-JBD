@@ -163,31 +163,55 @@ export default function ExpenseReportDetailPage() {
           /* Never print interactive controls (action buttons, save, etc.) */
           .er-print-root button { display: none !important; }
           /* Force the wide (lg) layout on paper */
-          .er-print-root .lg\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
           .er-print-root .lg\\:flex-row { flex-direction: row !important; }
           .er-print-root .lg\\:items-start { align-items: flex-start !important; }
           .er-print-root .lg\\:col-span-3 { grid-column: span 3 / span 3 !important; }
           .er-print-root .lg\\:block { display: block !important; }
           .er-print-root .lg\\:w-auto { width: auto !important; }
-          /* Header rows: the label is a fixed w-40 (10rem) with shrink-0, so at
-             print width it eats most of the column and the value box is left
-             too narrow — "ART FRESH CHICKEN CORP." wrapped onto four lines.
-             Shrink the label to what it needs and give the rest to the value.
-             Scoped to the header grid so the cash-count w-40 rule is untouched. */
-          .er-print-root .grid .w-40 {
-            width: auto !important; min-width: 0 !important; max-width: 7em !important;
+          /* Header rows: the label is a fixed w-40 (10rem) with shrink-0. On the
+             narrow portrait sheet that ate most of the cell and pushed the value
+             box into the next column (visible as collisions between columns).
+             A fixed em width can't win here — the longest label ("Period Covered
+             From:") and the shortest ("Date:") differ by ~4x, so any single
+             width either starves the short rows' boxes or truncates the long
+             labels. Instead let each label size to its own text while sharing
+             one track per column, so the value boxes still line up. Six tracks
+             = three label/value pairs across. Scoped to .er-header-grid so the
+             cash-count w-40 rules are untouched. */
+          .er-header-grid {
+            display: grid !important;
+            grid-template-columns:
+              max-content minmax(0, 1fr)
+              max-content minmax(0, 1fr)
+              max-content minmax(0, 1fr) !important;
+            column-gap: 10px !important;
+            row-gap: 4px !important;
+            align-items: center !important;
           }
-          .er-print-root .grid { column-gap: 10px !important; }
-          .er-print-root .grid .flex.items-center > div:last-child {
-            flex: 1 1 auto !important; min-width: 0 !important;
+          /* display:contents dissolves the row wrapper so each label and value
+             becomes a direct grid item of the container. That is what makes the
+             three label tracks SHARED down each column. Giving every row its own
+             grid instead (subgrid spanning 2 tracks) sized each row's label
+             independently, which is why the value boxes started at a different
+             x on each line. */
+          .er-header-grid > div { display: contents !important; }
+          .er-header-grid .w-40 {
+            width: auto !important; min-width: 0 !important; max-width: none !important;
+            flex: none !important;
+            /* Must not wrap: a two-line label ("External ID Code:") pushed its
+               own row's box down and out of line with the rest of the column. */
+            white-space: nowrap !important;
+            align-self: center !important;
+          }
+          .er-header-grid > div > div:last-child {
+            min-width: 0 !important;
             /* Wrap rather than ellipsis — truncating a company name on a
-               financial document loses data. The wider box means most values
-               now fit on one line anyway. */
-            overflow-wrap: normal !important;
+               financial document loses data. */
+            overflow-wrap: anywhere !important;
             word-break: normal !important;
             padding: 1px 4px !important;
+            align-self: center !important;
           }
-          .er-print-root .grid .flex.items-center { gap: 4px !important; }
           /* Expense line table spans the full paper width (column widths are
              assigned further down, under table-layout: fixed). */
           .er-lines-table { width: 100% !important; min-width: 0 !important; }
@@ -313,7 +337,7 @@ export default function ExpenseReportDetailPage() {
         <div className="mb-4 text-center text-base font-semibold text-slate-900 dark:text-slate-100">
           Expense Report
         </div>
-        <div className="grid grid-cols-1 gap-x-8 gap-y-2 lg:grid-cols-3">
+        <div className="er-header-grid grid grid-cols-1 gap-x-8 gap-y-2 lg:grid-cols-3">
           {/* Column 1 */}
           <HeaderRow label="Name:" value={er.employee_name} />
           {/* Column 2 */}
