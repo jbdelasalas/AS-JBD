@@ -101,8 +101,11 @@ const NAV: NavItem[] = [
     flag: 'fuel',
     flagDefault: 'on',
     children: [
-      { href: '/dashboard/fuel/tanks',      label: 'Tanks' },
-      { href: '/dashboard/fuel/deliveries', label: 'Deliveries' },
+      { href: '/dashboard/fuel/tanks',       label: 'Tanks' },
+      { href: '/dashboard/fuel/deliveries',  label: 'Deliveries' },
+      { href: '/dashboard/fuel/po-slips',    label: 'Gas P.O. Slips' },
+      { href: '/dashboard/fuel/vehicles',    label: 'Vehicles' },
+      { href: '/dashboard/fuel/consumption', label: 'Consumption Report' },
     ],
   },
   {

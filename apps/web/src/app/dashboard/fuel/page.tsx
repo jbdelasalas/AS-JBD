@@ -13,6 +13,21 @@ const CARDS = [
     title: 'Deliveries',
     desc: 'Inbound fuel from refinery/supplier. Received litres at 15°C post to inventory.',
   },
+  {
+    href: '/dashboard/fuel/po-slips',
+    title: 'Gas P.O. Slips',
+    desc: 'Employee gas consumption. Issue and print the slip, then capture what the station accomplished.',
+  },
+  {
+    href: '/dashboard/fuel/vehicles',
+    title: 'Vehicles',
+    desc: 'Company units slips are issued against — plate, tank capacity and assigned employee.',
+  },
+  {
+    href: '/dashboard/fuel/consumption',
+    title: 'Consumption Report',
+    desc: 'Fuel spend, litres and km/L per employee or per vehicle.',
+  },
 ];
 
 export default function FuelHomePage() {

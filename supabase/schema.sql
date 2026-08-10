@@ -1873,3 +1873,100 @@ INSERT INTO feature_flags (name, enabled, description) VALUES
   ('restaurant', true, 'Restaurant module nav shortcuts. Turn OFF to hide for non-restaurant deployments.'),
   ('fuel',       true, 'Fuel distribution & retailing — tanks, dip readings, deliveries, pump shifts, reconciliation.')
 ON CONFLICT (name) DO NOTHING;
+
+-- ============================================================================
+-- 024_fuel_po_slips.sql — Employee gas consumption (P.O. Slips)
+-- Paper chit an employee carries to the station: top half issued & approved
+-- in-house, bottom half accomplished by the station at the pump.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS vehicles (
+  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  plate_no        varchar(20) NOT NULL,
+  description     varchar(150),
+  vehicle_type    varchar(30),
+  default_product varchar(20),
+  tank_capacity_l numeric(10, 2),
+  assigned_employee_id uuid REFERENCES employees(id) ON DELETE SET NULL,
+  department_id   uuid REFERENCES departments(id) ON DELETE SET NULL,
+  cost_center_id  uuid REFERENCES cost_centers(id) ON DELETE SET NULL,
+  expense_account_id uuid REFERENCES accounts(id),
+  is_active       boolean NOT NULL DEFAULT true,
+  notes           text,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (company_id, plate_no)
+);
+
+CREATE INDEX IF NOT EXISTS idx_vehicles_company  ON vehicles (company_id);
+CREATE INDEX IF NOT EXISTS idx_vehicles_employee ON vehicles (assigned_employee_id);
+
+CREATE TABLE IF NOT EXISTS fuel_po_slips (
+  id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id        uuid NOT NULL REFERENCES companies(id) ON DELETE RESTRICT,
+  branch_id         uuid REFERENCES branches(id),
+  slip_no           varchar(30) NOT NULL,
+  entity_code       varchar(20) NOT NULL DEFAULT 'ARTFRESH'
+                      CHECK (entity_code IN ('PPC','ARTPRO','ARTFRESH','JHTC')),
+  employee_id       uuid REFERENCES employees(id),
+  issued_to_name    varchar(150) NOT NULL,
+  position_dept     varchar(150),
+  vehicle_id        uuid REFERENCES vehicles(id),
+  plate_no          varchar(20),
+  product           varchar(20) NOT NULL
+                      CHECK (product IN ('diesel','gasoline','premium','kerosene','other')),
+  quantity_litres   numeric(12, 2),
+  issue_date        date NOT NULL DEFAULT CURRENT_DATE,
+  purpose           text,
+  station_name      varchar(150),
+  gas_up_at         timestamptz,
+  odometer_km       numeric(12, 1),
+  actual_litres     numeric(12, 2),
+  official_receipt_no varchar(50),
+  catered_by        varchar(150),
+  amount            numeric(18, 2),
+  unit_price        numeric(18, 4),
+  km_travelled      numeric(12, 1),
+  km_per_litre      numeric(10, 3),
+  status            varchar(20) NOT NULL DEFAULT 'draft'
+                      CHECK (status IN ('draft','issued','redeemed','cancelled')),
+  approved_by       uuid REFERENCES users(id),
+  approved_at       timestamptz,
+  redeemed_by       uuid REFERENCES users(id),
+  redeemed_at       timestamptz,
+  cancelled_by      uuid REFERENCES users(id),
+  cancelled_at      timestamptz,
+  cancel_reason     text,
+  expense_account_id uuid REFERENCES accounts(id),
+  bill_id           uuid REFERENCES bills(id),
+  er_id             uuid REFERENCES employee_expense_reports(id),
+  je_id             uuid REFERENCES journal_entries(id),
+  notes             text,
+  created_by        uuid NOT NULL REFERENCES users(id),
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  updated_at        timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (company_id, slip_no)
+);
+
+CREATE INDEX IF NOT EXISTS idx_fps_company_date ON fuel_po_slips (company_id, issue_date DESC);
+CREATE INDEX IF NOT EXISTS idx_fps_employee     ON fuel_po_slips (employee_id);
+CREATE INDEX IF NOT EXISTS idx_fps_vehicle_odo  ON fuel_po_slips (vehicle_id, odometer_km DESC);
+CREATE INDEX IF NOT EXISTS idx_fps_status       ON fuel_po_slips (status);
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='vehicles_updated') THEN
+    CREATE TRIGGER vehicles_updated BEFORE UPDATE ON vehicles FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='fuel_po_slips_updated') THEN
+    CREATE TRIGGER fuel_po_slips_updated BEFORE UPDATE ON fuel_po_slips FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+  END IF;
+END $$;
+
+INSERT INTO document_series (company_id, doc_type, prefix, start_number, current_number)
+SELECT id, 'fuel_po_slip', 'PO-', 1, 0
+FROM companies
+WHERE NOT EXISTS (
+  SELECT 1 FROM document_series ds
+   WHERE ds.company_id = companies.id AND ds.doc_type = 'fuel_po_slip'
+);
