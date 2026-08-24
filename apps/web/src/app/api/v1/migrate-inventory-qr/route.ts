@@ -127,14 +127,31 @@ const STATEMENTS: [string, string][] = [
        SELECT 1 FROM %SCHEMA%.qr_labels q
         WHERE q.entity_type = 'bin' AND q.entity_id = b.id
      )`],
+  // Derive the code from the box's `id`, NOT its `box_uuid` — `codeFor()` and
+  // every runtime path key on the row id. Deriving from box_uuid here would let
+  // a later "label new boxes" mint a second, different code for the same box.
   ['backfill_box_labels', `
     INSERT INTO %SCHEMA%.qr_labels (company_id, code, entity_type, entity_id)
-    SELECT x.company_id, 'BOX-' || replace(x.box_uuid::text, '-', ''), 'box', x.id
+    SELECT x.company_id, 'BOX-' || replace(x.id::text, '-', ''), 'box', x.id
       FROM %SCHEMA%.dp_storage_boxes x
      WHERE NOT EXISTS (
        SELECT 1 FROM %SCHEMA%.qr_labels q
         WHERE q.entity_type = 'box' AND q.entity_id = x.id
      )`],
+  // Repair labels created by the earlier box_uuid-derived backfill so they
+  // match the runtime contract. Safe to re-run: it only touches rows whose code
+  // doesn't already equal the id-derived form, and no label has been printed
+  // or scanned in production yet.
+  ['repair_box_label_codes', `
+    UPDATE %SCHEMA%.qr_labels q
+       SET code = 'BOX-' || replace(q.entity_id::text, '-', ''),
+           updated_at = now()
+     WHERE q.entity_type = 'box'
+       AND q.code <> 'BOX-' || replace(q.entity_id::text, '-', '')
+       AND NOT EXISTS (
+         SELECT 1 FROM %SCHEMA%.qr_labels d
+          WHERE d.code = 'BOX-' || replace(q.entity_id::text, '-', '')
+       )`],
 ];
 
 export async function POST(request: NextRequest) {
