@@ -26,6 +26,9 @@ Each item has a `tracking_mode`: `none`, `lot`, or `serial`.
 |------|--------------|
 | **Bins** | Define storage locations per warehouse (zone + type: receiving / storage / picking / staging / shipping). |
 | **Bin Stock** | On-hand quantity per item, per bin, per lot. |
+| **Scan & Move** | Move boxes/pallets between bins by scanning QR labels — see [inventory-qr.md](inventory-qr.md). |
+| **QR Labels** | Issue and print bin / pallet / box stickers. |
+| **Pallets** | Group boxes onto a pallet so one scan moves the stack. |
 | **Put-away** | Move received goods into bins (posts to `bin_stock_balances`). |
 | **Pick Lists** | Pick stock from bins to fulfil a sales order. |
 | **Shipments** | Ship picked stock (draws bin stock down). |
@@ -38,6 +41,8 @@ Each item has a `tracking_mode`: `none`, `lot`, or `serial`.
 ```
 Goods receipt → Put-away (into bins) → Bin stock
    → Pick list (from bins, per sales order) → Shipment (out) → Bin stock down
+
+                  ↕ Scan & Move (bin ⇄ bin, any time)
 ```
 
 Lots carry an expiry date, enabling FEFO (first-expiry-first-out) picking.

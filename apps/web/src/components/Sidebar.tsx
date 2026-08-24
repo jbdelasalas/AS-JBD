@@ -89,6 +89,9 @@ const NAV: NavItem[] = [
     children: [
       { href: '/dashboard/wms/bins',         label: 'Bins' },
       { href: '/dashboard/wms/stock-on-hand', label: 'Bin Stock' },
+      { href: '/dashboard/wms/scan',         label: 'Scan & Move' },
+      { href: '/dashboard/wms/labels',       label: 'QR Labels' },
+      { href: '/dashboard/wms/pallets',      label: 'Pallets' },
       { href: '/dashboard/wms/putaways',     label: 'Put-away' },
       { href: '/dashboard/wms/pick-lists',   label: 'Pick Lists' },
       { href: '/dashboard/wms/shipments',    label: 'Shipments' },
@@ -119,6 +122,7 @@ const NAV: NavItem[] = [
       { href: '/dashboard/dressing-plant/production-report', label: 'Production Report' },
       { href: '/dashboard/dressing-plant/marination',   label: 'Marination' },
       { href: '/dashboard/dressing-plant/cold-chain',   label: 'Cold Chain' },
+      { href: '/dashboard/dressing-plant/scan',         label: 'Scan & Move' },
       { href: '/dashboard/dressing-plant/invoices',     label: 'Invoices' },
       { href: '/dashboard/dressing-plant/dispatch',     label: 'Dispatch & Gate' },
       { href: '/dashboard/dressing-plant/maintenance',  label: 'Sanitation & PM' },

@@ -36,6 +36,7 @@ into balanced, idempotent double-entry postings in the shared General Ledger.
 | C+ | **Production Report** | Detailed processed-production log: **Date · Time · Batch Number · Product Code · Head · Weight(kg)**. Date-range filter, totals, CSV export. | No |
 | D | **Marination** | Recipe BOM explosion consumes ingredient inventory. | **Yes** — Dr DP5220 / Cr DP1145 |
 | E | **Cold Chain** | Storage boxes with a barcode UUID (CCPT). Hourly storage clock accrues daily rental. | (accruals; invoice on billing) |
+| E+ | **Scan & Move** | Relocate boxes and pallets between chillers/bins by scanning QR labels. See [inventory-qr.md](inventory-qr.md). | No (moves stock) |
 | F | **Invoices** | Generate the basic-tolling invoice for a batch (idempotent). | **Yes** — Dr DP1130 / Cr DP4100 |
 | G | **Dispatch & Gate** | Bundle boxes into a delivery order, then issue a gate pass. **Release is blocked until the batch's invoices clear and every box scans.** | No |
 | H | **Sanitation & PM** | Machinery runtime, maintenance work orders, and sanitation chemical logs. | **Yes** — Dr DP5230 / Cr DP1140 |
