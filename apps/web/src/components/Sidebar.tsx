@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api, clearAuth } from '@/lib/api';
+import { isLabelOnlyUser, LABELS_HOME } from '@/lib/permissions';
 
 interface NavItem {
   href: string;
@@ -176,8 +177,12 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   // hidden so they never flash, while default-on groups stay visible and only
   // hide once a confirmed `false` arrives.
   const [flagStates, setFlagStates] = useState<Map<string, boolean>>(new Map());
+  // Resolved after mount: `permissions` lives in localStorage, which the server
+  // render cannot see, so reading it during render would mismatch hydration.
+  const [labelOnly, setLabelOnly] = useState(false);
 
   useEffect(() => {
+    setLabelOnly(isLabelOnlyUser());
     const name = localStorage.getItem('company_name');
     if (name) setCompanyName(name);
     const mode = localStorage.getItem('db-mode');
@@ -203,14 +208,18 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       setFlagStates(new Map(pairs.filter((p): p is readonly [string, boolean] => !!p)));
     });
   }, []);
-
-  const navItems = NAV.filter((item) => {
-    if (!item.flag) return true;
-    const state = flagStates.get(item.flag);
-    // Default-on modules show unless a confirmed OFF arrives; default-off (opt-in)
-    // modules show only once a confirmed ON arrives.
-    return item.flagDefault === 'on' ? state !== false : state === true;
-  });
+  // A label-only operator gets a nav with exactly one entry. The nav is not the
+  // security boundary — the API is — but offering an operator doors that will
+  // 403 is just a worse experience.
+  const navItems = labelOnly
+    ? [{ href: LABELS_HOME, label: 'Product Labels' }]
+    : NAV.filter((item) => {
+        if (!item.flag) return true;
+        const state = flagStates.get(item.flag);
+        // Default-on modules show unless a confirmed OFF arrives; default-off (opt-in)
+        // modules show only once a confirmed ON arrives.
+        return item.flagDefault === 'on' ? state !== false : state === true;
+      });
 
   async function confirmSwitch() {
     setShowConfirm(false);
@@ -339,7 +348,9 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               </svg>
             </button>
           </div>
-          {/* Environment toggle */}
+          {/* Environment toggle — a label-only operator has no business
+              swinging the whole app between production and sandbox. */}
+          {!labelOnly && (
           <button
             onClick={() => setShowConfirm(true)}
             disabled={switching}
@@ -354,6 +365,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             {isSandbox ? 'SANDBOX' : 'PRODUCTION'}
             <span className="ml-auto opacity-60">{switching ? '...' : 'switch'}</span>
           </button>
+          )}
         </div>
 
         {/* Nav */}

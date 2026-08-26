@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import type { LoginResponse } from '@perpet/shared';
 import { loadBranding, getBrandingBg } from '@/lib/branding';
+import { isLabelOnlyUser, LABELS_HOME } from '@/lib/permissions';
 
 type Company = { id: string; code: string; name: string };
 
@@ -71,9 +72,16 @@ export default function LoginPage() {
     await routeAfterLogin();
   }
 
-  // Portal customers go straight to /portal; everyone else to the dashboard
-  // (or the requested ?next= target).
+  // Label-only operators go straight to the printer; portal customers to
+  // /portal; everyone else to the dashboard (or the requested ?next= target).
   async function routeAfterLogin() {
+    // Checked before ?next=, because a label operator following a stale deep
+    // link to some other module would only land on a page that 403s.
+    if (isLabelOnlyUser()) {
+      router.replace(LABELS_HOME);
+      return;
+    }
+
     const explicitNext = new URLSearchParams(window.location.search).get('next');
     if (explicitNext) {
       router.replace(safeNext(explicitNext));

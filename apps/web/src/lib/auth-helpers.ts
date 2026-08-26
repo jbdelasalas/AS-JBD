@@ -66,3 +66,35 @@ export async function requireAuth(request: NextRequest): Promise<AuthContext> {
     permissions: payload.permissions ?? [],
   };
 }
+
+/**
+ * The one permission the `label_printer` role holds. Kept here so the API
+ * routes, the sidebar and the login redirect all name the same string.
+ */
+export const LABEL_PRINT_PERMISSION = 'dressing_plant.label.print';
+
+export function hasPermission(auth: AuthContext, permission: string): boolean {
+  return auth.isSuperadmin || auth.permissions.includes(permission);
+}
+
+/**
+ * Like `requireAuth`, but also demands a permission. Throws a 403 `Response`
+ * the route returns as-is, matching the `catch (e) { return e as Response }`
+ * shape the existing routes already use.
+ *
+ * A user holding *any* permission beyond the label one still passes when they
+ * have it; this gates the endpoint, it does not confine the caller.
+ */
+export async function requirePermission(
+  request: NextRequest,
+  permission: string,
+): Promise<AuthContext> {
+  const auth = await requireAuth(request);
+  if (!hasPermission(auth, permission)) {
+    throw new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  return auth;
+}

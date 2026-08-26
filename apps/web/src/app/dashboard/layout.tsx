@@ -1,15 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Sidebar } from '@/components/Sidebar';
 import { TopBar } from '@/components/TopBar';
 import { TableResizer } from '@/components/TableResizer';
 import { SelectEnhancer } from '@/components/SelectEnhancer';
 import { loadBranding } from '@/lib/branding';
+import { isLabelOnlyUser, LABELS_HOME } from '@/lib/permissions';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [ready, setReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -20,12 +22,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!token) {
       const here = window.location.pathname + window.location.search;
       router.replace(`/login?next=${encodeURIComponent(here)}`);
-    } else {
-      // Default hidden — the sidebar only shows when the user opens it.
-      setSidebarOpen(false);
-      setReady(true);
+      return;
     }
-  }, [router]);
+
+    // Keep a label-only operator on the label printer. Their token carries a
+    // single permission, so every other page would fail its data fetch anyway —
+    // this turns a wall of errors into a redirect. The API remains the actual
+    // boundary; clearing this flag in the browser unlocks no data.
+    if (isLabelOnlyUser() && pathname !== LABELS_HOME) {
+      router.replace(LABELS_HOME);
+      return;
+    }
+
+    // Default hidden — the sidebar only shows when the user opens it.
+    setSidebarOpen(false);
+    setReady(true);
+  }, [router, pathname]);
 
   if (!ready) {
     return (

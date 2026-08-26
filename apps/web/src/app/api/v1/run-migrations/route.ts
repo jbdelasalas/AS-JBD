@@ -4147,5 +4147,46 @@ export async function POST(request: NextRequest) {
     results.push(`052 field_requirements FAILED: ${(e as Error).message}`);
   } finally { client052.release(); }
 
+
+  // 028 — `label_printer` role: reaches the product-label printer and nothing
+  // else. Mirrors db/migrations/028_label_printer_role.sql so a deployment that
+  // has no psql access can still establish the role. Idempotent.
+  try {
+    await query(
+      `INSERT INTO permissions (code, module, action, name)
+       VALUES ('dressing_plant.label.print', 'dressing_plant', 'create', 'Print product labels')
+       ON CONFLICT (code) DO NOTHING`,
+    );
+    await query(
+      `INSERT INTO roles (code, name, description)
+       VALUES ('label_printer', 'Label printer',
+               'Print dressed-product traceability labels. No access to any other module.')
+       ON CONFLICT (code) DO NOTHING`,
+    );
+    // Exact, not additive: a re-run after someone hand-grants extras restores
+    // the intended boundary.
+    await query(
+      `DELETE FROM role_permissions rp
+        USING roles r
+        WHERE rp.role_id = r.id
+          AND r.code = 'label_printer'
+          AND rp.permission_id NOT IN (
+                SELECT id FROM permissions WHERE code = 'dressing_plant.label.print'
+              )`,
+    );
+    await query(
+      `INSERT INTO role_permissions (role_id, permission_id)
+       SELECT r.id, p.id FROM roles r, permissions p
+        WHERE r.code = 'label_printer' AND p.code = 'dressing_plant.label.print'
+       ON CONFLICT DO NOTHING`,
+    );
+    await query(
+      `INSERT INTO role_permissions (role_id, permission_id)
+       SELECT r.id, p.id FROM roles r, permissions p
+        WHERE r.code = 'superadmin' AND p.code = 'dressing_plant.label.print'
+       ON CONFLICT DO NOTHING`,
+    );
+    results.push('028 label_printer role: ok');
+  } catch (e) { results.push(`028 label_printer role: ${(e as Error).message}`); }
   return ok({ results });
 }

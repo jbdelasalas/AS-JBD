@@ -247,6 +247,22 @@ this replaces.
   before issuing a pass.
 - Postings run only through `dp_post_journal`, which validates that debits equal
   credits and refuses to post into a **closed fiscal period**.
+- **`label_printer` role — the label station and nothing else** (migration 028).
+  The plant hands the label printer to a packing-line operator, not to an office
+  user, so that account must not reach the ledger, price lists or payroll. The
+  role holds exactly one permission, `dressing_plant.label.print`, enforced in
+  three places:
+  - `POST /dressing-plant/label-lots` rejects a caller without it (403). This is
+    the real boundary — a lot number cannot be drawn without the permission.
+  - The sidebar collapses to the single **Product Labels** entry, and the
+    production/sandbox switch is hidden. Presentation only.
+  - Login sends a label-only account straight to
+    `/dashboard/dressing-plant/labels`, ahead of any `?next=` deep link, and the
+    dashboard layout redirects it back there from any other page.
+
+  "Label-only" means the account holds that permission *and no other*, so a
+  supervisor who also prints labels keeps full navigation. Assign it in
+  Administration → Users → *(user)* → Roles.
 
 ---
 

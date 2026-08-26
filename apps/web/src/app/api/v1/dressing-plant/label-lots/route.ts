@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { type NextRequest } from 'next/server';
 import { query } from '@/lib/db';
-import { requireAuth } from '@/lib/auth-helpers';
+import { requireAuth, requirePermission, LABEL_PRINT_PERMISSION } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
 
 // Batch/lot numbers for traceability labels.
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   let auth;
-  try { auth = await requireAuth(request); } catch (e) { return e as Response; }
+  try { auth = await requirePermission(request, LABEL_PRINT_PERMISSION); } catch (e) { return e as Response; }
 
   let dto: Record<string, unknown>;
   try { dto = await request.json(); } catch { return err('Invalid request body', 400); }
