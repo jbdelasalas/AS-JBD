@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { encodeQr, qrSvg } from '@/lib/qr';
+import { buildLabelPdf } from '@/lib/label-pdf';
 
 // Traceability stickers for dressed-chicken output. The QR carries the facility,
 // classification, lot and pack date as plain readable text, so a generic phone
@@ -407,6 +408,50 @@ export default function DressingPlantLabelsPage() {
     }
   }, [facility, product, lot, packDate, widthMm, heightMm, weightText, headsText]);
 
+  // Safari on iOS ignores `@page { size }` — it lays every page out at the
+  // sheet size chosen in the OS dialog (A4 by default), so the label lands
+  // small in a corner, and it stamps its own URL/date footer that no CSS can
+  // remove. A PDF sized to the stock has neither problem, so on iOS (and
+  // whenever the operator asks for it) we hand over a PDF instead of calling
+  // window.print().
+  const isIOS =
+    typeof navigator !== 'undefined' &&
+    (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      // iPadOS 13+ reports itself as a Mac; the touch points give it away.
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
+  const openPdf = useCallback(
+    async (lotNo: string) => {
+      const bytes = await buildLabelPdf(
+        {
+          facility,
+          product,
+          lot: lotNo,
+          packedText: formatPackDate(packDate),
+          weightKg: weightText,
+          heads: headsText,
+          qrText: qrPayload(facility, product, lotNo, packDate, weightText, headsText),
+        },
+        widthMm,
+        heightMm,
+        count,
+      );
+      // Copy into a fresh ArrayBuffer: the Blob constructor rejects the
+      // SharedArrayBuffer-backed view some bundlers hand back.
+      const blob = new Blob([new Uint8Array(bytes)], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, '_blank');
+      if (!win) {
+        // Popup blocked — fall back to a direct navigation so the operator
+        // still gets the file rather than silently nothing.
+        window.location.href = url;
+      }
+      // Give the viewer time to read the blob before revoking it.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    },
+    [facility, product, packDate, weightText, headsText, widthMm, heightMm, count],
+  );
+
   // Issue a lot and print it. The number comes from the server so it cannot
   // collide with another station's; it is allocated here — at the moment the
   // operator commits — rather than on page load, so browsing does not consume
@@ -455,10 +500,14 @@ export default function DressingPlantLabelsPage() {
         { id: row.lot_no, lot_no: row.lot_no, seq: row.seq, product, facility, copies: count, created_at: new Date().toISOString() },
         ...prev,
       ]);
-      // Let React paint the new lot into the print sheet before the dialog
-      // snapshots the page, or the labels carry the previous number.
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      window.print();
+      if (isIOS) {
+        await openPdf(row.lot_no);
+      } else {
+        // Let React paint the new lot into the print sheet before the dialog
+        // snapshots the page, or the labels carry the previous number.
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        window.print();
+      }
     } catch (e) {
       setFormError(`Could not issue a lot number: ${(e as Error).message}. Nothing was printed.`);
     } finally {
@@ -466,7 +515,7 @@ export default function DressingPlantLabelsPage() {
     }
   }, [
     companyId, product, countValid, count, packDate, sizeId, facility, facilityId,
-    weightValid, headsValid, weightText, headsNum, headsText,
+    weightValid, headsValid, weightText, headsNum, headsText, isIOS, openPdf,
   ]);
 
   // Reprinting an already-issued lot must not draw a new number — the sticker
@@ -474,9 +523,13 @@ export default function DressingPlantLabelsPage() {
   const reprint = useCallback(async () => {
     if (!lot) return;
     setFormError(null);
+    if (isIOS) {
+      await openPdf(lot);
+      return;
+    }
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     window.print();
-  }, [lot]);
+  }, [lot, isIOS, openPdf]);
 
   const sheet = countValid && lot ? Array.from({ length: count }, (_, i) => i) : [];
 
@@ -513,9 +566,15 @@ export default function DressingPlantLabelsPage() {
           #dp-label-sheet .dp-label:last-child { break-after: auto; page-break-after: auto; }
           /* @page cannot read a CSS variable, so the chosen stock is
              interpolated in. margin:0 matters as much as the size — a default
-             margin shrinks the printable area and the driver then scales the
-             label down to fit it. */
+             margin shrinks the printable area, the driver scales the label down
+             to fit, and the reclaimed strip is where browsers draw their
+             URL/date/page headers. Zero margin suppresses those on engines that
+             honour @page (Chrome, Edge, Firefox); Safari on iOS honours neither
+             and needs the PDF path instead. */
           @page { size: ${widthMm}mm ${heightMm}mm; margin: 0; }
+          /* The sheet must not exceed one page box, or a second blank page
+             appears carrying nothing but the browser's own header. */
+          html, body { width: ${widthMm}mm !important; }
         }
       `}</style>
 
@@ -855,6 +914,32 @@ export default function DressingPlantLabelsPage() {
                   Reprint <span className="font-mono">{lot}</span> (no new number)
                 </button>
               )}
+
+              {lot && (
+                <button
+                  onClick={() => openPdf(lot)}
+                  disabled={issuing}
+                  className="mt-2 w-full rounded border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-40 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  Open as PDF ({Math.round(widthMm)}×{Math.round(heightMm)} mm)
+                </button>
+              )}
+
+              <p className="mt-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                {isIOS ? (
+                  <>
+                    On iPhone and iPad the label opens as a PDF already sized to the stock — Safari
+                    cannot print an exact paper size on its own, and adds its own footer. Share →
+                    Print, and set <span className="font-medium">Scale 100%</span>.
+                  </>
+                ) : (
+                  <>
+                    Printing directly uses the size above. If your driver adds a header, footer, or
+                    margin, use <span className="font-medium">Open as PDF</span> instead — the page
+                    box is exactly the label.
+                  </>
+                )}
+              </p>
             </div>
           </div>
         )}
