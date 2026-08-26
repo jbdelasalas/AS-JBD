@@ -204,7 +204,7 @@ function Label({
         >
           {weightKg && <span className="tabular-nums">{weightKg} kg</span>}
           {weightKg && heads && <span> · </span>}
-          {heads && <span className="tabular-nums">{heads} hd</span>}
+          {heads && <span className="tabular-nums">{heads} head</span>}
         </div>
       )}
       <div className="mt-auto shrink-0 leading-snug" style={{ fontSize: `${metaPt}pt` }}>
