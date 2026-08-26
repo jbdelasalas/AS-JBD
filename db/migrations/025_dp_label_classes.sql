@@ -36,6 +36,19 @@ CREATE TABLE IF NOT EXISTS dp_sizes (
 ALTER TABLE dp_sizes ADD COLUMN IF NOT EXISTS class_group varchar(60);
 ALTER TABLE dp_sizes ADD COLUMN IF NOT EXISTS label_name  varchar(150);
 
+-- Widen the pre-existing columns. An installation created before this migration
+-- has code varchar(20) / name varchar(60), which the classification list below
+-- overflows ("SQUABS (0.5 & below)" is 20, "Fresh Chilled Class Assorted" is 28)
+-- — the CREATE TABLE above only governs a fresh install, so existing tables must
+-- be widened explicitly or the seed fails with "value too long".
+-- Widening a varchar is a metadata-only change: no table rewrite, no data loss.
+ALTER TABLE dp_sizes ALTER COLUMN code TYPE varchar(40);
+ALTER TABLE dp_sizes ALTER COLUMN name TYPE varchar(150);
+
+-- The seed's ON CONFLICT ... DO UPDATE fires row triggers, and dp_sizes may
+-- predate the module's updated_at convention.
+ALTER TABLE dp_sizes ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
 COMMENT ON COLUMN dp_sizes.class_group IS
   'Optgroup heading for the label classification dropdown; NULL for plain sizes.';
 COMMENT ON COLUMN dp_sizes.label_name IS
