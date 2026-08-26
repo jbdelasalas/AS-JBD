@@ -36,6 +36,7 @@ into balanced, idempotent double-entry postings in the shared General Ledger.
 | C+ | **Production Report** | Detailed processed-production log: **Date · Time · Batch Number · Product Code · Head · Weight(kg)**. Date-range filter, totals, CSV export. | No |
 | D | **Marination** | Recipe BOM explosion consumes ingredient inventory. | **Yes** — Dr DP5220 / Cr DP1145 |
 | E | **Cold Chain** | Storage boxes with a barcode UUID (CCPT). Hourly storage clock accrues daily rental. | (accruals; invoice on billing) |
+| E+ | **Product Labels** | QR traceability stickers for dressed output on 2×3in thermal stock — facility, classification, lot and pack date. | No |
 | E+ | **Scan & Move** | Relocate boxes and pallets between chillers/bins by scanning QR labels. See [inventory-qr.md](inventory-qr.md). | No (moves stock) |
 | F | **Invoices** | Generate the basic-tolling invoice for a batch (idempotent). | **Yes** — Dr DP1130 / Cr DP4100 |
 | G | **Dispatch & Gate** | Bundle boxes into a delivery order, then issue a gate pass. **Release is blocked until the batch's invoices clear and every box scans.** | No |
@@ -128,6 +129,38 @@ POSTGRES_URL="…:6543/postgres" node db/seeds/dressing_plant_demo.cjs
 1. Go to **Cold Chain**, pick the batch. Enter Product, Net kg, Pallet, Room.
 2. **Store** → a box with a barcode UUID appears (`in_storage`).
 3. **Run storage clock** accrues daily rental for boxes held over 24h.
+
+### Step 4b — Label product (Product Labels)
+1. Go to **Product Labels**. Set the **facility / brand name** once — it is
+   remembered on that device.
+2. Pick the **classification**, then **Suggest** a lot (`YYYYMMDD-NN`) or type
+   your own. Set the pack date and the number of copies.
+3. **Print** emits one 2×3in page per copy. Load the roll and print at 100% —
+   no "fit to page", or the label will not match the stock.
+
+The QR encodes four lines of **plain text** (facility, product, lot, pack date),
+so a generic phone camera resolves it with no app; the same facts print beside
+the code in case the sticker is damaged.
+
+**Classifications** live in `dp_sizes` (migration `025_dp_label_classes.sql`),
+the same managed list Production Detail uses, grouped by `class_group`:
+
+| Group | Entries |
+|-------|---------|
+| Squabs | 1 (0.5 kg & below) |
+| Fresh Chilled Class-A (kg) | 16 — 0.6 … 2.0, plus Oversized |
+| Fresh Chilled Class-A NL (kg) | 9 — 0.7 … 1.4 NL, plus NL Oversized |
+| Other classes | 3 — Assorted, Class-C, Cut Ups |
+| Offal & by-products | 17 — liver, gizzard, feet, heads, intestines, … |
+
+`code` is the short token the operator picks (`0.6`); `label_name` is what
+prints and is encoded (`Fresh Chilled Class-A 0.6 kg`) — a bare `0.6` is not a
+traceable description once the sticker leaves the plant.
+
+> **The lot counter is per device.** It lives in `localStorage` so a station
+> keeps printing through a network drop. Two stations labelling the same day
+> will both suggest `-01`; give them distinct prefixes, or allocate lot numbers
+> upstream on the job order, if that matters for your traceability scheme.
 
 ### Step 5 — Invoice (Invoices)
 1. Go to **Invoices**, pick the batch, **Generate tolling invoice**.

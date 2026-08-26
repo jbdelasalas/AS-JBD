@@ -212,6 +212,20 @@ function buildMatrix(version: number, codewords: Uint8Array, mask: number): Matr
     if (m.modules[idx(m, 8, size - 1 - i)] === -1) { m.modules[idx(m, 8, size - 1 - i)] = 0; reserved.push(idx(m, 8, size - 1 - i)); }
     if (m.modules[idx(m, size - 1 - i, 8)] === -1) { m.modules[idx(m, size - 1 - i, 8)] = 0; reserved.push(idx(m, size - 1 - i, 8)); }
   }
+  // Versions 7+ carry two 6x3 version-information blocks (next to the top-right
+  // and bottom-left finders). Reserve them here; writeVersionBits fills them in
+  // after masking, since they are never masked.
+  if (version >= 7) {
+    for (let a = 0; a < 6; a++) {
+      for (let b = 0; b < 3; b++) {
+        const tr = idx(m, a, size - 11 + b);
+        const bl = idx(m, size - 11 + b, a);
+        m.modules[tr] = 0; reserved.push(tr);
+        m.modules[bl] = 0; reserved.push(bl);
+      }
+    }
+  }
+
   const reservedSet = new Set(reserved);
 
   // Zig-zag data placement, right to left, skipping the vertical timing column.
@@ -236,7 +250,29 @@ function buildMatrix(version: number, codewords: Uint8Array, mask: number): Matr
   }
 
   writeFormatBits(m, mask);
+  writeVersionBits(m, version);
   return m;
+}
+
+/**
+ * Version-information blocks, required from version 7 up: the 6-bit version
+ * with an 18-bit BCH(18,6) code, mirrored beside the top-right and bottom-left
+ * finders. Omitting them makes a v7+ symbol unreadable to conforming scanners.
+ */
+function writeVersionBits(m: Matrix, version: number) {
+  if (version < 7) return;
+  const size = m.size;
+  let rem = version;
+  for (let i = 0; i < 12; i++) rem = ((rem << 1) ^ (((rem >>> 11) & 1) * 0x1f25)) & 0xfff;
+  const bits = (version << 12) | rem;
+
+  for (let i = 0; i < 18; i++) {
+    const bit = (bits >>> i) & 1;
+    const a = Math.floor(i / 3);
+    const b = i % 3;
+    m.modules[idx(m, a, size - 11 + b)] = bit;   // top-right block
+    m.modules[idx(m, size - 11 + b, a)] = bit;   // bottom-left block
+  }
 }
 
 function maskBit(mask: number, r: number, c: number): boolean {
@@ -261,15 +297,20 @@ function writeFormatBits(m: Matrix, mask: number) {
 
   for (let i = 0; i < 15; i++) {
     const bit = (bits >>> i) & 1;
-    // Top-left, split around the timing row/column.
-    if (i < 6)       m.modules[idx(m, 8, i)] = bit;
-    else if (i < 8)  m.modules[idx(m, 8, i + 1)] = bit;
-    else if (i === 8) m.modules[idx(m, 7, 8)] = bit;
-    else             m.modules[idx(m, 14 - i, 8)] = bit;
+    // Copy 1 around the top-left finder: bits 0-5 run down column 8, then the
+    // strip turns the corner at the timing row and bits 9-14 run left along
+    // row 8. (idx() takes (row, col) — the two must not be swapped, or the
+    // whole strip transposes and no scanner can read the symbol.)
+    if (i < 6)        m.modules[idx(m, i, 8)] = bit;
+    else if (i === 6) m.modules[idx(m, 7, 8)] = bit;
+    else if (i === 7) m.modules[idx(m, 8, 8)] = bit;
+    else if (i === 8) m.modules[idx(m, 8, 7)] = bit;
+    else              m.modules[idx(m, 8, 14 - i)] = bit;
 
-    // Mirrored copy along the right and bottom edges.
-    if (i < 8) m.modules[idx(m, size - 1 - i, 8)] = bit;
-    else       m.modules[idx(m, 8, size - 15 + i)] = bit;
+    // Copy 2: bits 0-7 along row 8 from the right edge, bits 8-14 up column 8
+    // from the bottom edge.
+    if (i < 8) m.modules[idx(m, 8, size - 1 - i)] = bit;
+    else       m.modules[idx(m, size - 15 + i, 8)] = bit;
   }
 }
 

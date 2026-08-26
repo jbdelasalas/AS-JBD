@@ -122,6 +122,7 @@ const NAV: NavItem[] = [
       { href: '/dashboard/dressing-plant/production-report', label: 'Production Report' },
       { href: '/dashboard/dressing-plant/marination',   label: 'Marination' },
       { href: '/dashboard/dressing-plant/cold-chain',   label: 'Cold Chain' },
+      { href: '/dashboard/dressing-plant/labels',       label: 'Product Labels' },
       { href: '/dashboard/dressing-plant/scan',         label: 'Scan & Move' },
       { href: '/dashboard/dressing-plant/invoices',     label: 'Invoices' },
       { href: '/dashboard/dressing-plant/dispatch',     label: 'Dispatch & Gate' },
@@ -182,13 +183,17 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     const mode = localStorage.getItem('db-mode');
     setIsSandbox(mode === 'sandbox');
 
-    // Resolve every flag the nav references, in parallel.
+    // Resolve every flag the nav references, in parallel — scoped to the company
+    // the user is signed in to, so a flag rolled out to only some companies
+    // shows its nav group in those companies alone.
+    const companyId = localStorage.getItem('company_id');
+    const scope = companyId ? `&company_id=${encodeURIComponent(companyId)}` : '';
     const flagNames = [...new Set(NAV.map((n) => n.flag).filter((f): f is string => !!f))];
     Promise.all(
       flagNames.map(async (f) => {
         try {
           // /flags returns { name, enabled } at the top level (no `data` wrapper).
-          const res = await api.get<{ name: string; enabled: boolean }>(`/flags?name=${encodeURIComponent(f)}`);
+          const res = await api.get<{ name: string; enabled: boolean }>(`/flags?name=${encodeURIComponent(f)}${scope}`);
           return [f, res.enabled] as const;
         } catch {
           return null;

@@ -9,6 +9,7 @@ const CARDS = [
   { href: '/dashboard/dressing-plant/production-report', title: 'Production Report', desc: 'Detailed production log — Date, Time, Batch, Product code, Head, Weight. Date-range filter + CSV export.' },
   { href: '/dashboard/dressing-plant/marination',  title: 'Marination', desc: 'Recipe BOM explosion consumes ingredient inventory and posts Dr 5220 / Cr 1145.' },
   { href: '/dashboard/dressing-plant/cold-chain',  title: 'Cold Chain', desc: 'Storage boxes with barcode UUIDs. Hourly storage clock accrues daily rental.' },
+  { href: '/dashboard/dressing-plant/labels',      title: 'Product Labels', desc: 'QR traceability stickers for dressed output on 2×3in thermal stock — facility, class, lot and pack date.' },
   { href: '/dashboard/dressing-plant/invoices',    title: 'Invoices', desc: 'Basic-tolling invoicing through the posting engine — idempotent Dr 1130 AR / Cr 4100.' },
   { href: '/dashboard/dressing-plant/dispatch',    title: 'Dispatch & Gate', desc: 'Delivery orders + gate pass. Release is blocked until accounting clears and boxes scan.' },
   { href: '/dashboard/dressing-plant/maintenance', title: 'Sanitation & PM', desc: 'Sanitation chemical consumption, machinery runtime and maintenance work orders.' },

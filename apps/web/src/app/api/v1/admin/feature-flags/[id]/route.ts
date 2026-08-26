@@ -6,6 +6,20 @@ import { ok, err } from '@/lib/api-response';
 
 type Ctx = { params: { id: string } };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// The rollout columns are `uuid[]`; anything that isn't a clean list of uuids
+// would either error deep in the driver or silently store junk, so reject it
+// here with a message the admin UI can show.
+function parseUuidArray(value: unknown, col: string): string[] {
+  if (!Array.isArray(value)) throw new Error(`${col} must be an array of ids`);
+  const ids = value.map((v) => String(v).trim()).filter(Boolean);
+  for (const id of ids) {
+    if (!UUID_RE.test(id)) throw new Error(`${col} contains an invalid id: ${id}`);
+  }
+  return [...new Set(ids)];
+}
+
 export async function PATCH(req: NextRequest, { params }: Ctx) {
   try {
     let auth: Awaited<ReturnType<typeof requireAuth>>;
@@ -19,10 +33,17 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     let idx = 1;
 
     for (const col of allowed) {
-      if (col in body) {
-        fields.push(`${col} = $${idx++}`);
-        values.push(body[col]);
+      if (!(col in body)) continue;
+      let value = body[col];
+      if (col === 'rollout_companies' || col === 'rollout_users') {
+        try {
+          value = parseUuidArray(value, col);
+        } catch (e) {
+          return err((e as Error).message, 400);
+        }
       }
+      fields.push(`${col} = $${idx++}`);
+      values.push(value);
     }
     if (fields.length === 0) return err('No fields to update', 400);
 

@@ -12,8 +12,12 @@ export async function GET(request: NextRequest) {
   const companyId = new URL(request.url).searchParams.get('company_id');
   if (!companyId) return err('company_id is required', 400);
 
+  // label_name is what prints on a traceability sticker; it falls back to name
+  // for plain sizes that predate the label classifications.
   const rows = await query(
-    `SELECT id, code, name, sort_order, is_active
+    `SELECT id, code, name, sort_order, is_active,
+            class_group,
+            COALESCE(label_name, name) AS label_name
        FROM dp_sizes WHERE company_id = $1 AND is_active = true
       ORDER BY sort_order, code`,
     [companyId],

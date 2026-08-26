@@ -1,18 +1,27 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 
 interface FlagRow {
   id: string; name: string; enabled: boolean;
+  rollout_companies: string[];
   description: string | null; updated_at: string;
 }
 
+interface CompanyRow { id: string; code: string; name: string }
+
 export default function FeatureFlagsPage() {
   const [rows, setRows] = useState<FlagRow[]>([]);
+  const [companies, setCompanies] = useState<CompanyRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
+  // Which flag's company-scope panel is open.
+  const [editingScope, setEditingScope] = useState<string | null>(null);
+  // Pending company selection for the open panel, applied on Save.
+  const [draftScope, setDraftScope] = useState<string[]>([]);
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
 
@@ -23,7 +32,12 @@ export default function FeatureFlagsPage() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    api.get<CompanyRow[]>('/admin/companies')
+      .then(setCompanies)
+      .catch(() => { /* scope editing degrades to read-only if this fails */ });
+  }, []);
 
   async function toggle(id: string, current: boolean) {
     setToggling(id);
@@ -35,6 +49,32 @@ export default function FeatureFlagsPage() {
       setError((e as Error).message);
     } finally {
       setToggling(null);
+    }
+  }
+
+  function openScope(r: FlagRow) {
+    if (editingScope === r.id) { setEditingScope(null); return; }
+    setEditingScope(r.id);
+    setDraftScope(r.rollout_companies ?? []);
+  }
+
+  function toggleCompany(companyId: string) {
+    setDraftScope((prev) => prev.includes(companyId)
+      ? prev.filter((c) => c !== companyId)
+      : [...prev, companyId]);
+  }
+
+  async function saveScope(id: string) {
+    setSaving(id);
+    setError(null);
+    try {
+      await api.patch(`/admin/feature-flags/${id}`, { rollout_companies: draftScope });
+      setRows((prev) => prev.map((r) => r.id === id ? { ...r, rollout_companies: draftScope } : r));
+      setEditingScope(null);
+    } catch (e: unknown) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(null);
     }
   }
 
@@ -54,11 +94,23 @@ export default function FeatureFlagsPage() {
     }
   }
 
+  function scopeLabel(r: FlagRow) {
+    const ids = r.rollout_companies ?? [];
+    if (ids.length === 0) return 'All companies';
+    if (ids.length === 1) {
+      const c = companies.find((x) => x.id === ids[0]);
+      return c ? c.name : '1 company';
+    }
+    return `${ids.length} companies`;
+  }
+
   return (
     <div>
       <div className="mb-4">
         <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Feature Flags</h1>
-        <p className="text-sm text-slate-600 dark:text-slate-400">Toggle features on or off system-wide.</p>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          Toggle features on or off. A flag that is on applies to all companies unless you limit it to specific ones.
+        </p>
       </div>
 
       {error && <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
@@ -78,29 +130,91 @@ export default function FeatureFlagsPage() {
             <tr>
               <th className="px-3 py-2 text-left font-medium">Flag name</th>
               <th className="px-3 py-2 text-left font-medium">Description</th>
+              <th className="px-3 py-2 text-left font-medium">Applies to</th>
               <th className="px-3 py-2 text-left font-medium">Status</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={3} className="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">Loading…</td></tr>
+              <tr><td colSpan={4} className="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">Loading…</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={3} className="px-3 py-8 text-center text-xs text-slate-500 dark:text-slate-400">No feature flags.</td></tr>
+              <tr><td colSpan={4} className="px-3 py-8 text-center text-xs text-slate-500 dark:text-slate-400">No feature flags.</td></tr>
             ) : rows.map((r) => (
-              <tr key={r.id} className="border-b border-slate-100 dark:border-slate-700 last:border-0">
-                <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">{r.name}</td>
-                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{r.description ?? '—'}</td>
-                <td className="px-3 py-2">
-                  <button
-                    onClick={() => toggle(r.id, r.enabled)}
-                    disabled={toggling === r.id}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${r.enabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'} disabled:opacity-50`}
-                  >
-                    <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform ${r.enabled ? 'translate-x-4' : 'translate-x-1'}`} />
-                  </button>
-                  <span className="ml-2 text-xs text-slate-600 dark:text-slate-400">{r.enabled ? 'On' : 'Off'}</span>
-                </td>
-              </tr>
+              <Fragment key={r.id}>
+                <tr className="border-b border-slate-100 dark:border-slate-700 last:border-0">
+                  <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">{r.name}</td>
+                  <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{r.description ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs">
+                    <button
+                      onClick={() => openScope(r)}
+                      className="rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      {scopeLabel(r)} <span className="text-slate-400">▾</span>
+                    </button>
+                  </td>
+                  <td className="px-3 py-2">
+                    <button
+                      onClick={() => toggle(r.id, r.enabled)}
+                      disabled={toggling === r.id}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${r.enabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'} disabled:opacity-50`}
+                    >
+                      <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform ${r.enabled ? 'translate-x-4' : 'translate-x-1'}`} />
+                    </button>
+                    <span className="ml-2 text-xs text-slate-600 dark:text-slate-400">{r.enabled ? 'On' : 'Off'}</span>
+                  </td>
+                </tr>
+
+                {editingScope === r.id && (
+                  <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                    <td colSpan={4} className="px-3 py-3">
+                      <p className="mb-2 text-xs text-slate-600 dark:text-slate-400">
+                        Select the companies this flag applies to. Select none to apply it to <strong>all</strong> companies.
+                      </p>
+                      {companies.length === 0 ? (
+                        <p className="text-xs text-slate-500 dark:text-slate-400">No companies available.</p>
+                      ) : (
+                        <div className="mb-3 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+                          {companies.map((c) => (
+                            <label key={c.id} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                              <input
+                                type="checkbox"
+                                checked={draftScope.includes(c.id)}
+                                onChange={() => toggleCompany(c.id)}
+                                className="rounded border-slate-300 dark:border-slate-600"
+                              />
+                              <span className="font-mono text-slate-500 dark:text-slate-400">{c.code}</span>
+                              <span>{c.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => saveScope(r.id)}
+                          disabled={saving === r.id}
+                          className="rounded bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                        >
+                          {saving === r.id ? 'Saving…' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => setEditingScope(null)}
+                          className="rounded border border-slate-300 dark:border-slate-600 px-3 py-1 text-xs text-slate-700 dark:text-slate-300"
+                        >
+                          Cancel
+                        </button>
+                        {draftScope.length > 0 && (
+                          <button
+                            onClick={() => setDraftScope([])}
+                            className="text-xs text-slate-500 dark:text-slate-400 hover:underline"
+                          >
+                            Clear (apply to all)
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </table>

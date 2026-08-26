@@ -69,7 +69,10 @@ export async function POST(
 
     // Inventory check (only for direct SIs not linked to a DR — DR post already decremented stock)
     if (!inv.dr_id) {
-      const allowNegative = await isFeatureEnabled(FLAGS.ALLOW_NEGATIVE_INVENTORY, client);
+      const allowNegative = await isFeatureEnabled(FLAGS.ALLOW_NEGATIVE_INVENTORY, {
+        client,
+        companyId: inv.company_id as string,
+      });
 
       if (!allowNegative) {
         const itemLines = await client.query(
