@@ -131,12 +131,39 @@ POSTGRES_URL="…:6543/postgres" node db/seeds/dressing_plant_demo.cjs
 3. **Run storage clock** accrues daily rental for boxes held over 24h.
 
 ### Step 4b — Label product (Product Labels)
-1. Go to **Product Labels**. Set the **facility / brand name** once — it is
-   remembered on that device.
-2. Pick the **classification**, then **Suggest** a lot (`YYYYMMDD-NN`) or type
-   your own. Set the pack date and the number of copies.
-3. **Print** emits one 2×3in page per copy. Load the roll and print at 100% —
-   no "fit to page", or the label will not match the stock.
+1. Go to **Product Labels**. Pick the **facility** — the list is managed in
+   Administration → Master Data → **Facilities**, and the company default is
+   pre-selected.
+2. Pick the **classification**, then the **pack date**, optionally the **net
+   weight (kg)** and **head count**, and the number of copies. Weight and heads
+   are printed prominently and travel inside the QR; leave them blank for
+   weight-only lines such as offal.
+3. Choose the **label stock** — 2×3in, 4×6in, 100×150mm, 60×40mm, 40×30mm, or
+   Custom (any size from 25 to 305 mm). The preview and the printed page both
+   resize; the choice is remembered on that device.
+4. **Print** emits one page per copy at the chosen size.
+
+**Getting the paper size right.** The page sets `@page { size: … ; margin: 0 }`
+from your choice, but the browser dialog still overrides it, so set there:
+
+| Setting | Value |
+|---------|-------|
+| Destination | your label printer (not the office MFP) |
+| Paper size | the same size you picked on the page |
+| Margins | **None** |
+| Scale | **100%** — never "Fit to page" |
+| Headers and footers | off |
+
+If output is small and centred on a big sheet, the dialog is still on A4. If it
+is slightly short, scale is on "Fit to page". Windows users should also confirm
+the stock size in the driver itself (Printing Preferences → the printer's own
+paper/label settings), because some thermal drivers ignore the browser's size.
+
+> **A QR needs physical room.** The code is sized by the label, and the payload
+> grows with your facility name. On 60×40 mm and smaller the page warns when the
+> code drops below ~3 printer dots per module (203 dpi), and turns red below ~2,
+> where it will not scan. Shorten the facility name or use larger stock. The
+> warning assumes 203 dpi — a 300 dpi printer has roughly 1.5× the margin.
 
 The QR encodes four lines of **plain text** (facility, product, lot, pack date),
 so a generic phone camera resolves it with no app; the same facts print beside
@@ -157,10 +184,28 @@ the same managed list Production Detail uses, grouped by `class_group`:
 prints and is encoded (`Fresh Chilled Class-A 0.6 kg`) — a bare `0.6` is not a
 traceable description once the sticker leaves the plant.
 
-> **The lot counter is per device.** It lives in `localStorage` so a station
-> keeps printing through a network drop. Two stations labelling the same day
-> will both suggest `-01`; give them distinct prefixes, or allocate lot numbers
-> upstream on the job order, if that matters for your traceability scheme.
+Migration `027` also creates the same 46 classifications as **sellable inventory
+items** (`FC-A-060`, `OFF-GIZZARD`, …) under the *Dressed & Processed* and
+*By-Products* categories, and links each `dp_sizes` row to its item via
+`dp_sizes.item_id`. That is what makes a classification usable in Sales,
+Production Detail and stock-on-hand — `dp_sizes` alone is only a vocabulary.
+Costs and selling prices are seeded at **0** for the company to set in
+Administration → Master Data → **Items**; re-running the migration never
+overwrites pricing you have entered.
+
+**Lot numbers are allocated by the server** (`dp_label_lots`, migration `026`)
+and cannot be typed or guessed. Pressing **Issue lot & print** draws the next
+number for that pack date, records it, and then prints; **Reprint** re-runs the
+same sticker without drawing a new number.
+
+Uniqueness is enforced by two `UNIQUE` constraints — `(company, pack_date, seq)`
+and `(company, lot_no)` — not by application logic. Concurrent stations race on
+the insert, the loser retries against the new maximum, and the database refuses
+a duplicate outright. Gaps are normal: an issued lot that was never printed
+still consumes its number, which is the correct trade against reuse.
+
+If issuing fails, **nothing prints** — an unnumbered sticker is exactly the hole
+this replaces.
 
 ### Step 5 — Invoice (Invoices)
 1. Go to **Invoices**, pick the batch, **Generate tolling invoice**.
