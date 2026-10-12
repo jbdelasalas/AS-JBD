@@ -28,6 +28,30 @@ ALTER TABLE warehouses
   ADD COLUMN IF NOT EXISTS longitude numeric(9, 6);
 
 -- ── What a truck can carry ──────────────────────────────────────────────────
+-- vehicles is defined by 024 (fuel P.O. slips), which not every database has
+-- run. Same definition, so whichever of the two runs first creates it and the
+-- other skips it.
+CREATE TABLE IF NOT EXISTS vehicles (
+  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  plate_no        varchar(20) NOT NULL,
+  description     varchar(150),
+  vehicle_type    varchar(30),
+  default_product varchar(20),
+  tank_capacity_l numeric(10, 2),
+  assigned_employee_id uuid REFERENCES employees(id) ON DELETE SET NULL,
+  department_id   uuid REFERENCES departments(id) ON DELETE SET NULL,
+  cost_center_id  uuid REFERENCES cost_centers(id) ON DELETE SET NULL,
+  expense_account_id uuid REFERENCES accounts(id),
+  is_active       boolean NOT NULL DEFAULT true,
+  notes           text,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (company_id, plate_no)
+);
+CREATE INDEX IF NOT EXISTS idx_vehicles_company  ON vehicles (company_id);
+CREATE INDEX IF NOT EXISTS idx_vehicles_employee ON vehicles (assigned_employee_id);
+
 ALTER TABLE vehicles
   ADD COLUMN IF NOT EXISTS capacity_kg        numeric(10, 2),
   ADD COLUMN IF NOT EXISTS is_refrigerated    boolean NOT NULL DEFAULT false,
