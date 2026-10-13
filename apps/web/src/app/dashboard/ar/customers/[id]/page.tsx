@@ -7,11 +7,20 @@ import { api } from '@/lib/api';
 import { formatPHP, formatDate } from '@/lib/format';
 import type { Customer } from '@perpet/shared';
 
-interface CustomerWithAR extends Customer {
+// Delivery fields (migration 029) — not on the shared Customer type yet.
+interface DeliveryFields {
+  receiving_from?: string | null;   // "HH:MM:SS" from the DB
+  receiving_to?: string | null;
+  delivery_notes?: string | null;
+}
+
+interface CustomerWithAR extends Customer, DeliveryFields {
   open_ar_balance: number;
   ar_account_code: string | null;
   ar_account_name: string | null;
 }
+
+const hhmm = (t?: string | null) => (t ? t.slice(0, 5) : '');
 
 interface InvoiceRow {
   id: string;
@@ -51,7 +60,7 @@ export default function CustomerDetailPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState<Partial<Customer>>({});
+  const [form, setForm] = useState<Partial<Customer> & DeliveryFields>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +104,9 @@ export default function CustomerDetailPage() {
         credit_limit: Number(form.credit_limit),
         is_vat_exempt: form.is_vat_exempt,
         is_active: form.is_active,
+        receiving_from: hhmm(form.receiving_from) || null,
+        receiving_to: hhmm(form.receiving_to) || null,
+        delivery_notes: form.delivery_notes || null,
       });
       setSaved(true);
       setEditing(false);
@@ -185,6 +197,19 @@ export default function CustomerDetailPage() {
               <label className={lbl}>Address</label>
               <input value={form.address ?? ''} onChange={(e) => set('address', e.target.value)} className={inp} />
             </div>
+            <div>
+              <label className={lbl} title="The trip planner only schedules a delivery inside these hours">Receives deliveries from</label>
+              <input type="time" value={hhmm(form.receiving_from)} onChange={(e) => set('receiving_from', e.target.value)} className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Receives deliveries until</label>
+              <input type="time" value={hhmm(form.receiving_to)} onChange={(e) => set('receiving_to', e.target.value)} className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Delivery notes</label>
+              <input value={form.delivery_notes ?? ''} placeholder="e.g. back gate, call before arriving"
+                onChange={(e) => set('delivery_notes', e.target.value)} className={inp} />
+            </div>
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                 <input type="checkbox" checked={form.is_vat_exempt ?? false} onChange={(e) => set('is_vat_exempt', e.target.checked)} />
@@ -218,6 +243,10 @@ export default function CustomerDetailPage() {
                 ['Phone', customer.phone ?? '—'],
                 ['Email', customer.email ?? '—'],
                 ['Address', customer.address ?? '—'],
+                ['Receiving hours', customer.receiving_from || customer.receiving_to
+                  ? `${hhmm(customer.receiving_from) || 'any time'} – ${hhmm(customer.receiving_to) || 'any time'}`
+                  : 'Any time'],
+                ...(customer.delivery_notes ? [['Delivery notes', customer.delivery_notes]] : []),
                 ['VAT Exempt', customer.is_vat_exempt ? 'Yes' : 'No'],
                 ['AR Account', customer.ar_account_code && customer.ar_account_name ? `${customer.ar_account_code} – ${customer.ar_account_name}` : '—'],
               ].map(([k, v]) => (

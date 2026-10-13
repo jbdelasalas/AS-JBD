@@ -50,6 +50,7 @@ export interface SolveOptions {
   returnToDepot: boolean;
   truckFixedCost: number;       // minutes-equivalent for using one more truck
   latePenaltyPerMin: number;
+  strictWindows: boolean;       // never arrive after a client stops receiving
   timeLimitMs: number;
 }
 
@@ -60,6 +61,7 @@ export const DEFAULT_OPTIONS: SolveOptions = {
   returnToDepot: true,
   truckFixedCost: 60,
   latePenaltyPerMin: 10,
+  strictWindows: true,
   timeLimitMs: 2500,
 };
 
@@ -132,9 +134,10 @@ export function straightLineMatrix(depot: Depot, stops: Stop[], opt: SolveOption
 // ── Route evaluation ────────────────────────────────────────────────────────
 
 /**
- * Simulates one truck driving `order` (indexes into `stops`). Lateness against a
- * receiving window is a cost, not a violation — a late delivery is still a
- * delivery and the dispatcher should see it rather than lose the order.
+ * Simulates one truck driving `order` (indexes into `stops`). Arriving before a
+ * client opens means waiting at the gate. Arriving after they stop receiving
+ * breaks a hard rule when `strictWindows` is on (the default — a closed wet
+ * market is a failed delivery); with it off, lateness is only a cost.
  */
 export function simulate(
   truck: Truck, order: number[], stops: Stop[], m: Matrix, opt: SolveOptions,
@@ -164,7 +167,10 @@ export function simulate(
     let wait = 0;
     if (s.windowFrom != null && t < s.windowFrom) { wait = s.windowFrom - t; t = s.windowFrom; }
     const lateMin = s.windowTo != null && t > s.windowTo ? t - s.windowTo : 0;
-    if (lateMin > 0) { late += lateMin; lateStops++; }
+    if (lateMin > 0) {
+      late += lateMin; lateStops++;
+      if (opt.strictWindows) violations.push(`${s.id}: arrives ${minToHhmm(t)}, client receives until ${minToHhmm(s.windowTo!)}`);
+    }
     visits.push({ stopId: s.id, arriveMin: arrive, startMin: t, departMin: t + s.serviceMin, waitMin: wait, lateMin, legKm });
     lastDrop = t;
     t += s.serviceMin;
@@ -228,7 +234,10 @@ export function routeCost(
     const leg = m.min(prev, i + 1);
     drive += leg; t += leg;
     if (s.windowFrom != null && t < s.windowFrom) { wait += s.windowFrom - t; t = s.windowFrom; }
-    if (s.windowTo != null && t > s.windowTo) late += t - s.windowTo;
+    if (s.windowTo != null && t > s.windowTo) {
+      if (opt.strictWindows) return Infinity;
+      late += t - s.windowTo;
+    }
     lastDrop = t;
     t += s.serviceMin;
     prev = i + 1;
@@ -258,10 +267,16 @@ function rejectReason(
   }
   const alone = fit.map((r) => simulate(trucks[r], [si], stops, m, opt));
   if (alone.every((r) => r.violations.length > 0)) {
-    return alone[0].violations.find((v) => /shift|cold-chain/.test(v)) ?? 'too far for any truck shift';
+    const why = alone[0].violations;
+    if (why.some((v) => /receives until/.test(v))) {
+      return `cannot reach it within receiving hours (${s.windowFrom != null ? minToHhmm(s.windowFrom) : '…'}–${minToHhmm(s.windowTo!)}) from the depot`;
+    }
+    return why.find((v) => /shift|cold-chain/.test(v)) ?? 'too far for any truck shift';
   }
   if (!fit.some((r) => trucks[r].capacityKg - loads[r] >= s.kg)) return 'all suitable trucks are full';
-  return 'no truck with room can fit it within its shift / cold-chain time';
+  return s.windowTo != null
+    ? `no truck with room can reach it within receiving hours (${s.windowFrom != null ? minToHhmm(s.windowFrom) : '…'}–${minToHhmm(s.windowTo)})`
+    : 'no truck with room can fit it within its shift / cold-chain time';
 }
 
 /** Small seeded PRNG so the same input always produces the same plan. */

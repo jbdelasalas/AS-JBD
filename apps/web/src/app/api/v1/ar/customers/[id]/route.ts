@@ -63,7 +63,17 @@ export async function PATCH(
     'name', 'customer_type', 'tin', 'address', 'contact_person',
     'email', 'phone', 'payment_terms_days', 'credit_limit',
     'is_vat_exempt', 'ar_account_id', 'is_active',
+    // Delivery: when the client accepts deliveries; the trip planner routes around it.
+    'receiving_from', 'receiving_to', 'delivery_notes',
   ];
+
+  for (const key of ['receiving_from', 'receiving_to'] as const) {
+    if (dto[key] === '') dto[key] = null;
+    if (dto[key] != null && !/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(String(dto[key]))) {
+      return err(`${key} must be a time like 06:30`, 400);
+    }
+  }
+  if (dto.delivery_notes === '') dto.delivery_notes = null;
 
   const sets: string[] = [];
   const queryParams: unknown[] = [];

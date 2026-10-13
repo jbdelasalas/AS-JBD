@@ -38,6 +38,7 @@ export interface PlanOptions {
   speed_kmh: number;
   service_min: number;
   max_on_road_min: number | null;
+  strict_windows: boolean;       // never plan an arrival after a client stops receiving
   small_truck_max_kg: number;
   return_to_depot: boolean;
   use_ai: boolean;
@@ -57,6 +58,7 @@ export const DEFAULT_PLAN_OPTIONS: PlanOptions = {
   speed_kmh: 25,
   service_min: 15,
   max_on_road_min: 360,
+  strict_windows: true,
   small_truck_max_kg: 2000,
   return_to_depot: true,
   use_ai: true,

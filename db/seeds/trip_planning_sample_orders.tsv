@@ -1,94 +1,94 @@
-SO No	Customer	Address	Product	Qty	UOM	Remarks
-SO-DEMO-1001	Tita Baby Carinderia Lipa	335 Burgos St., Lipa City, Batangas	Liver & Gizzard	56	kg	
-SO-DEMO-1002	Masagana Store Tanauan	232 National Hwy, Tanauan City, Batangas	Liver & Gizzard	54	kg	after 10am, closed early morning
-SO-DEMO-1002	Masagana Store Tanauan	232 National Hwy, Tanauan City, Batangas	Chicken Wings	87	kg	
-SO-DEMO-1002	Masagana Store Tanauan	232 National Hwy, Tanauan City, Batangas	Whole Dressed Chicken	368	kg	
-SO-DEMO-1003	JM Grocery Sto. Tomas	367 Burgos St., Sto. Tomas, Batangas	Liver & Gizzard	40	kg	small truck lang, makitid ang daan
-SO-DEMO-1003	JM Grocery Sto. Tomas	367 Burgos St., Sto. Tomas, Batangas	Breast Fillet	177	kg	
-SO-DEMO-1003	JM Grocery Sto. Tomas	367 Burgos St., Sto. Tomas, Batangas	Whole Dressed Chicken	326	kg	
-SO-DEMO-1004	Masagana Store Batangas	100 Bonifacio St., Batangas City, Batangas	Chicken Wings	49	kg	small truck lang, makitid ang daan
-SO-DEMO-1004	Masagana Store Batangas	100 Bonifacio St., Batangas City, Batangas	Whole Dressed Chicken	499	kg	
-SO-DEMO-1005	Palengke Stall San Jose	254 Mabini St., San Jose, Batangas	Leg Quarters	155	kg	before 8am lang
-SO-DEMO-1006	Tita Baby Carinderia Malvar	9 Bonifacio St., Malvar, Batangas	Leg Quarters	64	kg	small truck lang, makitid ang daan
-SO-DEMO-1007	Fresh Mart Rosario	15 Burgos St., Rosario, Batangas	Leg Quarters	254	kg	after 10am, closed early morning
-SO-DEMO-1007	Fresh Mart Rosario	15 Burgos St., Rosario, Batangas	Liver & Gizzard	13	kg	
-SO-DEMO-1008	Masagana Store Ibaan	31 Mabini St., Ibaan, Batangas	Breast Fillet	64	kg	before 8am lang
-SO-DEMO-1008	Masagana Store Ibaan	31 Mabini St., Ibaan, Batangas	Chicken Wings	124	kg	
-SO-DEMO-1009	JM Grocery Lemery	373 Rizal St., Lemery, Batangas	Chicken Wings	112	kg	rush — before 7:30am
-SO-DEMO-1010	Lutong Bahay Eatery Bauan	340 Rizal St., Bauan, Batangas	Leg Quarters	225	kg	
-SO-DEMO-1010	Lutong Bahay Eatery Bauan	340 Rizal St., Bauan, Batangas	Liver & Gizzard	40	kg	
-SO-DEMO-1010	Lutong Bahay Eatery Bauan	340 Rizal St., Bauan, Batangas	Chicken Wings	106	kg	
-SO-DEMO-1011	Mang Tonyo Lechon Manok Padre Garcia	311 Mabini St., Padre Garcia, Batangas	Leg Quarters	179	kg	before 8am lang
-SO-DEMO-1011	Mang Tonyo Lechon Manok Padre Garcia	311 Mabini St., Padre Garcia, Batangas	Chicken Wings	142	kg	
-SO-DEMO-1012	Lutong Bahay Eatery Calamba	13 Brgy. Poblacion, Calamba City, Laguna	Liver & Gizzard	60	kg	
-SO-DEMO-1013	Sunrise Restaurant Los Baños	135 Luna St., Los Baños, Laguna	Chicken Wings	127	kg	before 8am lang
-SO-DEMO-1013	Sunrise Restaurant Los Baños	135 Luna St., Los Baños, Laguna	Whole Dressed Chicken	400	kg	
-SO-DEMO-1014	Palengke Stall San Pablo	262 Mabini St., San Pablo City, Laguna	Breast Fillet	100	kg	
-SO-DEMO-1014	Palengke Stall San Pablo	262 Mabini St., San Pablo City, Laguna	Chicken Wings	88	kg	
-SO-DEMO-1014	Palengke Stall San Pablo	262 Mabini St., San Pablo City, Laguna	Leg Quarters	170	kg	
-SO-DEMO-1015	Inasal Corner Cabuyao	224 Bonifacio St., Cabuyao City, Laguna	Whole Dressed Chicken	334	kg	hapon na i-deliver, sarado umaga
-SO-DEMO-1015	Inasal Corner Cabuyao	224 Bonifacio St., Cabuyao City, Laguna	Liver & Gizzard	33	kg	
-SO-DEMO-1016	Fresh Mart Tiaong	392 Brgy. Poblacion, Tiaong, Quezon	Chicken Wings	59	kg	hapon na i-deliver, sarado umaga
-SO-DEMO-1016	Fresh Mart Tiaong	392 Brgy. Poblacion, Tiaong, Quezon	Whole Dressed Chicken	587	kg	
-SO-DEMO-1016	Fresh Mart Tiaong	392 Brgy. Poblacion, Tiaong, Quezon	Liver & Gizzard	51	kg	
-SO-DEMO-1017	Bente Uno Mart Candelaria	96 Luna St., Candelaria, Quezon	Whole Dressed Chicken	237	kg	
-SO-DEMO-1017	Bente Uno Mart Candelaria	96 Luna St., Candelaria, Quezon	Breast Fillet	185	kg	
-SO-DEMO-1017	Bente Uno Mart Candelaria	96 Luna St., Candelaria, Quezon	Liver & Gizzard	26	kg	
-SO-DEMO-1018	Bente Uno Mart Lipa #2	253 Luna St., Lipa City, Batangas	Whole Dressed Chicken	301	kg	
-SO-DEMO-1019	Bente Uno Mart Tanauan #2	301 National Hwy, Tanauan City, Batangas	Liver & Gizzard	33	kg	rush — before 7:30am
-SO-DEMO-1019	Bente Uno Mart Tanauan #2	301 National Hwy, Tanauan City, Batangas	Whole Dressed Chicken	366	kg	
-SO-DEMO-1020	Palengke Stall Sto. Tomas #2	358 Bonifacio St., Sto. Tomas, Batangas	Chicken Wings	93	kg	
-SO-DEMO-1020	Palengke Stall Sto. Tomas #2	358 Bonifacio St., Sto. Tomas, Batangas	Liver & Gizzard	42	kg	
-SO-DEMO-1020	Palengke Stall Sto. Tomas #2	358 Bonifacio St., Sto. Tomas, Batangas	Leg Quarters	96	kg	
-SO-DEMO-1021	Aling Nena Store Batangas #2	16 Bonifacio St., Batangas City, Batangas	Breast Fillet	129	kg	hapon na i-deliver, sarado umaga
-SO-DEMO-1021	Aling Nena Store Batangas #2	16 Bonifacio St., Batangas City, Batangas	Chicken Wings	102	kg	
-SO-DEMO-1021	Aling Nena Store Batangas #2	16 Bonifacio St., Batangas City, Batangas	Liver & Gizzard	31	kg	
-SO-DEMO-1022	Palengke Stall San Jose #2	139 Luna St., San Jose, Batangas	Whole Dressed Chicken	497	kg	receive 6-9am only
-SO-DEMO-1022	Palengke Stall San Jose #2	139 Luna St., San Jose, Batangas	Chicken Wings	70	kg	
-SO-DEMO-1023	Golden Grill Malvar #2	81 Luna St., Malvar, Batangas	Leg Quarters	174	kg	
-SO-DEMO-1024	Mang Tonyo Lechon Manok Rosario #2	300 P. Torres St., Rosario, Batangas	Leg Quarters	138	kg	
-SO-DEMO-1024	Mang Tonyo Lechon Manok Rosario #2	300 P. Torres St., Rosario, Batangas	Liver & Gizzard	38	kg	
-SO-DEMO-1024	Mang Tonyo Lechon Manok Rosario #2	300 P. Torres St., Rosario, Batangas	Breast Fillet	167	kg	
-SO-DEMO-1025	Bente Uno Mart Ibaan #2	26 P. Torres St., Ibaan, Batangas	Breast Fillet	98	kg	
-SO-DEMO-1026	Golden Grill Lemery #2	243 P. Torres St., Lemery, Batangas	Chicken Wings	89	kg	receive 6-9am only
-SO-DEMO-1026	Golden Grill Lemery #2	243 P. Torres St., Lemery, Batangas	Breast Fillet	90	kg	
-SO-DEMO-1026	Golden Grill Lemery #2	243 P. Torres St., Lemery, Batangas	Liver & Gizzard	25	kg	
-SO-DEMO-1027	Golden Grill Bauan #2	173 Luna St., Bauan, Batangas	Whole Dressed Chicken	330	kg	
-SO-DEMO-1027	Golden Grill Bauan #2	173 Luna St., Bauan, Batangas	Leg Quarters	195	kg	
-SO-DEMO-1027	Golden Grill Bauan #2	173 Luna St., Bauan, Batangas	Breast Fillet	103	kg	
-SO-DEMO-1028	Kainan sa Kanto Padre Garcia #2	246 Brgy. Poblacion, Padre Garcia, Batangas	Leg Quarters	50	kg	
-SO-DEMO-1028	Kainan sa Kanto Padre Garcia #2	246 Brgy. Poblacion, Padre Garcia, Batangas	Whole Dressed Chicken	163	kg	
-SO-DEMO-1028	Kainan sa Kanto Padre Garcia #2	246 Brgy. Poblacion, Padre Garcia, Batangas	Liver & Gizzard	49	kg	
-SO-DEMO-1029	Mang Tonyo Lechon Manok Calamba #2	118 Bonifacio St., Calamba City, Laguna	Breast Fillet	182	kg	after 10am, closed early morning
-SO-DEMO-1029	Mang Tonyo Lechon Manok Calamba #2	118 Bonifacio St., Calamba City, Laguna	Leg Quarters	171	kg	
-SO-DEMO-1030	Fresh Mart Los Baños #2	259 P. Torres St., Los Baños, Laguna	Chicken Wings	103	kg	back gate, call Ate Weng pagdating
-SO-DEMO-1031	Mang Tonyo Lechon Manok San Pablo #2	67 National Hwy, San Pablo City, Laguna	Breast Fillet	172	kg	small truck lang, makitid ang daan
-SO-DEMO-1032	JM Grocery Cabuyao #2	12 National Hwy, Cabuyao City, Laguna	Breast Fillet	164	kg	hapon na i-deliver, sarado umaga
-SO-DEMO-1032	JM Grocery Cabuyao #2	12 National Hwy, Cabuyao City, Laguna	Liver & Gizzard	38	kg	
-SO-DEMO-1032	JM Grocery Cabuyao #2	12 National Hwy, Cabuyao City, Laguna	Leg Quarters	169	kg	
-SO-DEMO-1033	Masagana Store Tiaong #2	207 Rizal St., Tiaong, Quezon	Whole Dressed Chicken	500	kg	hapon na i-deliver, sarado umaga
-SO-DEMO-1033	Masagana Store Tiaong #2	207 Rizal St., Tiaong, Quezon	Liver & Gizzard	25	kg	
-SO-DEMO-1033	Masagana Store Tiaong #2	207 Rizal St., Tiaong, Quezon	Leg Quarters	123	kg	
-SO-DEMO-1034	Inasal Corner Candelaria #2	136 Rizal St., Candelaria, Quezon	Whole Dressed Chicken	264	kg	
-SO-DEMO-1034	Inasal Corner Candelaria #2	136 Rizal St., Candelaria, Quezon	Liver & Gizzard	25	kg	
-SO-DEMO-1035	Kainan sa Kanto Lipa #3	102 Mabini St., Lipa City, Batangas	Chicken Wings	85	kg	before 8am lang
-SO-DEMO-1036	Golden Grill Tanauan #3	87 Brgy. Poblacion, Tanauan City, Batangas	Liver & Gizzard	23	kg	before 8am lang
-SO-DEMO-1037	Fresh Mart Sto. Tomas #3	119 Rizal St., Sto. Tomas, Batangas	Breast Fillet	191	kg	before 8am lang
-SO-DEMO-1037	Fresh Mart Sto. Tomas #3	119 Rizal St., Sto. Tomas, Batangas	Liver & Gizzard	34	kg	
-SO-DEMO-1037	Fresh Mart Sto. Tomas #3	119 Rizal St., Sto. Tomas, Batangas	Whole Dressed Chicken	367	kg	
-SO-DEMO-1038	Tita Baby Carinderia Batangas #3	160 Brgy. Poblacion, Batangas City, Batangas	Whole Dressed Chicken	248	kg	rush — before 7:30am
-SO-DEMO-1039	Inasal Corner San Jose #3	304 Bonifacio St., San Jose, Batangas	Liver & Gizzard	29	kg	
-SO-DEMO-1039	Inasal Corner San Jose #3	304 Bonifacio St., San Jose, Batangas	Chicken Wings	158	kg	
-SO-DEMO-1040	Lutong Bahay Eatery Malvar #3	254 Mabini St., Malvar, Batangas	Chicken Wings	47	kg	receive 6-9am only
-SO-DEMO-1040	Lutong Bahay Eatery Malvar #3	254 Mabini St., Malvar, Batangas	Leg Quarters	179	kg	
-SO-DEMO-1040	Lutong Bahay Eatery Malvar #3	254 Mabini St., Malvar, Batangas	Breast Fillet	92	kg	
-SO-DEMO-1041	Chicken Haus Rosario #3	14 Luna St., Rosario, Batangas	Liver & Gizzard	42	kg	
-SO-DEMO-1041	Chicken Haus Rosario #3	14 Luna St., Rosario, Batangas	Breast Fillet	77	kg	
-SO-DEMO-1041	Chicken Haus Rosario #3	14 Luna St., Rosario, Batangas	Chicken Wings	113	kg	
-SO-DEMO-1042	Inasal Corner Ibaan #3	302 Burgos St., Ibaan, Batangas	Liver & Gizzard	12	kg	
-SO-DEMO-1043	Aling Nena Store Lemery #3	334 National Hwy, Lemery, Batangas	Chicken Wings	66	kg	back gate, call Ate Weng pagdating
-SO-DEMO-1043	Aling Nena Store Lemery #3	334 National Hwy, Lemery, Batangas	Liver & Gizzard	55	kg	
-SO-DEMO-1043	Aling Nena Store Lemery #3	334 National Hwy, Lemery, Batangas	Leg Quarters	259	kg	
-SO-DEMO-1044	Kainan sa Kanto Bauan #3	160 P. Torres St., Bauan, Batangas	Liver & Gizzard	26	kg	hapon na i-deliver, sarado umaga
-SO-DEMO-1045	Kainan sa Kanto Padre Garcia #3	174 National Hwy, Padre Garcia, Batangas	Whole Dressed Chicken	380	kg	
-SO-DEMO-1045	Kainan sa Kanto Padre Garcia #3	174 National Hwy, Padre Garcia, Batangas	Breast Fillet	162	kg	
+SO No	Customer	Address	Product	Qty	UOM	Remarks	From	To
+SO-DEMO-1001	Tita Baby Carinderia Lipa	335 Burgos St., Lipa City, Batangas	Liver & Gizzard	56	kg		07:00	10:30
+SO-DEMO-1002	Masagana Store Tanauan	232 National Hwy, Tanauan City, Batangas	Liver & Gizzard	54	kg	after 10am, closed early morning	07:00	17:00
+SO-DEMO-1002	Masagana Store Tanauan	232 National Hwy, Tanauan City, Batangas	Chicken Wings	87	kg		07:00	17:00
+SO-DEMO-1002	Masagana Store Tanauan	232 National Hwy, Tanauan City, Batangas	Whole Dressed Chicken	368	kg		07:00	17:00
+SO-DEMO-1003	JM Grocery Sto. Tomas	367 Burgos St., Sto. Tomas, Batangas	Liver & Gizzard	40	kg	small truck lang, makitid ang daan	07:00	17:00
+SO-DEMO-1003	JM Grocery Sto. Tomas	367 Burgos St., Sto. Tomas, Batangas	Breast Fillet	177	kg		07:00	17:00
+SO-DEMO-1003	JM Grocery Sto. Tomas	367 Burgos St., Sto. Tomas, Batangas	Whole Dressed Chicken	326	kg		07:00	17:00
+SO-DEMO-1004	Masagana Store Batangas	100 Bonifacio St., Batangas City, Batangas	Chicken Wings	49	kg	small truck lang, makitid ang daan	07:00	17:00
+SO-DEMO-1004	Masagana Store Batangas	100 Bonifacio St., Batangas City, Batangas	Whole Dressed Chicken	499	kg		07:00	17:00
+SO-DEMO-1005	Palengke Stall San Jose	254 Mabini St., San Jose, Batangas	Leg Quarters	155	kg	before 8am lang	05:00	08:30
+SO-DEMO-1006	Tita Baby Carinderia Malvar	9 Bonifacio St., Malvar, Batangas	Leg Quarters	64	kg	small truck lang, makitid ang daan	07:00	10:30
+SO-DEMO-1007	Fresh Mart Rosario	15 Burgos St., Rosario, Batangas	Leg Quarters	254	kg	after 10am, closed early morning	07:00	17:00
+SO-DEMO-1007	Fresh Mart Rosario	15 Burgos St., Rosario, Batangas	Liver & Gizzard	13	kg		07:00	17:00
+SO-DEMO-1008	Masagana Store Ibaan	31 Mabini St., Ibaan, Batangas	Breast Fillet	64	kg	before 8am lang	07:00	17:00
+SO-DEMO-1008	Masagana Store Ibaan	31 Mabini St., Ibaan, Batangas	Chicken Wings	124	kg		07:00	17:00
+SO-DEMO-1009	JM Grocery Lemery	373 Rizal St., Lemery, Batangas	Chicken Wings	112	kg	rush — before 7:30am	07:00	17:00
+SO-DEMO-1010	Lutong Bahay Eatery Bauan	340 Rizal St., Bauan, Batangas	Leg Quarters	225	kg		07:00	10:30
+SO-DEMO-1010	Lutong Bahay Eatery Bauan	340 Rizal St., Bauan, Batangas	Liver & Gizzard	40	kg		07:00	10:30
+SO-DEMO-1010	Lutong Bahay Eatery Bauan	340 Rizal St., Bauan, Batangas	Chicken Wings	106	kg		07:00	10:30
+SO-DEMO-1011	Mang Tonyo Lechon Manok Padre Garcia	311 Mabini St., Padre Garcia, Batangas	Leg Quarters	179	kg	before 8am lang	08:00	11:00
+SO-DEMO-1011	Mang Tonyo Lechon Manok Padre Garcia	311 Mabini St., Padre Garcia, Batangas	Chicken Wings	142	kg		08:00	11:00
+SO-DEMO-1012	Lutong Bahay Eatery Calamba	13 Brgy. Poblacion, Calamba City, Laguna	Liver & Gizzard	60	kg		07:00	10:30
+SO-DEMO-1013	Sunrise Restaurant Los Baños	135 Luna St., Los Baños, Laguna	Chicken Wings	127	kg	before 8am lang	13:30	17:00
+SO-DEMO-1013	Sunrise Restaurant Los Baños	135 Luna St., Los Baños, Laguna	Whole Dressed Chicken	400	kg		13:30	17:00
+SO-DEMO-1014	Palengke Stall San Pablo	262 Mabini St., San Pablo City, Laguna	Breast Fillet	100	kg		05:00	08:30
+SO-DEMO-1014	Palengke Stall San Pablo	262 Mabini St., San Pablo City, Laguna	Chicken Wings	88	kg		05:00	08:30
+SO-DEMO-1014	Palengke Stall San Pablo	262 Mabini St., San Pablo City, Laguna	Leg Quarters	170	kg		05:00	08:30
+SO-DEMO-1015	Inasal Corner Cabuyao	224 Bonifacio St., Cabuyao City, Laguna	Whole Dressed Chicken	334	kg	hapon na i-deliver, sarado umaga	08:00	11:00
+SO-DEMO-1015	Inasal Corner Cabuyao	224 Bonifacio St., Cabuyao City, Laguna	Liver & Gizzard	33	kg		08:00	11:00
+SO-DEMO-1016	Fresh Mart Tiaong	392 Brgy. Poblacion, Tiaong, Quezon	Chicken Wings	59	kg	hapon na i-deliver, sarado umaga	07:00	17:00
+SO-DEMO-1016	Fresh Mart Tiaong	392 Brgy. Poblacion, Tiaong, Quezon	Whole Dressed Chicken	587	kg		07:00	17:00
+SO-DEMO-1016	Fresh Mart Tiaong	392 Brgy. Poblacion, Tiaong, Quezon	Liver & Gizzard	51	kg		07:00	17:00
+SO-DEMO-1017	Bente Uno Mart Candelaria	96 Luna St., Candelaria, Quezon	Whole Dressed Chicken	237	kg		07:00	17:00
+SO-DEMO-1017	Bente Uno Mart Candelaria	96 Luna St., Candelaria, Quezon	Breast Fillet	185	kg		07:00	17:00
+SO-DEMO-1017	Bente Uno Mart Candelaria	96 Luna St., Candelaria, Quezon	Liver & Gizzard	26	kg		07:00	17:00
+SO-DEMO-1018	Bente Uno Mart Lipa #2	253 Luna St., Lipa City, Batangas	Whole Dressed Chicken	301	kg		07:00	17:00
+SO-DEMO-1019	Bente Uno Mart Tanauan #2	301 National Hwy, Tanauan City, Batangas	Liver & Gizzard	33	kg	rush — before 7:30am	07:00	17:00
+SO-DEMO-1019	Bente Uno Mart Tanauan #2	301 National Hwy, Tanauan City, Batangas	Whole Dressed Chicken	366	kg		07:00	17:00
+SO-DEMO-1020	Palengke Stall Sto. Tomas #2	358 Bonifacio St., Sto. Tomas, Batangas	Chicken Wings	93	kg		05:00	08:30
+SO-DEMO-1020	Palengke Stall Sto. Tomas #2	358 Bonifacio St., Sto. Tomas, Batangas	Liver & Gizzard	42	kg		05:00	08:30
+SO-DEMO-1020	Palengke Stall Sto. Tomas #2	358 Bonifacio St., Sto. Tomas, Batangas	Leg Quarters	96	kg		05:00	08:30
+SO-DEMO-1021	Aling Nena Store Batangas #2	16 Bonifacio St., Batangas City, Batangas	Breast Fillet	129	kg	hapon na i-deliver, sarado umaga	07:00	17:00
+SO-DEMO-1021	Aling Nena Store Batangas #2	16 Bonifacio St., Batangas City, Batangas	Chicken Wings	102	kg		07:00	17:00
+SO-DEMO-1021	Aling Nena Store Batangas #2	16 Bonifacio St., Batangas City, Batangas	Liver & Gizzard	31	kg		07:00	17:00
+SO-DEMO-1022	Palengke Stall San Jose #2	139 Luna St., San Jose, Batangas	Whole Dressed Chicken	497	kg	receive 6-9am only	05:00	08:30
+SO-DEMO-1022	Palengke Stall San Jose #2	139 Luna St., San Jose, Batangas	Chicken Wings	70	kg		05:00	08:30
+SO-DEMO-1023	Golden Grill Malvar #2	81 Luna St., Malvar, Batangas	Leg Quarters	174	kg		08:00	11:00
+SO-DEMO-1024	Mang Tonyo Lechon Manok Rosario #2	300 P. Torres St., Rosario, Batangas	Leg Quarters	138	kg		08:00	11:00
+SO-DEMO-1024	Mang Tonyo Lechon Manok Rosario #2	300 P. Torres St., Rosario, Batangas	Liver & Gizzard	38	kg		08:00	11:00
+SO-DEMO-1024	Mang Tonyo Lechon Manok Rosario #2	300 P. Torres St., Rosario, Batangas	Breast Fillet	167	kg		08:00	11:00
+SO-DEMO-1025	Bente Uno Mart Ibaan #2	26 P. Torres St., Ibaan, Batangas	Breast Fillet	98	kg		07:00	17:00
+SO-DEMO-1026	Golden Grill Lemery #2	243 P. Torres St., Lemery, Batangas	Chicken Wings	89	kg	receive 6-9am only	08:00	11:00
+SO-DEMO-1026	Golden Grill Lemery #2	243 P. Torres St., Lemery, Batangas	Breast Fillet	90	kg		08:00	11:00
+SO-DEMO-1026	Golden Grill Lemery #2	243 P. Torres St., Lemery, Batangas	Liver & Gizzard	25	kg		08:00	11:00
+SO-DEMO-1027	Golden Grill Bauan #2	173 Luna St., Bauan, Batangas	Whole Dressed Chicken	330	kg		08:00	11:00
+SO-DEMO-1027	Golden Grill Bauan #2	173 Luna St., Bauan, Batangas	Leg Quarters	195	kg		08:00	11:00
+SO-DEMO-1027	Golden Grill Bauan #2	173 Luna St., Bauan, Batangas	Breast Fillet	103	kg		08:00	11:00
+SO-DEMO-1028	Kainan sa Kanto Padre Garcia #2	246 Brgy. Poblacion, Padre Garcia, Batangas	Leg Quarters	50	kg		07:00	10:30
+SO-DEMO-1028	Kainan sa Kanto Padre Garcia #2	246 Brgy. Poblacion, Padre Garcia, Batangas	Whole Dressed Chicken	163	kg		07:00	10:30
+SO-DEMO-1028	Kainan sa Kanto Padre Garcia #2	246 Brgy. Poblacion, Padre Garcia, Batangas	Liver & Gizzard	49	kg		07:00	10:30
+SO-DEMO-1029	Mang Tonyo Lechon Manok Calamba #2	118 Bonifacio St., Calamba City, Laguna	Breast Fillet	182	kg	after 10am, closed early morning	08:00	11:00
+SO-DEMO-1029	Mang Tonyo Lechon Manok Calamba #2	118 Bonifacio St., Calamba City, Laguna	Leg Quarters	171	kg		08:00	11:00
+SO-DEMO-1030	Fresh Mart Los Baños #2	259 P. Torres St., Los Baños, Laguna	Chicken Wings	103	kg	back gate, call Ate Weng pagdating	07:00	17:00
+SO-DEMO-1031	Mang Tonyo Lechon Manok San Pablo #2	67 National Hwy, San Pablo City, Laguna	Breast Fillet	172	kg	small truck lang, makitid ang daan	08:00	11:00
+SO-DEMO-1032	JM Grocery Cabuyao #2	12 National Hwy, Cabuyao City, Laguna	Breast Fillet	164	kg	hapon na i-deliver, sarado umaga	07:00	17:00
+SO-DEMO-1032	JM Grocery Cabuyao #2	12 National Hwy, Cabuyao City, Laguna	Liver & Gizzard	38	kg		07:00	17:00
+SO-DEMO-1032	JM Grocery Cabuyao #2	12 National Hwy, Cabuyao City, Laguna	Leg Quarters	169	kg		07:00	17:00
+SO-DEMO-1033	Masagana Store Tiaong #2	207 Rizal St., Tiaong, Quezon	Whole Dressed Chicken	500	kg	hapon na i-deliver, sarado umaga	07:00	17:00
+SO-DEMO-1033	Masagana Store Tiaong #2	207 Rizal St., Tiaong, Quezon	Liver & Gizzard	25	kg		07:00	17:00
+SO-DEMO-1033	Masagana Store Tiaong #2	207 Rizal St., Tiaong, Quezon	Leg Quarters	123	kg		07:00	17:00
+SO-DEMO-1034	Inasal Corner Candelaria #2	136 Rizal St., Candelaria, Quezon	Whole Dressed Chicken	264	kg		08:00	11:00
+SO-DEMO-1034	Inasal Corner Candelaria #2	136 Rizal St., Candelaria, Quezon	Liver & Gizzard	25	kg		08:00	11:00
+SO-DEMO-1035	Kainan sa Kanto Lipa #3	102 Mabini St., Lipa City, Batangas	Chicken Wings	85	kg	before 8am lang	07:00	10:30
+SO-DEMO-1036	Golden Grill Tanauan #3	87 Brgy. Poblacion, Tanauan City, Batangas	Liver & Gizzard	23	kg	before 8am lang	08:00	11:00
+SO-DEMO-1037	Fresh Mart Sto. Tomas #3	119 Rizal St., Sto. Tomas, Batangas	Breast Fillet	191	kg	before 8am lang	07:00	17:00
+SO-DEMO-1037	Fresh Mart Sto. Tomas #3	119 Rizal St., Sto. Tomas, Batangas	Liver & Gizzard	34	kg		07:00	17:00
+SO-DEMO-1037	Fresh Mart Sto. Tomas #3	119 Rizal St., Sto. Tomas, Batangas	Whole Dressed Chicken	367	kg		07:00	17:00
+SO-DEMO-1038	Tita Baby Carinderia Batangas #3	160 Brgy. Poblacion, Batangas City, Batangas	Whole Dressed Chicken	248	kg	rush — before 7:30am	07:00	10:30
+SO-DEMO-1039	Inasal Corner San Jose #3	304 Bonifacio St., San Jose, Batangas	Liver & Gizzard	29	kg		08:00	11:00
+SO-DEMO-1039	Inasal Corner San Jose #3	304 Bonifacio St., San Jose, Batangas	Chicken Wings	158	kg		08:00	11:00
+SO-DEMO-1040	Lutong Bahay Eatery Malvar #3	254 Mabini St., Malvar, Batangas	Chicken Wings	47	kg	receive 6-9am only	07:00	10:30
+SO-DEMO-1040	Lutong Bahay Eatery Malvar #3	254 Mabini St., Malvar, Batangas	Leg Quarters	179	kg		07:00	10:30
+SO-DEMO-1040	Lutong Bahay Eatery Malvar #3	254 Mabini St., Malvar, Batangas	Breast Fillet	92	kg		07:00	10:30
+SO-DEMO-1041	Chicken Haus Rosario #3	14 Luna St., Rosario, Batangas	Liver & Gizzard	42	kg		13:30	17:00
+SO-DEMO-1041	Chicken Haus Rosario #3	14 Luna St., Rosario, Batangas	Breast Fillet	77	kg		13:30	17:00
+SO-DEMO-1041	Chicken Haus Rosario #3	14 Luna St., Rosario, Batangas	Chicken Wings	113	kg		13:30	17:00
+SO-DEMO-1042	Inasal Corner Ibaan #3	302 Burgos St., Ibaan, Batangas	Liver & Gizzard	12	kg		08:00	11:00
+SO-DEMO-1043	Aling Nena Store Lemery #3	334 National Hwy, Lemery, Batangas	Chicken Wings	66	kg	back gate, call Ate Weng pagdating	07:00	17:00
+SO-DEMO-1043	Aling Nena Store Lemery #3	334 National Hwy, Lemery, Batangas	Liver & Gizzard	55	kg		07:00	17:00
+SO-DEMO-1043	Aling Nena Store Lemery #3	334 National Hwy, Lemery, Batangas	Leg Quarters	259	kg		07:00	17:00
+SO-DEMO-1044	Kainan sa Kanto Bauan #3	160 P. Torres St., Bauan, Batangas	Liver & Gizzard	26	kg	hapon na i-deliver, sarado umaga	07:00	10:30
+SO-DEMO-1045	Kainan sa Kanto Padre Garcia #3	174 National Hwy, Padre Garcia, Batangas	Whole Dressed Chicken	380	kg		07:00	10:30
+SO-DEMO-1045	Kainan sa Kanto Padre Garcia #3	174 National Hwy, Padre Garcia, Batangas	Breast Fillet	162	kg		07:00	10:30

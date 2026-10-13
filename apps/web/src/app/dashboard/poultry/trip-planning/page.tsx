@@ -150,6 +150,14 @@ export default function TripPlanningPage() {
     } catch (e) { setError((e as Error).message); }
   }
 
+  async function saveClientHours(s: PlanStop) {
+    if (!s.customer_id) return;
+    try {
+      await api.patch(`/ar/customers/${s.customer_id}`, { receiving_from: s.window_from ?? null, receiving_to: s.window_to ?? null });
+      setNotice(`Saved receiving hours ${s.window_from ?? 'any time'}–${s.window_to ?? 'any time'} for ${s.customer}.`);
+    } catch (e) { setError((e as Error).message); }
+  }
+
   function addAdhocTruck() {
     const id = `adhoc-${Date.now()}`;
     setTrucks((prev) => [...prev, { use: true, id, vehicle_id: null, plate: '', capacity_kg: 2000, reefer: true, start: '05:00', end: '19:00', driver: '', helper: '' }]);
@@ -407,7 +415,7 @@ export default function TripPlanningPage() {
                     <th className="px-2 py-1.5 text-left">#</th>
                     <th className="px-2 py-1.5 text-left">SO / Customer</th>
                     <th className="px-2 py-1.5 text-right">Kg</th>
-                    <th className="px-2 py-1.5 text-left">Receive</th>
+                    <th className="px-2 py-1.5 text-left" title="Client's receiving hours. Blank = any time.">Receiving hours</th>
                     <th className="px-2 py-1.5 text-center" title="Needs refrigerated truck">Cold</th>
                     <th className="px-2 py-1.5 text-center" title="Small truck only">Small</th>
                     <th className="px-2 py-1.5 text-left">Pin</th>
@@ -437,6 +445,10 @@ export default function TripPlanningPage() {
                           <span className="text-slate-400">–</span>
                           <input type="time" value={s.window_to ?? ''} onChange={(e) => updateStop(s.id, { window_to: e.target.value || null })} className={`${input} w-[84px]`} />
                         </div>
+                        {s.customer_id && (s.window_from || s.window_to) && (
+                          <button className="mt-0.5 text-[10px] text-brand-600 hover:underline" title="Save these hours on the customer record so every future order uses them"
+                            onClick={() => saveClientHours(s)}>save as client&rsquo;s hours</button>
+                        )}
                       </td>
                       <td className="px-2 py-1.5 text-center"><input type="checkbox" checked={s.needs_reefer} onChange={(e) => updateStop(s.id, { needs_reefer: e.target.checked })} /></td>
                       <td className="px-2 py-1.5 text-center"><input type="checkbox" checked={s.small_truck_only} onChange={(e) => updateStop(s.id, { small_truck_only: e.target.checked })} /></td>
@@ -522,6 +534,8 @@ export default function TripPlanningPage() {
                 <input type="number" min={0} step={0.5} value={options.max_on_road_min ? options.max_on_road_min / 60 : ''} placeholder="none"
                   onChange={(e) => { setOptions({ ...options, max_on_road_min: e.target.value ? Number(e.target.value) * 60 : null }); resetPlan(); }} className={`${input} mt-0.5 w-full`} /></label>
               <label title="A stop marked 'small truck only' gets a truck of at most this capacity">Small truck = up to (kg)<input type="number" min={0} value={options.small_truck_max_kg} onChange={(e) => { setOptions({ ...options, small_truck_max_kg: Number(e.target.value) }); resetPlan(); }} className={`${input} mt-0.5 w-full`} /></label>
+              <label className="flex items-center gap-1.5 pt-4" title="On: a truck may arrive early and wait, but is never planned to arrive after a client stops receiving — such orders are left off with the reason. Off: late arrivals are allowed and flagged.">
+                <input type="checkbox" checked={options.strict_windows} onChange={(e) => { setOptions({ ...options, strict_windows: e.target.checked }); resetPlan(); }} /> Never deliver outside receiving hours</label>
               <label className="flex items-center gap-1.5 pt-4"><input type="checkbox" checked={options.return_to_depot} onChange={(e) => { setOptions({ ...options, return_to_depot: e.target.checked }); resetPlan(); }} /> Trucks return to depot</label>
               <label className="flex items-center gap-1.5 pt-4"><input type="checkbox" checked={options.use_ai} onChange={(e) => { setOptions({ ...options, use_ai: e.target.checked }); resetPlan(); }} /> AI reads remarks &amp; explains</label>
             </div>
@@ -658,7 +672,8 @@ export default function TripPlanningPage() {
                                     <td className="px-1 py-1 text-right text-slate-600">{fmtKg(s.kg)}</td>
                                     <td className="px-1 py-1 text-right">
                                       <span className={v.lateMin > 0 ? 'font-semibold text-red-600' : 'text-slate-700 dark:text-slate-300'}>{minToHhmm(v.startMin)}</span>
-                                      {(s.window_from || s.window_to) && <div className="text-[10px] text-slate-400">{s.window_from ?? '…'}–{s.window_to ?? '…'}</div>}
+                                      {(s.window_from || s.window_to) && <div className="text-[10px] text-slate-400">opens {s.window_from ?? '…'}–{s.window_to ?? '…'}</div>}
+                                      {v.waitMin >= 5 && <div className="text-[10px] text-amber-600" title={`Arrives ${minToHhmm(v.arriveMin)}, waits for the client to open`}>waits {Math.round(v.waitMin)} min</div>}
                                     </td>
                                     <td className="whitespace-nowrap px-1 py-1 text-right">
                                       <button className="px-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30" disabled={k === 0} onClick={() => shiftStop(r.truckId, v.stopId, -1)}>▲</button>

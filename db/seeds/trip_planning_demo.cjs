@@ -102,11 +102,26 @@ function buildOrders() {
 }
 
 function writeTsv(orders) {
-  const rows = [['SO No', 'Customer', 'Address', 'Product', 'Qty', 'UOM', 'Remarks'].join('\t')];
+  const rows = [['SO No', 'Customer', 'Address', 'Product', 'Qty', 'UOM', 'Remarks', 'From', 'To'].join('\t')];
   for (const o of orders) {
-    o.lines.forEach(([p, kg], k) => rows.push([o.so, o.customer, o.address, p, kg, 'kg', k === 0 ? o.remarks : ''].join('\t')));
+    const [from, to] = receivingHours(o.customer);
+    o.lines.forEach(([p, kg], k) => rows.push([o.so, o.customer, o.address, p, kg, 'kg', k === 0 ? o.remarks : '', from ?? '', to ?? ''].join('\t')));
   }
   fs.writeFileSync(TSV_PATH, rows.join('\n') + '\n');
+}
+
+/**
+ * Typical receiving hours by kind of client: wet-market stalls take stock
+ * before the morning rush, eateries before lunch prep, lechon stands before
+ * they fire up, groceries most of the day. A few have none (any time).
+ */
+function receivingHours(name) {
+  if (/Palengke/.test(name)) return ['05:00', '08:30'];
+  if (/Carinderia|Eatery|Kainan|Kusina/.test(name)) return ['07:00', '10:30'];
+  if (/Lechon|Inasal|Grill/.test(name)) return ['08:00', '11:00'];
+  if (/Restaurant|Chicken Haus/.test(name)) return ['13:30', '17:00'];
+  if (/Grocery|Mart|Store/.test(name)) return ['07:00', '17:00'];
+  return [null, null];
 }
 
 /**
@@ -133,11 +148,14 @@ async function seedSalesOrders(c, companyId, branchId, orders) {
 
   let created = 0;
   for (const [i, o] of orders.entries()) {
+    const [from, to] = receivingHours(o.customer);
     const cust = await c.query(
-      `INSERT INTO customers (company_id, code, name, address, latitude, longitude, delivery_notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
-       ON CONFLICT (company_id, code) DO UPDATE SET address = EXCLUDED.address RETURNING id`,
-      [companyId, `DEMO-C${String(i + 1).padStart(3, '0')}`, o.customer, o.address, o.lat, o.lng, o.remarks || null],
+      `INSERT INTO customers (company_id, code, name, address, latitude, longitude, delivery_notes, receiving_from, receiving_to)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       ON CONFLICT (company_id, code) DO UPDATE
+         SET address = EXCLUDED.address, receiving_from = EXCLUDED.receiving_from, receiving_to = EXCLUDED.receiving_to
+       RETURNING id`,
+      [companyId, `DEMO-C${String(i + 1).padStart(3, '0')}`, o.customer, o.address, o.lat, o.lng, o.remarks || null, from, to],
     );
     if ((await c.query(`SELECT 1 FROM sales_orders WHERE company_id = $1 AND order_no = $2`, [companyId, o.so])).rowCount) continue;
 

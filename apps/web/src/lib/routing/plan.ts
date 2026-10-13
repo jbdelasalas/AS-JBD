@@ -48,6 +48,8 @@ export function toSolver(input: PlanInput): {
       speedKmh: o.speed_kmh > 0 ? o.speed_kmh : 25,
       maxOnRoadMin: o.max_on_road_min && o.max_on_road_min > 0 ? o.max_on_road_min : null,
       returnToDepot: o.return_to_depot,
+      // Plans saved before this option existed carry no flag — treat them as strict.
+      strictWindows: o.strict_windows !== false,
     },
     noLocation,
   };
