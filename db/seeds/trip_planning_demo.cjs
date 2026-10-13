@@ -18,6 +18,7 @@
  * Usage:
  *   POSTGRES_URL="postgresql://…" node db/seeds/trip_planning_demo.cjs
  *   POSTGRES_URL="postgresql://…" node db/seeds/trip_planning_demo.cjs --remove
+ *   POSTGRES_URL="postgresql://…" node db/seeds/trip_planning_demo.cjs --schema=sandbox   (adds sample SOs)
  */
 
 const pg = require('pg');
@@ -56,6 +57,13 @@ const SHOPS = ['Aling Nena Store', 'Kusina ni Juan', 'Mang Tonyo Lechon Manok', 
   'Inasal Corner', 'Bente Uno Mart', 'Masagana Store', 'Kainan sa Kanto'];
 const STREETS = ['Rizal St.', 'Mabini St.', 'Burgos St.', 'P. Torres St.', 'Luna St.', 'Bonifacio St.', 'National Hwy', 'Brgy. Poblacion'];
 const PRODUCTS = [['Whole Dressed Chicken', 150, 600], ['Breast Fillet', 50, 220], ['Chicken Wings', 40, 160], ['Leg Quarters', 50, 260], ['Liver & Gizzard', 10, 60]];
+const PRICE = { 'Whole Dressed Chicken': 185, 'Breast Fillet': 260, 'Chicken Wings': 210, 'Leg Quarters': 170, 'Liver & Gizzard': 120 };
+
+// Sales orders are due the day after the seed runs (the planner opens on
+// tomorrow's date). Override with TP_DEMO_DATE=YYYY-MM-DD.
+const DELIVERY_DATE = process.env.TP_DEMO_DATE
+  || new Date(Date.now() + 864e5).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+
 const REMARKS = ['', '', '', '', 'before 8am lang', 'hapon na i-deliver, sarado umaga', 'small truck lang, makitid ang daan',
   'receive 6-9am only', 'back gate, call Ate Weng pagdating', 'after 10am, closed early morning', 'rush — before 7:30am'];
 
@@ -101,11 +109,70 @@ function writeTsv(orders) {
   fs.writeFileSync(TSV_PATH, rows.join('\n') + '\n');
 }
 
+/**
+ * Sandbox only: demo items, one customer per order (with its map pin and the
+ * remarks as delivery notes for the AI), and an open sales order due on
+ * DELIVERY_DATE — so "Load SOs for <date>" has something to load.
+ */
+async function seedSalesOrders(c, companyId, branchId, orders) {
+  const user = (await c.query(`SELECT id FROM users WHERE is_active AND is_superadmin ORDER BY created_at LIMIT 1`)).rows[0]
+            || (await c.query(`SELECT id FROM users WHERE is_active ORDER BY created_at LIMIT 1`)).rows[0];
+  if (!user) throw new Error('No active user to own the sample sales orders.');
+
+  const itemIds = {};
+  for (const [name] of PRODUCTS) {
+    const sku = `DEMO-${name.replace(/[^A-Za-z]/g, '').slice(0, 12).toUpperCase()}`;
+    const r = await c.query(
+      `INSERT INTO items (company_id, sku, name, uom, selling_price)
+       VALUES ($1,$2,$3,'kg',$4)
+       ON CONFLICT (company_id, sku) DO UPDATE SET name = EXCLUDED.name RETURNING id`,
+      [companyId, sku, `${name} (demo)`, PRICE[name]],
+    );
+    itemIds[name] = r.rows[0].id;
+  }
+
+  let created = 0;
+  for (const [i, o] of orders.entries()) {
+    const cust = await c.query(
+      `INSERT INTO customers (company_id, code, name, address, latitude, longitude, delivery_notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT (company_id, code) DO UPDATE SET address = EXCLUDED.address RETURNING id`,
+      [companyId, `DEMO-C${String(i + 1).padStart(3, '0')}`, o.customer, o.address, o.lat, o.lng, o.remarks || null],
+    );
+    if ((await c.query(`SELECT 1 FROM sales_orders WHERE company_id = $1 AND order_no = $2`, [companyId, o.so])).rowCount) continue;
+
+    const lines = o.lines.map(([p, kg], k) => ({ no: k + 1, item: itemIds[p], p, kg, price: PRICE[p], total: +(kg * PRICE[p]).toFixed(2) }));
+    const subtotal = +lines.reduce((a, l) => a + l.total, 0).toFixed(2);
+    const vat = +(subtotal * 0.12).toFixed(2);
+    const so = await c.query(
+      `INSERT INTO sales_orders (company_id, branch_id, order_no, customer_id, order_date, delivery_date,
+                                 reference, subtotal, vat_amount, total, status, created_by)
+       VALUES ($1,$2,$3,$4,CURRENT_DATE,$5,'Demo order — trip planning',$6,$7,$8,'open',$9) RETURNING id`,
+      [companyId, branchId, o.so, cust.rows[0].id, DELIVERY_DATE, subtotal, vat, +(subtotal + vat).toFixed(2), user.id],
+    );
+    for (const l of lines) {
+      await c.query(
+        `INSERT INTO sales_order_lines (order_id, line_no, item_id, description, quantity, unit_price, line_total)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [so.rows[0].id, l.no, l.item, l.p, l.kg, l.price, l.total],
+      );
+    }
+    created++;
+  }
+  console.log(`Sales orders: ${created} new open SOs (SO-DEMO-1001…) due ${DELIVERY_DATE}, ${orders.length} DEMO customers, ${PRODUCTS.length} DEMO items.`);
+}
+
 async function main() {
   const url = process.env.POSTGRES_URL || process.env.DATABASE_URL;
   if (!url) throw new Error('Set POSTGRES_URL (or DATABASE_URL).');
   const c = new pg.Client({ connectionString: url.replace(/([?&])sslmode=[^&]*/g, '$1'), ssl: { rejectUnauthorized: false } });
   await c.connect();
+  // --schema=sandbox seeds the sandbox copy of the database (what the app uses
+  // in Sandbox mode). Sample sales orders and customers are only ever created
+  // there — live books never get fake orders.
+  const schema = (process.argv.find((a) => a.startsWith('--schema=')) || '--schema=public').split('=')[1];
+  if (!['public', 'sandbox'].includes(schema)) throw new Error('--schema must be public or sandbox');
+  await c.query(`SET search_path TO ${schema}, extensions, public`);
   try {
     const co = (await c.query(`SELECT id, name FROM companies WHERE name = $1 LIMIT 1`, [COMPANY_NAME])).rows[0];
     if (!co) throw new Error(`Company "${COMPANY_NAME}" not found.`);
@@ -113,6 +180,20 @@ async function main() {
     await c.query('BEGIN');
 
     if (process.argv.includes('--remove')) {
+      // Demo trips first (they hold the trucks, depot and SOs), then the plans
+      // that produced them, then the masters.
+      const t = await c.query(`DELETE FROM trips WHERE company_id = $1 AND plate_no LIKE 'DEMO-%'`, [co.id]);
+      await c.query(`DELETE FROM route_plans p USING warehouses w
+                      WHERE p.depot_warehouse_id = w.id AND w.company_id = $1 AND w.code = $2`, [co.id, DEPOT.code]);
+      const so = await c.query(`DELETE FROM sales_orders so WHERE so.company_id = $1 AND so.order_no LIKE 'SO-DEMO-%'
+                                   AND NOT EXISTS (SELECT 1 FROM trip_stops ts WHERE ts.sales_order_id = so.id)
+                                   AND NOT EXISTS (SELECT 1 FROM delivery_receipts dr WHERE dr.so_id = so.id)`, [co.id]);
+      const cu = await c.query(`DELETE FROM customers cu WHERE cu.company_id = $1 AND cu.code LIKE 'DEMO-C%'
+                                   AND NOT EXISTS (SELECT 1 FROM sales_orders s WHERE s.customer_id = cu.id)
+                                   AND NOT EXISTS (SELECT 1 FROM trip_stops ts WHERE ts.customer_id = cu.id)`, [co.id]);
+      const it = await c.query(`DELETE FROM items i WHERE i.company_id = $1 AND i.sku LIKE 'DEMO-%'
+                                   AND NOT EXISTS (SELECT 1 FROM sales_order_lines l WHERE l.item_id = i.id)`, [co.id]);
+      console.log(`Removed ${t.rowCount} demo trips, ${so.rowCount} sales orders, ${cu.rowCount} customers, ${it.rowCount} items.`);
       const v = await c.query(`DELETE FROM vehicles WHERE company_id = $1 AND plate_no LIKE 'DEMO-%' AND NOT EXISTS (SELECT 1 FROM trips t WHERE t.vehicle_id = vehicles.id)`, [co.id]);
       const g = await c.query(`DELETE FROM geocode_cache WHERE company_id = $1 AND address_key = ANY($2)`, [co.id, orders.map((o) => addressKey(o.address))]);
       const w = await c.query(`DELETE FROM warehouses WHERE company_id = $1 AND code = $2
@@ -147,6 +228,8 @@ async function main() {
         [co.id, addressKey(o.address), o.lat, o.lng, o.address],
       );
     }
+    if (schema === 'sandbox') await seedSalesOrders(c, co.id, branch ? branch.id : null, orders);
+
     await c.query('COMMIT');
     writeTsv(orders);
     const kg = orders.reduce((a, o) => a + o.lines.reduce((b, l) => b + l[1], 0), 0);
