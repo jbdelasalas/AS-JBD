@@ -64,6 +64,16 @@ const PRICE = { 'Whole Dressed Chicken': 185, 'Breast Fillet': 260, 'Chicken Win
 const DELIVERY_DATE = process.env.TP_DEMO_DATE
   || new Date(Date.now() + 864e5).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
 
+// Per-order receiving hours that override the client's usual (fiesta day, a
+// restaurant asking for a later drop, a store closing early).
+const ORDER_OVERRIDES = [
+  ['SO-DEMO-1004', '06:00', '07:30'],
+  ['SO-DEMO-1011', '15:00', '18:00'],
+  ['SO-DEMO-1019', '09:00', '12:00'],
+  ['SO-DEMO-1027', '05:30', '07:00'],
+  ['SO-DEMO-1036', '14:00', '16:00'],
+];
+
 const REMARKS = ['', '', '', '', 'before 8am lang', 'hapon na i-deliver, sarado umaga', 'small truck lang, makitid ang daan',
   'receive 6-9am only', 'back gate, call Ate Weng pagdating', 'after 10am, closed early morning', 'rush — before 7:30am'];
 
@@ -165,7 +175,7 @@ async function seedSalesOrders(c, companyId, branchId, orders) {
     const so = await c.query(
       `INSERT INTO sales_orders (company_id, branch_id, order_no, customer_id, order_date, delivery_date,
                                  reference, subtotal, vat_amount, total, status, created_by)
-       VALUES ($1,$2,$3,$4,CURRENT_DATE,$5,'Demo order — trip planning',$6,$7,$8,'open',$9) RETURNING id`,
+       VALUES ($1,$2,$3,$4,CURRENT_DATE,$5,'Demo order — trip planning',$6,$7,$8,'approved',$9) RETURNING id`,
       [companyId, branchId, o.so, cust.rows[0].id, DELIVERY_DATE, subtotal, vat, +(subtotal + vat).toFixed(2), user.id],
     );
     for (const l of lines) {
@@ -177,7 +187,13 @@ async function seedSalesOrders(c, companyId, branchId, orders) {
     }
     created++;
   }
-  console.log(`Sales orders: ${created} new open SOs (SO-DEMO-1001…) due ${DELIVERY_DATE}, ${orders.length} DEMO customers, ${PRODUCTS.length} DEMO items.`);
+  // Approved is what the SO workflow produces and what the planner loads.
+  await c.query(`UPDATE sales_orders SET status = 'approved' WHERE company_id = $1 AND order_no LIKE 'SO-DEMO-%' AND status = 'open'`, [companyId]);
+  // A few orders differ from their client's usual hours, to show the per-order override.
+  for (const [so, from, to] of ORDER_OVERRIDES) {
+    await c.query(`UPDATE sales_orders SET receiving_from = $3, receiving_to = $4 WHERE company_id = $1 AND order_no = $2`, [companyId, so, from, to]);
+  }
+  console.log(`Sales orders: ${created} new approved SOs (SO-DEMO-1001…) due ${DELIVERY_DATE}, ${ORDER_OVERRIDES.length} with their own receiving hours; ${orders.length} DEMO customers, ${PRODUCTS.length} DEMO items.`);
 }
 
 async function main() {

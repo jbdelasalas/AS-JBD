@@ -6,7 +6,12 @@ import { api } from '@/lib/api';
 import { useTaggingData } from '@/hooks/useTaggingData';
 import { TaggingFields, type TaggingValues } from '@/components/TaggingPanel';
 
-interface Customer { id: string; code: string; name: string; payment_terms_days: number; credit_limit: number; address: string | null; }
+interface Customer {
+  id: string; code: string; name: string; payment_terms_days: number; credit_limit: number; address: string | null;
+  receiving_from?: string | null; receiving_to?: string | null;   // client's default receiving hours ("HH:MM:SS")
+}
+
+const hhmm = (t?: string | null) => (t ? t.slice(0, 5) : '');
 interface Item { id: string; sku: string; name: string; selling_price: number; uom: string; }
 interface Account { id: string; code: string; name: string; }
 
@@ -80,6 +85,9 @@ export default function NewSalesOrderPage() {
     reference: '',
     notes: '',
     with_si: true,
+    // Receiving hours for this order — start from the client's, change for this delivery only.
+    receiving_from: '',
+    receiving_to: '',
   });
 
   const [lines, setLines] = useState<Line[]>([{ ...EMPTY_LINE }]);
@@ -198,6 +206,8 @@ export default function NewSalesOrderPage() {
         cost_center_id: tags.cost_center_id || undefined,
         grow_reference_id: tags.grow_reference_id || undefined,
         delivery_date: form.delivery_date || undefined,
+        receiving_from: form.receiving_from || null,
+        receiving_to: form.receiving_to || null,
         lines: lines.map(l => ({
           ...l,
           item_id: l.line_type === 'item' ? l.item_id || undefined : undefined,
@@ -238,7 +248,10 @@ export default function NewSalesOrderPage() {
               <select required value={form.customer_id}
                 onChange={e => {
                   const c = customers.find(x => x.id === e.target.value);
-                  setForm(f => ({ ...f, customer_id: e.target.value, payment_terms_days: c?.payment_terms_days ?? 30 }));
+                  setForm(f => ({
+                    ...f, customer_id: e.target.value, payment_terms_days: c?.payment_terms_days ?? 30,
+                    receiving_from: hhmm(c?.receiving_from), receiving_to: hhmm(c?.receiving_to),
+                  }));
                 }}
                 className={inp}>
                 <option value="">Select customer…</option>
@@ -262,6 +275,23 @@ export default function NewSalesOrderPage() {
             <div className="col-span-3">
               <label className={lbl}>Customer Address</label>
               <div className={ro}>{selectedCustomer?.address ?? '—'}</div>
+            </div>
+
+            {/* Receiving hours: client's default, editable for this order */}
+            <div>
+              <label className={lbl} title="The trip planner only schedules this delivery inside these hours">Receiving From</label>
+              <input type="time" value={form.receiving_from} onChange={e => setForm(f => ({ ...f, receiving_from: e.target.value }))} className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Receiving Until</label>
+              <input type="time" value={form.receiving_to} onChange={e => setForm(f => ({ ...f, receiving_to: e.target.value }))} className={inp} />
+            </div>
+            <div className="col-span-2 flex items-end pb-2 text-xs text-slate-500 dark:text-slate-400">
+              {selectedCustomer
+                ? (selectedCustomer.receiving_from || selectedCustomer.receiving_to
+                    ? `Client's usual hours: ${hhmm(selectedCustomer.receiving_from) || 'any time'}–${hhmm(selectedCustomer.receiving_to) || 'any time'}. Change here for this order only.`
+                    : 'Client has no usual receiving hours (any time). Set them here for this order, or on the customer record for all orders.')
+                : ''}
             </div>
 
             {/* Row 3: Reference | With SI checkbox */}

@@ -154,7 +154,17 @@ export default function TripPlanningPage() {
     if (!s.customer_id) return;
     try {
       await api.patch(`/ar/customers/${s.customer_id}`, { receiving_from: s.window_from ?? null, receiving_to: s.window_to ?? null });
-      setNotice(`Saved receiving hours ${s.window_from ?? 'any time'}–${s.window_to ?? 'any time'} for ${s.customer}.`);
+      setStops((prev) => prev.map((x) => (x.id === s.id ? { ...x, hours_source: 'client' } : x)));
+      setNotice(`${s.customer}'s usual receiving hours are now ${s.window_from ?? 'any time'}–${s.window_to ?? 'any time'}.`);
+    } catch (e) { setError((e as Error).message); }
+  }
+
+  async function saveOrderHours(s: PlanStop) {
+    if (!s.sales_order_id) return;
+    try {
+      await api.patch(`/sales/orders/${s.sales_order_id}/receiving-hours`, { receiving_from: s.window_from ?? null, receiving_to: s.window_to ?? null });
+      setStops((prev) => prev.map((x) => (x.id === s.id ? { ...x, hours_source: 'order' } : x)));
+      setNotice(`Saved receiving hours ${s.window_from ?? 'any time'}–${s.window_to ?? 'any time'} on ${s.so_ref}.`);
     } catch (e) { setError((e as Error).message); }
   }
 
@@ -441,14 +451,25 @@ export default function TripPlanningPage() {
                       </td>
                       <td className="px-2 py-1.5">
                         <div className="flex items-center gap-1">
-                          <input type="time" value={s.window_from ?? ''} onChange={(e) => updateStop(s.id, { window_from: e.target.value || null })} className={`${input} w-[84px]`} />
+                          <input type="time" value={s.window_from ?? ''} onChange={(e) => updateStop(s.id, { window_from: e.target.value || null, hours_source: 'plan' })} className={`${input} w-[84px]`} />
                           <span className="text-slate-400">–</span>
-                          <input type="time" value={s.window_to ?? ''} onChange={(e) => updateStop(s.id, { window_to: e.target.value || null })} className={`${input} w-[84px]`} />
+                          <input type="time" value={s.window_to ?? ''} onChange={(e) => updateStop(s.id, { window_to: e.target.value || null, hours_source: 'plan' })} className={`${input} w-[84px]`} />
                         </div>
-                        {s.customer_id && (s.window_from || s.window_to) && (
-                          <button className="mt-0.5 text-[10px] text-brand-600 hover:underline" title="Save these hours on the customer record so every future order uses them"
-                            onClick={() => saveClientHours(s)}>save as client&rsquo;s hours</button>
-                        )}
+                        <div className="mt-0.5 flex flex-wrap gap-x-2 text-[10px]">
+                          {s.hours_source && (
+                            <span className={s.hours_source === 'plan' ? 'text-amber-700' : 'text-slate-400'}>
+                              {s.hours_source === 'order' ? 'set on this SO' : s.hours_source === 'client' ? "client's usual" : 'changed here — this plan only'}
+                            </span>
+                          )}
+                          {s.hours_source === 'plan' && s.sales_order_id && (
+                            <button className="text-brand-600 hover:underline" title="Save on this sales order only"
+                              onClick={() => saveOrderHours(s)}>save on SO</button>
+                          )}
+                          {s.hours_source === 'plan' && s.customer_id && (
+                            <button className="text-brand-600 hover:underline" title="Make these the client's usual hours for all future orders"
+                              onClick={() => saveClientHours(s)}>save as client&rsquo;s usual</button>
+                          )}
+                        </div>
                       </td>
                       <td className="px-2 py-1.5 text-center"><input type="checkbox" checked={s.needs_reefer} onChange={(e) => updateStop(s.id, { needs_reefer: e.target.checked })} /></td>
                       <td className="px-2 py-1.5 text-center"><input type="checkbox" checked={s.small_truck_only} onChange={(e) => updateStop(s.id, { small_truck_only: e.target.checked })} /></td>

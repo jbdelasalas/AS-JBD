@@ -3,6 +3,7 @@ import { type NextRequest } from 'next/server';
 import { query, getPool } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
+import { receivingTime } from '@/lib/routing/types';
 
 function mapRow(r: Record<string, unknown>) {
   return {
@@ -108,6 +109,15 @@ export async function POST(request: NextRequest) {
   );
   if (!customers[0]) return err('Customer not found or inactive', 404);
 
+  // Receiving hours for this order. Blank = the client's usual hours apply
+  // (the trip planner falls back to the customer record).
+  let receiving: { from: string | null; to: string | null };
+  try {
+    receiving = { from: receivingTime(dto.receiving_from), to: receivingTime(dto.receiving_to) };
+  } catch (e) {
+    return err((e as Error).message, 400);
+  }
+
   const itemIds = lines.map((l) => l.item_id as string);
   const items = await query<{ id: string; name: string; selling_price: string; is_active: boolean }>(
     `SELECT id, name, selling_price, is_active FROM items WHERE id = ANY($1) AND company_id = $2`,
@@ -145,14 +155,15 @@ export async function POST(request: NextRequest) {
     const totTotal = mappedLines.reduce((s, l) => s + l.total, 0);
 
     const headerRows = await client.query(
-      `INSERT INTO sales_orders (company_id, branch_id, order_no, customer_id, order_date, delivery_date, warehouse_id, payment_terms_days, discount_pct, reference, notes, subtotal, vat_amount, total, status, created_by, building_id, cost_center_id, grow_reference_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'draft',$15,$16,$17,$18) RETURNING *`,
+      `INSERT INTO sales_orders (company_id, branch_id, order_no, customer_id, order_date, delivery_date, warehouse_id, payment_terms_days, discount_pct, reference, notes, subtotal, vat_amount, total, status, created_by, building_id, cost_center_id, grow_reference_id, receiving_from, receiving_to)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'draft',$15,$16,$17,$18,$19,$20) RETURNING *`,
       [
         companyId, dto.branch_id ?? null, orderNo, customerId,
         dto.order_date, dto.delivery_date ?? null, dto.warehouse_id ?? null,
         terms, dto.discount_pct ?? 0, dto.reference ?? null, dto.notes ?? null,
         totSubtotal.toFixed(2), totVat.toFixed(2), totTotal.toFixed(2), auth.userId,
         dto.building_id ?? null, dto.cost_center_id ?? null, dto.grow_reference_id ?? null,
+        receiving.from, receiving.to,
       ],
     );
     const header = headerRows.rows[0];

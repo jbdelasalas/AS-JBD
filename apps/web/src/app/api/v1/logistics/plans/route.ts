@@ -35,6 +35,7 @@ function cleanStop(s: Partial<PlanStop>, i: number): PlanStop {
     items: Array.isArray(s.items) ? s.items.slice(0, 50) : [],
     window_from: s.window_from && HHMM.test(s.window_from) ? s.window_from : null,
     window_to: s.window_to && HHMM.test(s.window_to) ? s.window_to : null,
+    hours_source: s.hours_source === 'order' || s.hours_source === 'client' || s.hours_source === 'plan' ? s.hours_source : null,
     remarks: String(s.remarks ?? '').slice(0, 500),
     needs_reefer: s.needs_reefer !== false,
     small_truck_only: s.small_truck_only === true,

@@ -3,6 +3,7 @@ import { type NextRequest } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
+import { receivingTime } from '@/lib/routing/types';
 
 export async function GET(request: NextRequest) {
   let auth: Awaited<ReturnType<typeof requireAuth>>;
@@ -104,11 +105,20 @@ export async function POST(request: NextRequest) {
   );
   const arAccountId = (dto.ar_account_id as string | undefined) ?? arRows[0]?.id ?? null;
 
+  // Usual receiving hours — the default for every order; a sales order can override.
+  let receiving: { from: string | null; to: string | null };
+  try {
+    receiving = { from: receivingTime(dto.receiving_from), to: receivingTime(dto.receiving_to) };
+  } catch (e) {
+    return err((e as Error).message, 400);
+  }
+
   const rows = await query(
     `INSERT INTO customers
        (company_id, code, name, customer_type, tin, address, contact_person,
-        email, phone, payment_terms_days, credit_limit, is_vat_exempt, ar_account_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+        email, phone, payment_terms_days, credit_limit, is_vat_exempt, ar_account_id,
+        receiving_from, receiving_to, delivery_notes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
      RETURNING *`,
     [
       companyId, code, dto.name,
@@ -122,6 +132,8 @@ export async function POST(request: NextRequest) {
       dto.credit_limit ?? 0,
       dto.is_vat_exempt ?? false,
       arAccountId,
+      receiving.from, receiving.to,
+      (dto.delivery_notes as string) || null,
     ],
   );
   const customer = rows[0] as Record<string, unknown>;

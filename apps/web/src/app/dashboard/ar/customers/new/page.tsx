@@ -14,6 +14,9 @@ export default function NewCustomerPage() {
     customer_type: 'HRI',
     tin: '',
     address: '',
+    receiving_from: '',
+    receiving_to: '',
+    delivery_notes: '',
     contact_person: '',
     email: '',
     phone: '',
@@ -33,6 +36,9 @@ export default function NewCustomerPage() {
         ...form,
         tin: form.tin || undefined,
         address: form.address || undefined,
+        receiving_from: form.receiving_from || null,
+        receiving_to: form.receiving_to || null,
+        delivery_notes: form.delivery_notes || null,
         contact_person: form.contact_person || undefined,
         email: form.email || undefined,
         phone: form.phone || undefined,
@@ -123,6 +129,26 @@ export default function NewCustomerPage() {
               <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Address</label>
               <textarea rows={2} value={form.address}
                 onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400" title="Default for every order; a sales order can change it">Receives deliveries from</label>
+              <input type="time" value={form.receiving_from}
+                onChange={(e) => setForm((f) => ({ ...f, receiving_from: e.target.value }))}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Receives deliveries until</label>
+              <input type="time" value={form.receiving_to}
+                onChange={(e) => setForm((f) => ({ ...f, receiving_to: e.target.value }))}
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+              <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Blank = any time. Each order can change it.</p>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Delivery notes</label>
+              <input value={form.delivery_notes} placeholder="e.g. back gate, call before arriving"
+                onChange={(e) => setForm((f) => ({ ...f, delivery_notes: e.target.value }))}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 

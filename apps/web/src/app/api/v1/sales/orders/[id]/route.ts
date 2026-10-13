@@ -43,6 +43,8 @@ export async function GET(
     `SELECT so.*,
             c.name AS customer_name, c.code AS customer_code, c.credit_limit,
             c.payment_terms_days AS customer_terms, c.address AS customer_address,
+            to_char(c.receiving_from, 'HH24:MI') AS customer_receiving_from,
+            to_char(c.receiving_to,   'HH24:MI') AS customer_receiving_to,
             br.code AS branch_code, br.name AS branch_name,
             fb.code AS building_code, fb.name AS building_name,
             cc.code AS cost_center_code, cc.name AS cost_center_name,

@@ -51,6 +51,64 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+/**
+ * When this order may be delivered. The order's own hours win; blank falls back
+ * to the client's usual hours (shown). Editable until the order is delivered,
+ * closed or cancelled — it is logistics, not money, so approval doesn't lock it.
+ */
+function ReceivingHours({ order, onSaved }: { order: SalesOrder; onSaved: () => void }) {
+  const o = order as unknown as {
+    id: string; status: string;
+    receiving_from?: string | null; receiving_to?: string | null;
+    customer_receiving_from?: string | null; customer_receiving_to?: string | null;
+  };
+  const hhmm = (t?: string | null) => (t ? t.slice(0, 5) : '');
+  const [editing, setEditing] = useState(false);
+  const [from, setFrom] = useState(hhmm(o.receiving_from));
+  const [to, setTo] = useState(hhmm(o.receiving_to));
+  const [msg, setMsg] = useState<string | null>(null);
+  const locked = ['fully_delivered', 'closed', 'cancelled'].includes(o.status);
+  const own = o.receiving_from || o.receiving_to;
+  const client = o.customer_receiving_from || o.customer_receiving_to
+    ? `${hhmm(o.customer_receiving_from) || 'any time'}–${hhmm(o.customer_receiving_to) || 'any time'}` : 'any time';
+
+  async function save(clear: boolean) {
+    setMsg(null);
+    try {
+      await api.patch(`/sales/orders/${o.id}/receiving-hours`, clear ? { receiving_from: null, receiving_to: null } : { receiving_from: from || null, receiving_to: to || null });
+      setEditing(false); onSaved();
+    } catch (e) { setMsg((e as Error).message); }
+  }
+
+  if (editing) {
+    return (
+      <div className="col-span-2">
+        <div className="mb-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">Receiving Hours (this order)</div>
+        <div className="flex flex-wrap items-center gap-1.5 text-sm">
+          <input type="time" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800" />
+          <span className="text-slate-400">–</span>
+          <input type="time" value={to} onChange={(e) => setTo(e.target.value)} className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800" />
+          <button onClick={() => save(false)} className="rounded bg-brand-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-700">Save</button>
+          {own && <button onClick={() => save(true)} className="text-xs text-slate-500 hover:underline">Use client&rsquo;s usual</button>}
+          <button onClick={() => setEditing(false)} className="text-xs text-slate-500 hover:underline">Cancel</button>
+        </div>
+        <div className="mt-0.5 text-[11px] text-slate-400">Client&rsquo;s usual: {client}</div>
+        {msg && <div className="mt-1 text-xs text-red-600">{msg}</div>}
+      </div>
+    );
+  }
+  return (
+    <div className="col-span-2">
+      <div className="mb-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">Receiving Hours</div>
+      <div className="text-sm text-slate-900 dark:text-slate-100">
+        {own ? `${hhmm(o.receiving_from) || 'any time'}–${hhmm(o.receiving_to) || 'any time'}` : client}
+        <span className="ml-1.5 text-[11px] text-slate-400">{own ? '(set for this order)' : "(client's usual)"}</span>
+        {!locked && <button onClick={() => setEditing(true)} className="ml-2 text-xs text-brand-600 hover:underline">Change for this order</button>}
+      </div>
+    </div>
+  );
+}
+
 export default function SalesOrderDetailPage() {
   const { id }    = useParams<{ id: string }>();
   const router    = useRouter();
@@ -185,6 +243,7 @@ export default function SalesOrderDetailPage() {
           <Field label="Discount"       value={order.discount_pct ? `${order.discount_pct}%` : null} />
           <Field label="Credit Checked" value={order.credit_checked ? '✓ Passed' : 'Not yet'} />
           <Field label="Reference"      value={order.reference} />
+          <ReceivingHours key={`${(order as unknown as { receiving_from?: string }).receiving_from}-${(order as unknown as { receiving_to?: string }).receiving_to}`} order={order} onSaved={load} />
           {order.notes && (
             <div className="col-span-4">
               <Field label="Notes" value={order.notes} />
