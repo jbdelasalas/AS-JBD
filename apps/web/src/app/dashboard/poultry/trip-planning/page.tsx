@@ -71,6 +71,7 @@ export default function TripPlanningPage() {
   const [pinEdits, setPinEdits] = useState<Record<string, Partial<PlanStop>>>({});
   const [warnings, setWarnings] = useState<string[] | null>(null);
   const [sheets, setSheets] = useState<TripSheet[] | null>(null);
+  const [confirmedPlanId, setConfirmedPlanId] = useState<string | null>(null);
 
   const [pinning, setPinning] = useState<{ kind: 'stop' | 'depot'; id: string; label: string } | null>(null);
   const [pasteOpen, setPasteOpen] = useState(false);
@@ -303,6 +304,7 @@ export default function TripPlanningPage() {
       setNotice(`Confirmed ${plan.plan_no}: ${r.trips.length} trip(s) — ${r.trips.join(', ')}.`);
       const full = await api.get<{ trips: TripSheet[] }>(`/logistics/plans/${plan.id}?company_id=${companyId}`);
       setSheets(full.trips);
+      setConfirmedPlanId(plan.id);
       setStops((prev) => prev.filter((s) => !Object.values(assignment).flat().includes(s.id)));
       setPlan(null);
     } catch (e) {
@@ -310,6 +312,23 @@ export default function TripPlanningPage() {
         setWarnings((e.detail as { warnings: string[] }).warnings);
       } else setError((e as Error).message);
     } finally { setBusy(null); }
+  }
+
+  // The confirmed trips in the GPS tracker's Trip Summary Report layout.
+  async function exportForGps() {
+    if (!confirmedPlanId) return;
+    setError(null); setBusy('Preparing Excel…');
+    try {
+      const res = await fetch(`/api/v1/logistics/plans/${confirmedPlanId}/gps-export?company_id=${companyId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token') ?? ''}` },
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `Export failed (${res.status})`);
+      const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? 'trip_plan.xlsx';
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a');
+      a.href = url; a.download = name; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { setError((e as Error).message); } finally { setBusy(null); }
   }
 
   // ── Map data ─────────────────────────────────────────────────────────────
@@ -723,7 +742,9 @@ export default function TripPlanningPage() {
             <section className={card}>
               <div className="mb-2 flex items-center gap-2">
                 <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Trip sheets</h2>
-                <button className={`${btn} ml-auto`} onClick={() => window.print()}>Print trip sheets</button>
+                <button className={`${btn} ml-auto`} disabled={!confirmedPlanId || !!busy} onClick={exportForGps}
+                  title="The GPS tracker's Trip Summary Report layout, with planned arrivals filled in">Export for GPS (Excel)</button>
+                <button className={btn} onClick={() => window.print()}>Print trip sheets</button>
               </div>
               <div id="trip-sheets" className="space-y-4 text-xs text-slate-900 dark:text-slate-100">
                 {sheets.map((t) => (

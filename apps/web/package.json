@@ -14,6 +14,7 @@
     "@perpet/shared": "*",
     "@types/bcryptjs": "^2.4.6",
     "bcryptjs": "^2.4.3",
+    "exceljs": "^4.4.0",
     "jose": "^5.9.6",
     "leaflet": "^1.9.4",
     "next": "^14.2.3",
