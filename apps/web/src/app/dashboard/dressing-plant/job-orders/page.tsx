@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 
-interface Customer { id: string; code: string; name: string; }
 interface JobOrder {
   id: string;
   batch_no: string;
@@ -33,12 +32,14 @@ const STATUS_STYLE: Record<string, string> = {
   cancelled: 'bg-red-100 text-red-700',
 };
 
+const BILL_TO = 'ART FRESH CHICKEN CORP';
+const FARM_LOCATIONS = ['Majayjay Farm', 'Magdalena Farm'];
+
 const labelCls = 'mb-1 block text-sm text-slate-700 dark:text-slate-300';
 const fieldCls = 'w-full rounded border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100';
 const roCls = 'w-full rounded border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/60';
 
 export default function JobOrdersPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [orders, setOrders] = useState<JobOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +48,6 @@ export default function JobOrdersPage() {
   // Booking form
   const [lastBookingNo, setLastBookingNo] = useState('');
   const [lastStatus, setLastStatus] = useState('');
-  const [customerId, setCustomerId] = useState('');
   const [farmLocation, setFarmLocation] = useState('');
   const [expectedArrival, setExpectedArrival] = useState('');
   const [truckPlate, setTruckPlate] = useState('');
@@ -65,15 +65,7 @@ export default function JobOrdersPage() {
       .finally(() => setLoading(false));
   }, [companyId]);
 
-  const loadCustomers = useCallback(() => {
-    if (!companyId) return;
-    // Bill To list is the ERP customer master.
-    api.get<{ data: Customer[] }>(`/ar/customers?company_id=${companyId}&limit=500`)
-      .then((r) => { setCustomers(r.data); setCustomerId((prev) => prev || r.data[0]?.id || ''); })
-      .catch(() => {});
-  }, [companyId]);
-
-  useEffect(() => { loadCustomers(); load(); }, [loadCustomers, load]);
+  useEffect(() => { load(); }, [load]);
 
   function resetForm() {
     setFarmLocation(''); setExpectedArrival(''); setTruckPlate(''); setExpectedHeads(''); setRemarks('');
@@ -82,12 +74,12 @@ export default function JobOrdersPage() {
   async function addOrder(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!companyId || !customerId) { setError('Select a Bill To customer first'); return; }
+    if (!companyId) return;
+    if (!farmLocation) { setError('Select a farm location'); return; }
     setSaving(true);
     try {
       const r = await api.post<{ batch_no: string; status: string }>('/dressing-plant/job-orders', {
         company_id: companyId,
-        customer_id: customerId,
         farm_location: farmLocation || null,
         expected_arrival: expectedArrival || null,
         expected_truck_plate: truckPlate || null,
@@ -128,14 +120,14 @@ export default function JobOrdersPage() {
         <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <label className={labelCls}>Bill To:</label>
-            <select value={customerId} onChange={(e) => setCustomerId(e.target.value)} className={fieldCls}>
-              {customers.length === 0 && <option value="">Select Customer</option>}
-              {customers.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
-            </select>
+            <input value={BILL_TO} readOnly className={roCls} />
           </div>
           <div>
             <label className={labelCls}>Farm Location:</label>
-            <input value={farmLocation} onChange={(e) => setFarmLocation(e.target.value)} className={fieldCls} />
+            <select value={farmLocation} onChange={(e) => setFarmLocation(e.target.value)} className={fieldCls}>
+              <option value="">Select Farm</option>
+              {FARM_LOCATIONS.map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
           </div>
           <div>
             <label className={labelCls}>Expected Arrival Date Time</label>
@@ -162,15 +154,10 @@ export default function JobOrdersPage() {
         </div>
 
         <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
-          <button type="submit" disabled={saving || !customerId}
+          <button type="submit" disabled={saving}
             className="rounded bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
             {saving ? 'Saving…' : '+ Create Booking'}
           </button>
-          {customers.length === 0 && (
-            <span className="ml-3 text-xs text-slate-500 dark:text-slate-400">
-              No customers yet — add them under Receivables → Customers.
-            </span>
-          )}
         </div>
       </form>
 

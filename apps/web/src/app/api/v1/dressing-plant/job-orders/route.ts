@@ -7,6 +7,8 @@ import { ok, err } from '@/lib/api-response';
 // Job orders = the batch. Everything downstream carries this id + client_id.
 // Batch numbers are auto-allocated DP-<year>-<seq> per company.
 
+const DEFAULT_BILL_TO = 'ART FRESH CHICKEN CORP';
+
 export async function GET(request: NextRequest) {
   try { await requireAuth(request); } catch (e) { return e as Response; }
 
@@ -59,8 +61,24 @@ export async function POST(request: NextRequest) {
   // matching dp_clients row so the two-key model (job_orders.client_id) holds.
   let clientId = (dto.client_id as string) || null;
   const customerId = (dto.customer_id as string) || null;
+  if (!clientId && !customerId) {
+    // No client given → bill to Art Fresh itself (the booking form's fixed Bill To).
+    // Linked to the ERP customer of the same name when one exists.
+    try {
+      const [created] = await query<{ id: string }>(
+        `INSERT INTO dp_clients (company_id, code, name, customer_id)
+         VALUES ($1, 'AFCC', $2,
+                 (SELECT id FROM customers WHERE company_id = $1 AND upper(name) = $2 LIMIT 1))
+         ON CONFLICT (company_id, code) DO UPDATE SET name = EXCLUDED.name
+         RETURNING id`,
+        [companyId, DEFAULT_BILL_TO],
+      );
+      clientId = created.id;
+    } catch (e: unknown) {
+      return err((e as Error).message ?? 'Failed to resolve tolling client', 500);
+    }
+  }
   if (!clientId) {
-    if (!customerId) return err('customer_id (or client_id) is required', 400);
     try {
       const cust = await query<{ code: string; name: string }>(
         `SELECT code, name FROM customers WHERE id = $1 AND company_id = $2 LIMIT 1`,
