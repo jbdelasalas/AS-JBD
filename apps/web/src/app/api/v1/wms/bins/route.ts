@@ -3,8 +3,7 @@ import { type NextRequest } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
-
-const BIN_TYPES = ['receiving', 'storage', 'picking', 'staging', 'shipping'];
+import { BIN_TYPES, BIN_ZONES, zoneByCode, buildBinCode } from '@/lib/wms-bins';
 
 export async function GET(request: NextRequest) {
   try { await requireAuth(request); } catch (e) { return e as Response; }
@@ -39,17 +38,23 @@ export async function POST(request: NextRequest) {
 
   const companyId = dto.company_id as string;
   const warehouseId = dto.warehouse_id as string;
-  const code = (dto.code as string)?.trim();
-  if (!companyId || !warehouseId || !code) return err('company_id, warehouse_id, code are required', 400);
+  if (!companyId || !warehouseId) return err('company_id and warehouse_id are required', 400);
 
-  const binType = (dto.bin_type as string) ?? 'storage';
-  if (!BIN_TYPES.includes(binType)) return err(`bin_type must be one of ${BIN_TYPES.join(', ')}`, 400);
+  // The code is always built here from zone + rack/level (or lane), so every
+  // bin follows the same format.
+  const zone = zoneByCode(dto.zone as string);
+  if (!zone) return err(`zone must be one of ${BIN_ZONES.map((z) => z.code).join(', ')}`, 400);
+  const code = buildBinCode(zone.code, { rack: dto.rack as string, level: dto.level as string, lane: dto.lane as string });
+  if (!code) return err(zone.dock ? 'lane is required for a dock zone' : 'rack and level are required', 400);
+
+  const binType = (dto.bin_type as string) ?? zone.binType;
+  if (!(BIN_TYPES as readonly string[]).includes(binType)) return err(`bin_type must be one of ${BIN_TYPES.join(', ')}`, 400);
 
   try {
     const [bin] = await query(
       `INSERT INTO bins (company_id, warehouse_id, code, zone, bin_type)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [companyId, warehouseId, code.toUpperCase(), (dto.zone as string)?.trim() || null, binType],
+      [companyId, warehouseId, code, zone.code, binType],
     );
     return ok(bin, 201);
   } catch (e) {

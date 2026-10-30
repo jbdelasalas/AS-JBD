@@ -12,7 +12,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   const sets: string[] = [];
   const vals: unknown[] = [];
-  for (const f of ['zone', 'bin_type', 'is_active'] as const) {
+  // Zone is part of the bin code (FRZ-R01-L2), so it can't change on its own —
+  // delete the bin and add it again under the right zone.
+  for (const f of ['bin_type', 'is_active'] as const) {
     if (f in dto) { vals.push(dto[f]); sets.push(`${f} = $${vals.length}`); }
   }
   if (!sets.length) return err('No fields to update', 400);

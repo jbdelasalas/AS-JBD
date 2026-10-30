@@ -1614,7 +1614,7 @@ CREATE TABLE IF NOT EXISTS bins (
   code          varchar(30) NOT NULL,
   zone          varchar(30),
   bin_type      varchar(20) NOT NULL DEFAULT 'storage'
-                  CHECK (bin_type IN ('receiving','storage','picking','staging','shipping')),
+                  CHECK (bin_type IN ('receiving','storage','picking','shipping')),
   is_active     boolean NOT NULL DEFAULT true,
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now(),

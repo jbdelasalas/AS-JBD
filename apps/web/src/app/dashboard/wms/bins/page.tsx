@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
+import { BIN_TYPES, BIN_ZONES, RACKS, LEVELS, LANES, zoneByCode, buildBinCode } from '@/lib/wms-bins';
 
 interface Warehouse { id: string; name: string; }
 interface Bin {
@@ -9,7 +10,8 @@ interface Bin {
   is_active: boolean; warehouse_id: string; warehouse_name: string;
 }
 
-const BIN_TYPES = ['receiving', 'storage', 'picking', 'staging', 'shipping'];
+const sel = 'w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100';
+const lbl = 'mb-1 block text-xs text-slate-600 dark:text-slate-400';
 
 export default function BinsPage() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -19,10 +21,20 @@ export default function BinsPage() {
 
   // New-bin form
   const [warehouseId, setWarehouseId] = useState('');
-  const [code, setCode] = useState('');
-  const [zone, setZone] = useState('');
-  const [binType, setBinType] = useState('storage');
+  const [zone, setZone] = useState('CHL');
+  const [rack, setRack] = useState(RACKS[0]);
+  const [level, setLevel] = useState(LEVELS[0]);
+  const [lane, setLane] = useState(LANES[0]);
+  const [binType, setBinType] = useState<string>(zoneByCode('CHL')!.binType);
   const [saving, setSaving] = useState(false);
+
+  const isDock = zoneByCode(zone)?.dock ?? false;
+  const code = buildBinCode(zone, { rack, level, lane });
+
+  function pickZone(z: string) {
+    setZone(z);
+    setBinType(zoneByCode(z)?.binType ?? 'storage');
+  }
 
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('company_id') : null;
 
@@ -46,11 +58,10 @@ export default function BinsPage() {
   async function addBin(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!companyId || !warehouseId || !code.trim()) { setError('Warehouse and code are required'); return; }
+    if (!companyId || !warehouseId || !code) { setError('Warehouse, zone and location are required'); return; }
     setSaving(true);
     try {
-      await api.post('/wms/bins', { company_id: companyId, warehouse_id: warehouseId, code, zone, bin_type: binType });
-      setCode(''); setZone('');
+      await api.post('/wms/bins', { company_id: companyId, warehouse_id: warehouseId, zone, rack, level, lane, bin_type: binType });
       load();
     } catch (e) {
       setError((e as Error).message);
@@ -78,33 +89,52 @@ export default function BinsPage() {
       {error && <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
 
       <form onSubmit={addBin} className="mb-5 grid grid-cols-12 gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-        <div className="col-span-4">
-          <label className="mb-1 block text-xs text-slate-600 dark:text-slate-400">Warehouse *</label>
-          <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}
-            className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+        <div className="col-span-3">
+          <label className={lbl}>Warehouse *</label>
+          <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className={sel}>
             {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
         </div>
         <div className="col-span-3">
-          <label className="mb-1 block text-xs text-slate-600 dark:text-slate-400">Code *</label>
-          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="A-01-01"
-            className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+          <label className={lbl}>Zone *</label>
+          <select value={zone} onChange={(e) => pickZone(e.target.value)} className={sel}>
+            {BIN_ZONES.map((z) => <option key={z.code} value={z.code}>{z.code} — {z.label}</option>)}
+          </select>
         </div>
+        {isDock ? (
+          <div className="col-span-2">
+            <label className={lbl}>Lane *</label>
+            <select value={lane} onChange={(e) => setLane(e.target.value)} className={sel}>
+              {LANES.map((l) => <option key={l} value={l}>{l}</option>)}
+            </select>
+          </div>
+        ) : (
+          <>
+            <div className="col-span-1">
+              <label className={lbl}>Rack *</label>
+              <select value={rack} onChange={(e) => setRack(e.target.value)} className={sel}>
+                {RACKS.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div className="col-span-1">
+              <label className={lbl} title="L1 = floor">Level *</label>
+              <select value={level} onChange={(e) => setLevel(e.target.value)} className={sel}>
+                {LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
+          </>
+        )}
         <div className="col-span-2">
-          <label className="mb-1 block text-xs text-slate-600 dark:text-slate-400">Zone</label>
-          <input value={zone} onChange={(e) => setZone(e.target.value)} placeholder="A"
-            className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
-        </div>
-        <div className="col-span-2">
-          <label className="mb-1 block text-xs text-slate-600 dark:text-slate-400">Type</label>
-          <select value={binType} onChange={(e) => setBinType(e.target.value)}
-            className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+          <label className={lbl}>Type</label>
+          <select value={binType} onChange={(e) => setBinType(e.target.value)} className={sel}>
             {BIN_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
-        <div className="col-span-1 flex items-end">
-          <button type="submit" disabled={saving}
-            className="w-full rounded bg-brand-600 px-2 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">+</button>
+        <div className="col-span-2 flex items-end gap-2">
+          <span className="flex-1 truncate rounded bg-slate-100 px-2 py-1.5 font-mono text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+            title="Bin code">{code ?? '—'}</span>
+          <button type="submit" disabled={saving || !code}
+            className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">+</button>
         </div>
       </form>
 
@@ -129,7 +159,7 @@ export default function BinsPage() {
               <tr key={b.id} className="border-t border-slate-100 dark:border-slate-800">
                 <td className="px-3 py-2 text-xs text-slate-700 dark:text-slate-300">{b.warehouse_name}</td>
                 <td className="px-3 py-2 font-mono text-xs text-slate-900 dark:text-slate-100">{b.code}</td>
-                <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{b.zone ?? '—'}</td>
+                <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{zoneByCode(b.zone)?.label ?? b.zone ?? '—'}</td>
                 <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{b.bin_type}</td>
                 <td className="px-3 py-2">
                   <button onClick={() => toggleActive(b)}
