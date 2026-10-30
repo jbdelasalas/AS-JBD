@@ -68,8 +68,8 @@ export async function POST(request: NextRequest) {
     try {
       const [created] = await query<{ id: string }>(
         `INSERT INTO dp_clients (company_id, code, name, customer_id)
-         VALUES ($1, 'AFCC', $2,
-                 (SELECT id FROM customers WHERE company_id = $1 AND upper(name) = $2 LIMIT 1))
+         VALUES ($1, 'AFCC', $2::text,
+                 (SELECT id FROM customers WHERE company_id = $1 AND upper(name) = $2::text LIMIT 1))
          ON CONFLICT (company_id, code) DO UPDATE SET name = EXCLUDED.name
          RETURNING id`,
         [companyId, DEFAULT_BILL_TO],
