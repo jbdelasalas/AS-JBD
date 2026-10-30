@@ -32,6 +32,10 @@ const STATUS_STYLE: Record<string, string> = {
   cancelled: 'bg-red-100 text-red-700',
 };
 
+interface Customer { id: string; code: string; name: string; }
+interface Vehicle { id: string; plate_no: string; description: string | null; default_driver: string | null; default_helper: string | null; }
+
+// Default Bill To — Art Fresh's own birds. Blank customer_id makes the API use it.
 const BILL_TO = 'ART FRESH CHICKEN CORP';
 const FARM_LOCATIONS = ['Majayjay Farm', 'Magdalena Farm'];
 
@@ -48,9 +52,14 @@ export default function JobOrdersPage() {
   // Booking form
   const [lastBookingNo, setLastBookingNo] = useState('');
   const [lastStatus, setLastStatus] = useState('');
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerId, setCustomerId] = useState('');
   const [farmLocation, setFarmLocation] = useState('');
   const [expectedArrival, setExpectedArrival] = useState('');
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [truckPlate, setTruckPlate] = useState('');
+  const [driver, setDriver] = useState('');
+  const [helper, setHelper] = useState('');
   const [expectedHeads, setExpectedHeads] = useState('');
   const [remarks, setRemarks] = useState('');
 
@@ -67,8 +76,33 @@ export default function JobOrdersPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    if (!companyId) return;
+    api.get<{ data: Customer[] }>(`/ar/customers?company_id=${companyId}&is_active=true&limit=500`)
+      .then((r) => setCustomers(r.data))
+      .catch(() => {});
+    api.get<{ data: Vehicle[] }>(`/dressing-plant/vehicles?company_id=${companyId}`)
+      .then((r) => setVehicles(r.data))
+      .catch(() => {});
+  }, [companyId]);
+
+  // Picking a truck fills in its usual crew; both stay editable.
+  function pickTruck(plate: string) {
+    setTruckPlate(plate);
+    const v = vehicles.find((x) => x.plate_no === plate);
+    setDriver(v?.default_driver ?? '');
+    setHelper(v?.default_helper ?? '');
+  }
+
+  // Names already on the fleet, offered as suggestions for Driver / Helper.
+  const crewNames = Array.from(new Set(vehicles.flatMap((v) => [v.default_driver, v.default_helper]).filter(Boolean) as string[])).sort();
+
+  // Art Fresh's own customer record, if it exists, stands in for the default.
+  const ownCustomer = customers.find((c) => c.name.trim().toUpperCase().replace(/\.$/, '') === BILL_TO);
+
   function resetForm() {
-    setFarmLocation(''); setExpectedArrival(''); setTruckPlate(''); setExpectedHeads(''); setRemarks('');
+    setCustomerId('');
+    setFarmLocation(''); setExpectedArrival(''); setTruckPlate(''); setDriver(''); setHelper(''); setExpectedHeads(''); setRemarks('');
   }
 
   async function addOrder(e: React.FormEvent) {
@@ -80,9 +114,12 @@ export default function JobOrdersPage() {
     try {
       const r = await api.post<{ batch_no: string; status: string }>('/dressing-plant/job-orders', {
         company_id: companyId,
+        customer_id: customerId || null,
         farm_location: farmLocation || null,
         expected_arrival: expectedArrival || null,
         expected_truck_plate: truckPlate || null,
+        expected_driver: driver || null,
+        expected_helper: helper || null,
         expected_heads: expectedHeads || null,
         notes: remarks || null,
       });
@@ -120,7 +157,12 @@ export default function JobOrdersPage() {
         <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <label className={labelCls}>Bill To:</label>
-            <input value={BILL_TO} readOnly className={roCls} />
+            <select value={customerId} onChange={(e) => setCustomerId(e.target.value)} className={fieldCls}>
+              <option value="">{BILL_TO}</option>
+              {customers.filter((c) => c.id !== ownCustomer?.id).map((c) => (
+                <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className={labelCls}>Farm Location:</label>
@@ -135,22 +177,40 @@ export default function JobOrdersPage() {
           </div>
         </div>
 
-        {/* Expected Truck Plate / Expected Farm Count Heads */}
-        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {/* Expected Truck Plate / Driver / Helper */}
+        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <label className={labelCls}>Expected Truck Plate:</label>
-            <input value={truckPlate} onChange={(e) => setTruckPlate(e.target.value)} className={fieldCls} />
+            <select value={truckPlate} onChange={(e) => pickTruck(e.target.value)} className={fieldCls}>
+              <option value="">Select Truck</option>
+              {vehicles.map((v) => (
+                <option key={v.id} value={v.plate_no}>{v.plate_no}{v.description ? ` — ${v.description}` : ''}</option>
+              ))}
+            </select>
           </div>
+          <div>
+            <label className={labelCls}>Driver:</label>
+            <input value={driver} onChange={(e) => setDriver(e.target.value)} list="dp-crew-names" placeholder="Driver name" className={fieldCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Helper:</label>
+            <input value={helper} onChange={(e) => setHelper(e.target.value)} list="dp-crew-names" placeholder="Helper name" className={fieldCls} />
+          </div>
+          <datalist id="dp-crew-names">
+            {crewNames.map((n) => <option key={n} value={n} />)}
+          </datalist>
+        </div>
+
+        {/* Expected Farm Count Heads / Booking Remarks */}
+        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className={labelCls}>Expected Farm Count Heads:</label>
             <input type="number" min="0" value={expectedHeads} onChange={(e) => setExpectedHeads(e.target.value)} className={fieldCls} />
           </div>
-        </div>
-
-        {/* Booking Remarks */}
-        <div className="mb-4 sm:max-w-md">
-          <label className={labelCls}>Booking Remarks:</label>
-          <input value={remarks} onChange={(e) => setRemarks(e.target.value)} className={fieldCls} />
+          <div>
+            <label className={labelCls}>Booking Remarks:</label>
+            <input value={remarks} onChange={(e) => setRemarks(e.target.value)} className={fieldCls} />
+          </div>
         </div>
 
         <div className="border-t border-slate-100 pt-4 dark:border-slate-800">

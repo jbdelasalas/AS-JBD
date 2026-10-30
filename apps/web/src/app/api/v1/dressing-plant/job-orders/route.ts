@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
   const rows = await query(
     `SELECT jo.id, jo.batch_no, jo.status, jo.received_at, jo.locked, jo.notes,
             jo.farm_location, jo.expected_arrival, jo.expected_truck_plate, jo.expected_heads,
+            jo.expected_driver, jo.expected_helper,
             jo.client_id, c.name AS client_name, c.code AS client_code, c.customer_id,
             rw.net_live_weight_kg, rw.head_count, rw.doa_count,
             yr.recovery_pct, yr.dressed_recovery_weight_kg
@@ -117,8 +118,9 @@ export async function POST(request: NextRequest) {
     const [row] = await query<{ id: string; batch_no: string; status: string }>(
       `INSERT INTO dp_job_orders
          (company_id, branch_id, batch_no, client_id, notes,
-          farm_location, expected_arrival, expected_truck_plate, expected_heads, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+          farm_location, expected_arrival, expected_truck_plate, expected_heads,
+          expected_driver, expected_helper, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING id, batch_no, status`,
       [
         companyId,
@@ -130,6 +132,8 @@ export async function POST(request: NextRequest) {
         (dto.expected_arrival as string) || null,
         (dto.expected_truck_plate as string) || null,
         dto.expected_heads != null && dto.expected_heads !== '' ? Number(dto.expected_heads) : null,
+        (dto.expected_driver as string)?.trim() || null,
+        (dto.expected_helper as string)?.trim() || null,
         auth.userId,
       ],
     );
