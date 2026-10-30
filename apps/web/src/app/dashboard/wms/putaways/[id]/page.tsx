@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 
 interface Line { id: string; line_no: number; sku: string; item_name: string; uom: string; bin_code: string; lot_no: string | null; qty: number; unit_cost: number; }
-interface Putaway { id: string; putaway_no: string; status: string; created_at: string; posted_at: string | null; notes: string | null; warehouse_name: string; grn_no: string | null; lines: Line[]; }
+interface Putaway { id: string; putaway_no: string; status: string; created_at: string; posted_at: string | null; notes: string | null; warehouse_name: string; source_no: string | null; lines: Line[]; }
 
 const STATUS_STYLES: Record<string, string> = {
   draft: 'bg-slate-100 text-slate-700', posted: 'bg-emerald-100 text-emerald-700', cancelled: 'bg-red-100 text-red-700',
@@ -38,7 +38,7 @@ export default function PutawayDetailPage() {
       <div className="mb-4 flex items-start justify-between">
         <div>
           <h1 className="font-mono text-lg font-semibold text-slate-900 dark:text-slate-100">{pa.putaway_no}</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400">{pa.warehouse_name}{pa.grn_no ? ` · from ${pa.grn_no}` : ''} · {formatDate(pa.created_at)}</p>
+          <p className="text-sm text-slate-600 dark:text-slate-400">{pa.warehouse_name}{pa.source_no ? ` · from ${pa.source_no}` : ''} · {formatDate(pa.created_at)}</p>
         </div>
         <div className="flex items-center gap-2">
           <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[pa.status]}`}>{pa.status}</span>

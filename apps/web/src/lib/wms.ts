@@ -11,6 +11,43 @@ export async function nextDocNo(
   return `${prefix}-${new Date().getFullYear()}-${String(n).padStart(6, '0')}`;
 }
 
+export interface SourceRemaining { qty: number; unitCost: number; }
+
+/**
+ * What is still left to put away from a goods receipt or a received transfer,
+ * per item: received qty minus qty already on draft/posted put-aways from the
+ * same source.
+ */
+export async function putawaySourceRemaining(
+  client: Pick<PoolClient, 'query'>, src: { grnId?: string | null; transferId?: string | null },
+): Promise<Map<string, SourceRemaining>> {
+  const { rows } = src.grnId
+    ? await client.query(
+        `SELECT pol.item_id, SUM(grl.qty_received) AS qty,
+                SUM(grl.qty_received * grl.unit_cost) / NULLIF(SUM(grl.qty_received), 0) AS unit_cost
+           FROM goods_receipt_lines grl
+           JOIN purchase_order_lines pol ON pol.id = grl.po_line_id
+          WHERE grl.grn_id = $1
+          GROUP BY pol.item_id`, [src.grnId])
+    : await client.query(
+        `SELECT item_id, SUM(qty) AS qty,
+                SUM(qty * COALESCE(unit_cost_at_send, 0)) / NULLIF(SUM(qty), 0) AS unit_cost
+           FROM stock_transfer_lines WHERE transfer_id = $1
+          GROUP BY item_id`, [src.transferId]);
+
+  const used = await client.query(
+    `SELECT pl.item_id, SUM(pl.qty) AS qty
+       FROM putaway_lines pl JOIN putaways p ON p.id = pl.putaway_id
+      WHERE p.status <> 'cancelled' AND ${src.grnId ? 'p.grn_id' : 'p.transfer_id'} = $1
+      GROUP BY pl.item_id`, [src.grnId ?? src.transferId]);
+  const usedBy = new Map(used.rows.map((r) => [String(r.item_id), Number(r.qty)]));
+
+  return new Map(rows.map((r) => [String(r.item_id), {
+    qty: Number(r.qty) - (usedBy.get(String(r.item_id)) ?? 0),
+    unitCost: Number(r.unit_cost ?? 0),
+  }]));
+}
+
 /** Find-or-create an item_lot, returning its id. Returns null when lotNo is blank. */
 export async function resolveLot(
   client: PoolClient, companyId: string, itemId: string,

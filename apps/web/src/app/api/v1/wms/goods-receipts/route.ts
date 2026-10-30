@@ -29,14 +29,28 @@ export async function GET(request: NextRequest) {
   if (!grns.length) return ok([]);
 
   const ids = grns.map((g) => g.id);
+  // Per item: received minus what draft/posted put-aways already took.
   const lines = await query(
-    `SELECT grl.grn_id, grl.qty_received, grl.unit_cost,
-            pol.item_id, i.sku, i.name AS item_name, i.uom, i.tracking_mode
-       FROM goods_receipt_lines grl
-       JOIN purchase_order_lines pol ON pol.id = grl.po_line_id
-       JOIN items i ON i.id = pol.item_id
-      WHERE grl.grn_id = ANY($1::uuid[])
-      ORDER BY grl.line_no`,
+    `WITH rcv AS (
+       SELECT grl.grn_id, pol.item_id, MIN(grl.line_no) AS line_no, SUM(grl.qty_received) AS qty,
+              SUM(grl.qty_received * grl.unit_cost) / NULLIF(SUM(grl.qty_received), 0) AS unit_cost
+         FROM goods_receipt_lines grl
+         JOIN purchase_order_lines pol ON pol.id = grl.po_line_id
+        WHERE grl.grn_id = ANY($1::uuid[])
+        GROUP BY grl.grn_id, pol.item_id
+     ), used AS (
+       SELECT p.grn_id, pl.item_id, SUM(pl.qty) AS qty
+         FROM putaway_lines pl JOIN putaways p ON p.id = pl.putaway_id
+        WHERE p.grn_id = ANY($1::uuid[]) AND p.status <> 'cancelled'
+        GROUP BY p.grn_id, pl.item_id
+     )
+     SELECT rcv.grn_id, rcv.qty - COALESCE(used.qty, 0) AS qty_received, rcv.unit_cost,
+            rcv.item_id, i.sku, i.name AS item_name, i.uom, i.tracking_mode
+       FROM rcv
+       JOIN items i ON i.id = rcv.item_id
+       LEFT JOIN used ON used.grn_id = rcv.grn_id AND used.item_id = rcv.item_id
+      WHERE rcv.qty - COALESCE(used.qty, 0) > 0
+      ORDER BY rcv.line_no`,
     [ids],
   );
 
@@ -51,5 +65,6 @@ export async function GET(request: NextRequest) {
     byGrn.set(String(l.grn_id), arr);
   }
 
-  return ok(grns.map((g) => ({ ...g, lines: byGrn.get(String(g.id)) ?? [] })));
+  // Fully put-away receipts drop off the list.
+  return ok(grns.filter((g) => byGrn.has(String(g.id))).map((g) => ({ ...g, lines: byGrn.get(String(g.id))! })));
 }

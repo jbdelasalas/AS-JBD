@@ -8,10 +8,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   try { await requireAuth(request); } catch (e) { return e as Response; }
 
   const [header] = await query(
-    `SELECT p.*, w.name AS warehouse_name, gr.grn_no
+    `SELECT p.*, w.name AS warehouse_name, COALESCE(gr.grn_no, st.transfer_no) AS source_no
        FROM putaways p
        JOIN warehouses w ON w.id = p.warehouse_id
        LEFT JOIN goods_receipts gr ON gr.id = p.grn_id
+       LEFT JOIN stock_transfers st ON st.id = p.transfer_id
       WHERE p.id = $1 LIMIT 1`,
     [params.id],
   );

@@ -8,7 +8,7 @@ import DataTable, { ColDef } from '@/components/DataTable';
 
 interface Row {
   id: string; putaway_no: string; status: string; created_at: string;
-  posted_at: string | null; warehouse_name: string; grn_no: string | null;
+  posted_at: string | null; warehouse_name: string; source_no: string | null;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -22,7 +22,7 @@ const COLUMNS: ColDef<Row>[] = [
   { key: 'putaway_no',     header: 'Put-away No.', render: r => <Link href={`/dashboard/wms/putaways/${r.id}`} className="font-mono text-xs text-brand-700 hover:underline dark:text-brand-400">{r.putaway_no}</Link>, exportValue: r => r.putaway_no },
   { key: 'created_at',     header: 'Created',      render: r => <span className="text-xs text-slate-600 dark:text-slate-400">{formatDate(r.created_at)}</span>, exportValue: r => formatDate(r.created_at) },
   { key: 'warehouse_name', header: 'Warehouse',    render: r => <span className="text-xs text-slate-700 dark:text-slate-300">{r.warehouse_name}</span>, exportValue: r => r.warehouse_name },
-  { key: 'grn_no',         header: 'From GRN',      render: r => <span className="text-xs text-slate-500 dark:text-slate-400">{r.grn_no ?? '—'}</span>, exportValue: r => r.grn_no ?? '' },
+  { key: 'source_no',      header: 'Source',        render: r => <span className="text-xs text-slate-500 dark:text-slate-400">{r.source_no ?? '—'}</span>, exportValue: r => r.source_no ?? '' },
   { key: 'status',         header: 'Status',       render: r => <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[r.status] ?? STATUS_STYLES.draft}`}>{r.status}</span>, exportValue: r => r.status },
 ];
 
