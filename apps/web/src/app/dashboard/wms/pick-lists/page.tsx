@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import DataTable, { ColDef } from '@/components/DataTable';
 
-interface Row { id: string; pick_no: string; status: string; created_at: string; warehouse_name: string; order_no: string | null; }
+interface Row { id: string; pick_no: string; status: string; created_at: string; warehouse_name: string; order_no: string | null; customer_name: string | null; }
 
 const STATUS_STYLES: Record<string, string> = {
   draft: 'bg-slate-100 text-slate-700 dark:text-slate-300', picking: 'bg-amber-100 text-amber-700',
@@ -19,6 +19,7 @@ const COLUMNS: ColDef<Row>[] = [
   { key: 'created_at',     header: 'Created',   render: r => <span className="text-xs text-slate-600 dark:text-slate-400">{formatDate(r.created_at)}</span>, exportValue: r => formatDate(r.created_at) },
   { key: 'warehouse_name', header: 'Warehouse', render: r => <span className="text-xs text-slate-700 dark:text-slate-300">{r.warehouse_name}</span>, exportValue: r => r.warehouse_name },
   { key: 'order_no',       header: 'Sales Order', render: r => <span className="text-xs text-slate-500 dark:text-slate-400">{r.order_no ?? '—'}</span>, exportValue: r => r.order_no ?? '' },
+  { key: 'customer_name',  header: 'Customer',    render: r => <span className="text-xs text-slate-500 dark:text-slate-400">{r.customer_name ?? '—'}</span>, exportValue: r => r.customer_name ?? '' },
   { key: 'status',         header: 'Status',    render: r => <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[r.status] ?? STATUS_STYLES.draft}`}>{r.status}</span>, exportValue: r => r.status },
 ];
 

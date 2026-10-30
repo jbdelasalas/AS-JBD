@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 
 interface Line { id: string; line_no: number; sku: string; item_name: string; uom: string; bin_code: string; lot_no: string | null; qty_to_pick: number; qty_picked: number; bin_available: number; }
-interface PickList { id: string; pick_no: string; status: string; created_at: string; notes: string | null; warehouse_name: string; order_no: string | null; lines: Line[]; }
+interface PickList { id: string; pick_no: string; status: string; created_at: string; notes: string | null; warehouse_name: string; order_no: string | null; customer_name: string | null; lines: Line[]; }
 
 const STATUS_STYLES: Record<string, string> = {
   draft: 'bg-slate-100 text-slate-700', picking: 'bg-amber-100 text-amber-700',
@@ -43,7 +43,7 @@ export default function PickListDetailPage() {
       <div className="mb-4 flex items-start justify-between">
         <div>
           <h1 className="font-mono text-lg font-semibold text-slate-900 dark:text-slate-100">{pl.pick_no}</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400">{pl.warehouse_name}{pl.order_no ? ` · ${pl.order_no}` : ''} · {formatDate(pl.created_at)}</p>
+          <p className="text-sm text-slate-600 dark:text-slate-400">{pl.warehouse_name}{pl.order_no ? ` · ${pl.order_no}${pl.customer_name ? ` (${pl.customer_name})` : ''}` : ''} · {formatDate(pl.created_at)}</p>
         </div>
         <div className="flex items-center gap-2">
           <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[pl.status]}`}>{pl.status}</span>

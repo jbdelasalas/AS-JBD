@@ -29,6 +29,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     for (const l of lines) {
       const qty = pickedById.has(String(l.id)) ? pickedById.get(String(l.id))! : Number(l.qty_to_pick);
       if (qty < 0) throw new Error('Picked qty cannot be negative');
+      // The to-pick qty is what the sales order allowed; picking more would ship beyond the order.
+      if (qty > Number(l.qty_to_pick) + 1e-9) throw new Error(`Picked qty (${qty}) is more than the qty to pick (${Number(l.qty_to_pick)}) for one of the lines`);
       const avail = await binQtyOnHand(client, String(l.item_id), String(l.bin_id), l.lot_id ? String(l.lot_id) : null);
       if (qty > avail) throw new Error(`Bin only holds ${avail} for one of the lines (tried to pick ${qty})`);
       await client.query(`UPDATE pick_list_lines SET qty_picked = $1 WHERE id = $2`, [qty, l.id]);

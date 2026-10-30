@@ -8,10 +8,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   try { await requireAuth(request); } catch (e) { return e as Response; }
 
   const [header] = await query(
-    `SELECT p.*, w.name AS warehouse_name, so.order_no
+    `SELECT p.*, w.name AS warehouse_name, so.order_no, c.name AS customer_name
        FROM pick_lists p
        JOIN warehouses w ON w.id = p.warehouse_id
        LEFT JOIN sales_orders so ON so.id = p.so_id
+       LEFT JOIN customers c ON c.id = so.customer_id
       WHERE p.id = $1 LIMIT 1`,
     [params.id],
   );

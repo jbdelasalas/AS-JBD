@@ -61,6 +61,34 @@ export async function putawaySourceRemaining(
   }]));
 }
 
+/** Sales-order statuses whose lines can be picked. */
+export const PICKABLE_SO_STATUSES = ['approved', 'partially_delivered'];
+
+/**
+ * SQL for what is still open to pick on sales orders, per (order, item):
+ * ordered minus whichever is larger — qty already delivered (Delivery Receipt
+ * posting) or qty already on this order's pick lists (to-pick while draft,
+ * picked after). Expects $1 = uuid[] of sales order ids.
+ */
+export const SO_OPEN_TO_PICK_SQL = `
+  WITH ordered AS (
+    SELECT sol.order_id, sol.item_id, MIN(sol.line_no) AS line_no,
+           SUM(sol.quantity) AS qty, SUM(COALESCE(sol.qty_delivered, 0)) AS delivered
+      FROM sales_order_lines sol
+     WHERE sol.order_id = ANY($1::uuid[]) AND sol.item_id IS NOT NULL
+     GROUP BY sol.order_id, sol.item_id
+  ), picking AS (
+    SELECT p.so_id AS order_id, pl.item_id,
+           SUM(CASE WHEN p.status IN ('draft', 'picking') THEN pl.qty_to_pick ELSE COALESCE(pl.qty_picked, 0) END) AS qty
+      FROM pick_list_lines pl JOIN pick_lists p ON p.id = pl.pick_id
+     WHERE p.so_id = ANY($1::uuid[]) AND p.status <> 'cancelled'
+     GROUP BY p.so_id, pl.item_id
+  )
+  SELECT o.order_id, o.item_id, o.line_no, o.qty AS ordered,
+         o.qty - GREATEST(o.delivered, COALESCE(pk.qty, 0)) AS open_qty
+    FROM ordered o
+    LEFT JOIN picking pk ON pk.order_id = o.order_id AND pk.item_id = o.item_id`;
+
 /** Find-or-create an item_lot, returning its id. Returns null when lotNo is blank. */
 export async function resolveLot(
   client: PoolClient, companyId: string, itemId: string,
