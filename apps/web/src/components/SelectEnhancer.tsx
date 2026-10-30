@@ -11,6 +11,11 @@ import { useEffect } from 'react';
 
 export function SelectEnhancer() {
   useEffect(() => {
+    // Phones/tablets: keep the native picker. The overlay's search box pops the
+    // on-screen keyboard, whose resize/scroll closed the overlay and left the
+    // select focused with nothing to type into.
+    if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) return;
+
     let overlay: HTMLDivElement | null = null;
     let activeSelect: HTMLSelectElement | null = null;
 
@@ -92,13 +97,26 @@ export function SelectEnhancer() {
 
       // Options list
       const list = document.createElement('div');
-      Object.assign(list.style, { overflowY: 'auto', flex: '1' });
+      Object.assign(list.style, { overflowY: 'auto', flex: '1', minHeight: '0', overscrollBehavior: 'contain' });
       div.appendChild(list);
 
       const allOptions = Array.from(select.options);
+      // Keyboard highlight (ArrowUp/ArrowDown), as an index into the rendered rows
+      let rows: { el: HTMLDivElement; value: string; selected: boolean }[] = [];
+      let hi = -1;
+
+      function paint() {
+        rows.forEach((r, i) => {
+          r.el.style.background = i === hi
+            ? (dark ? '#334155' : '#e2e8f0')
+            : r.selected ? (dark ? '#1e3a5f' : '#eff6ff') : 'transparent';
+        });
+        rows[hi]?.el.scrollIntoView({ block: 'nearest' });
+      }
 
       function renderOptions(query: string) {
         list.innerHTML = '';
+        rows = [];
         const q = query.toLowerCase();
         const filtered = q ? allOptions.filter(o => o.text.toLowerCase().includes(q)) : allOptions;
 
@@ -141,7 +159,10 @@ export function SelectEnhancer() {
           });
 
           list.appendChild(item);
+          rows.push({ el: item, value: opt.value, selected });
         }
+        hi = rows.findIndex((r) => r.selected);
+        if (hi >= 0) paint();
       }
 
       renderOptions('');
@@ -149,9 +170,16 @@ export function SelectEnhancer() {
       searchInput.addEventListener('input', () => renderOptions(searchInput.value));
       searchInput.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') { removeOverlay(); select.focus(); }
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (!rows.length) return;
+          hi = e.key === 'ArrowDown' ? Math.min(hi + 1, rows.length - 1) : Math.max(hi - 1, 0);
+          paint();
+        }
         if (e.key === 'Enter') {
-          const first = list.querySelector('div') as HTMLElement | null;
-          first?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+          e.preventDefault();
+          const row = rows[hi] ?? rows[0];
+          if (row) selectOption(select, row.value);
         }
         if (e.key === 'Tab') removeOverlay();
       });
@@ -195,8 +223,11 @@ export function SelectEnhancer() {
       }
     }
 
-    // Close on scroll/resize
-    function onScroll() { removeOverlay(); }
+    // Close on page scroll/resize — but not when the option list itself scrolls
+    function onScroll(e: Event) {
+      if (overlay && e.target instanceof Node && overlay.contains(e.target)) return;
+      removeOverlay();
+    }
 
     document.addEventListener('mousedown', onMouseDown, true);
     document.addEventListener('mousedown', onDocMouseDown);
