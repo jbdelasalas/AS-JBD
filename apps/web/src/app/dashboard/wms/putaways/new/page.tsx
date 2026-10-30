@@ -9,7 +9,8 @@ interface Bin { id: string; code: string; warehouse_id: string; }
 type SourceLine = { item_id: string; sku: string; item_name: string; uom: string; tracking_mode: string; qty: number; unit_cost: number };
 interface Grn { id: string; grn_no: string; warehouse_id: string; lines: SourceLine[]; }
 interface Transfer { id: string; transfer_no: string; from_warehouse_name: string; lines: SourceLine[]; }
-type Source = 'grn' | 'transfer';
+interface Batch { id: string; batch_no: string; client_name: string; lines: SourceLine[]; }
+type Source = 'grn' | 'transfer' | 'production';
 interface Line { item_id: string; bin_id: string; lot_no: string; qty: string; unit_cost: string; tracking_mode: string; }
 
 const blank: Line = { item_id: '', bin_id: '', lot_no: '', qty: '', unit_cost: '0', tracking_mode: 'none' };
@@ -20,6 +21,7 @@ export default function NewPutawayPage() {
   const [bins, setBins] = useState<Bin[]>([]);
   const [grns, setGrns] = useState<Grn[]>([]);
   const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const [batches, setBatches] = useState<Batch[]>([]);
   const [warehouseId, setWarehouseId] = useState('');
   const [source, setSource] = useState<Source>('grn');
   const [docId, setDocId] = useState('');
@@ -27,12 +29,21 @@ export default function NewPutawayPage() {
   const [lines, setLines] = useState<Line[]>([{ ...blank }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Opened from Production Detail → "Put away": ?job_order_id=…
+  const [pendingBatch, setPendingBatch] = useState<string | null>(null);
 
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('company_id') : null;
 
   useEffect(() => {
     if (!companyId) return;
     api.get<{ data: Warehouse[] }>(`/wms/warehouses?company_id=${companyId}`).then((r) => setWarehouses(r.data)).catch(() => {});
+    // Production output isn't in any warehouse yet, so its batches don't depend on the warehouse picked.
+    api.get<Batch[]>(`/wms/production-receipts?company_id=${companyId}`).then(setBatches).catch(() => {});
+    const qs = new URLSearchParams(window.location.search);
+    if (qs.get('job_order_id')) {
+      setSource('production');
+      setPendingBatch(qs.get('job_order_id'));
+    }
   }, [companyId]);
 
   const loadForWarehouse = useCallback((wh: string) => {
@@ -42,13 +53,29 @@ export default function NewPutawayPage() {
     api.get<Transfer[]>(`/wms/stock-transfers?company_id=${companyId}&warehouse_id=${wh}`).then(setTransfers).catch(() => {});
   }, [companyId]);
 
-  useEffect(() => { loadForWarehouse(warehouseId); setDocId(''); }, [warehouseId, loadForWarehouse]);
+  // A goods receipt or transfer belongs to one warehouse, so changing it clears the pick; a batch doesn't.
+  useEffect(() => {
+    loadForWarehouse(warehouseId);
+    if (source !== 'production') setDocId('');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [warehouseId, loadForWarehouse]);
 
   const docs = source === 'grn'
-    ? grns.map((g) => ({ id: g.id, label: g.grn_no, lines: g.lines }))
-    : transfers.map((t) => ({ id: t.id, label: `${t.transfer_no} · from ${t.from_warehouse_name}`, lines: t.lines }));
+    ? grns.map((g) => ({ id: g.id, label: g.grn_no, lotNo: '', lines: g.lines }))
+    : source === 'transfer'
+      ? transfers.map((t) => ({ id: t.id, label: `${t.transfer_no} · from ${t.from_warehouse_name}`, lotNo: '', lines: t.lines }))
+      // Production output is lotted by batch so binned stock traces back to it.
+      : batches.map((b) => ({ id: b.id, label: `${b.batch_no} · ${b.client_name}`, lotNo: b.batch_no, lines: b.lines }));
   // Lines can only use items on the chosen document (add a line to split one item across bins).
   const docLines = docs.find((d) => d.id === docId)?.lines ?? [];
+
+  useEffect(() => {
+    if (pendingBatch && source === 'production' && docs.some((d) => d.id === pendingBatch)) {
+      pickDoc(pendingBatch);
+      setPendingBatch(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingBatch, batches]);
 
   function pickSource(s: Source) {
     setSource(s);
@@ -62,7 +89,7 @@ export default function NewPutawayPage() {
     const doc = docs.find((d) => d.id === id);
     if (!doc) { setLines([{ ...blank }]); return; }
     setLines(doc.lines.map((l) => ({
-      item_id: l.item_id, bin_id: '', lot_no: '', qty: String(l.qty),
+      item_id: l.item_id, bin_id: '', lot_no: doc.lotNo, qty: String(l.qty),
       unit_cost: String(l.unit_cost), tracking_mode: l.tracking_mode ?? 'none',
     })));
   }
@@ -71,6 +98,7 @@ export default function NewPutawayPage() {
     setLines((prev) => prev.map((l, idx) => {
       if (idx !== i) return l;
       const next = { ...l, [field]: value };
+      if (field === 'item_id' && source === 'production' && !l.lot_no) next.lot_no = docs.find((d) => d.id === docId)?.lotNo ?? '';
       if (field === 'item_id') next.tracking_mode = docLines.find((dl) => dl.item_id === value)?.tracking_mode ?? 'none';
       return next;
     }));
@@ -82,7 +110,7 @@ export default function NewPutawayPage() {
     e.preventDefault();
     setError(null);
     if (!companyId || !warehouseId) { setError('Select a warehouse'); return; }
-    if (!docId) { setError(source === 'grn' ? 'Select a goods receipt' : 'Select a transfer'); return; }
+    if (!docId) { setError(source === 'grn' ? 'Select a goods receipt' : source === 'transfer' ? 'Select a transfer' : 'Select a production batch'); return; }
     const valid = lines.filter((l) => l.item_id && l.bin_id && Number(l.qty) > 0);
     if (!valid.length) { setError('Each line needs an item, a bin, and a positive qty'); return; }
 
@@ -92,6 +120,7 @@ export default function NewPutawayPage() {
         company_id: companyId, warehouse_id: warehouseId, notes: notes || null,
         grn_id: source === 'grn' ? docId : null,
         transfer_id: source === 'transfer' ? docId : null,
+        job_order_id: source === 'production' ? docId : null,
         lines: valid.map((l) => ({ item_id: l.item_id, bin_id: l.bin_id, lot_no: l.lot_no || null, qty: Number(l.qty), unit_cost: Number(l.unit_cost) })),
       });
       router.push(`/dashboard/wms/putaways/${res.id}`);
@@ -103,7 +132,7 @@ export default function NewPutawayPage() {
     <div className="mx-auto max-w-3xl">
       <div className="mb-4">
         <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">New Put-away</h1>
-        <p className="text-sm text-slate-600 dark:text-slate-400">Assign received goods to bins — from a supplier goods receipt or a stock transfer from another warehouse.</p>
+        <p className="text-sm text-slate-600 dark:text-slate-400">Assign received goods to bins — from a supplier goods receipt, a stock transfer from another warehouse, or a dressing-plant batch transferred from production.</p>
       </div>
 
       {error && <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
@@ -125,13 +154,14 @@ export default function NewPutawayPage() {
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                 <option value="grn">Goods Receipt (supplier)</option>
                 <option value="transfer">Stock Transfer (other warehouse)</option>
+                <option value="production">Production (dressing plant)</option>
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs text-slate-600 dark:text-slate-400">{source === 'grn' ? 'Goods Receipt *' : 'Transfer *'}</label>
-              <select value={docId} onChange={(e) => pickDoc(e.target.value)} disabled={!warehouseId}
+              <label className="mb-1 block text-xs text-slate-600 dark:text-slate-400">{source === 'grn' ? 'Goods Receipt *' : source === 'transfer' ? 'Transfer *' : 'Batch *'}</label>
+              <select value={docId} onChange={(e) => pickDoc(e.target.value)} disabled={!warehouseId && source !== 'production'}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
-                <option value="">{warehouseId && !docs.length ? '— nothing left to put away —' : 'Select…'}</option>
+                <option value="">{(warehouseId || source === 'production') && !docs.length ? '— nothing left to put away —' : 'Select…'}</option>
                 {docs.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
               </select>
             </div>

@@ -13,15 +13,28 @@ export async function nextDocNo(
 
 export interface SourceRemaining { qty: number; unitCost: number; }
 
+/** Production output lines (alias po) that go to the warehouse through a put-away. */
+export const DP_OUTPUT_PUTAWAY_ELIGIBLE =
+  `po.weight_kg > 0 AND NOT (COALESCE(po.transferred_kg, 0) > 0 AND po.transferred_warehouse_id IS NULL)`;
+
 /**
- * What is still left to put away from a goods receipt or a received transfer,
- * per item: received qty minus qty already on draft/posted put-aways from the
- * same source.
+ * What is still left to put away from a goods receipt, a received transfer or a
+ * dressing-plant batch's production output, per item: received (or produced)
+ * qty minus qty already on draft/posted put-aways from the same source.
  */
 export async function putawaySourceRemaining(
-  client: Pick<PoolClient, 'query'>, src: { grnId?: string | null; transferId?: string | null },
+  client: Pick<PoolClient, 'query'>,
+  src: { grnId?: string | null; transferId?: string | null; jobOrderId?: string | null },
 ): Promise<Map<string, SourceRemaining>> {
-  const { rows } = src.grnId
+  const { rows } = src.jobOrderId
+    ? await client.query(
+        // Production output carries no cost yet. DP_OUTPUT_PUTAWAY_ELIGIBLE skips
+        // lines binned by the old direct transfer, which never had a put-away.
+        `SELECT item_id, SUM(weight_kg) AS qty, 0 AS unit_cost
+           FROM dp_processed_output po
+          WHERE job_order_id = $1 AND ${DP_OUTPUT_PUTAWAY_ELIGIBLE}
+          GROUP BY item_id`, [src.jobOrderId])
+    : src.grnId
     ? await client.query(
         `SELECT pol.item_id, SUM(grl.qty_received) AS qty,
                 SUM(grl.qty_received * grl.unit_cost) / NULLIF(SUM(grl.qty_received), 0) AS unit_cost
@@ -38,8 +51,8 @@ export async function putawaySourceRemaining(
   const used = await client.query(
     `SELECT pl.item_id, SUM(pl.qty) AS qty
        FROM putaway_lines pl JOIN putaways p ON p.id = pl.putaway_id
-      WHERE p.status <> 'cancelled' AND ${src.grnId ? 'p.grn_id' : 'p.transfer_id'} = $1
-      GROUP BY pl.item_id`, [src.grnId ?? src.transferId]);
+      WHERE p.status <> 'cancelled' AND ${src.jobOrderId ? 'p.job_order_id' : src.grnId ? 'p.grn_id' : 'p.transfer_id'} = $1
+      GROUP BY pl.item_id`, [src.jobOrderId ?? src.grnId ?? src.transferId]);
   const usedBy = new Map(used.rows.map((r) => [String(r.item_id), Number(r.qty)]));
 
   return new Map(rows.map((r) => [String(r.item_id), {

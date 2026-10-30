@@ -19,11 +19,12 @@ export async function GET(request: NextRequest) {
 
   const rows = await query(
     `SELECT p.id, p.putaway_no, p.status, p.created_at, p.posted_at, p.notes,
-            w.name AS warehouse_name, COALESCE(gr.grn_no, st.transfer_no) AS source_no
+            w.name AS warehouse_name, COALESCE(gr.grn_no, st.transfer_no, jo.batch_no) AS source_no
        FROM putaways p
        JOIN warehouses w ON w.id = p.warehouse_id
        LEFT JOIN goods_receipts gr ON gr.id = p.grn_id
        LEFT JOIN stock_transfers st ON st.id = p.transfer_id
+       LEFT JOIN dp_job_orders jo ON jo.id = p.job_order_id
       WHERE ${where}
       ORDER BY p.created_at DESC
       LIMIT 500`,
@@ -53,8 +54,10 @@ export async function POST(request: NextRequest) {
   // (or more qty than the source has left) would push bins above the warehouse.
   const grnId = (dto.grn_id as string) || null;
   const transferId = (dto.transfer_id as string) || null;
-  if (!grnId && !transferId) return err('Choose the goods receipt or stock transfer this put-away comes from', 400);
-  if (grnId && transferId) return err('A put-away comes from a goods receipt or a transfer, not both', 400);
+  const jobOrderId = (dto.job_order_id as string) || null;
+  const sourceCount = [grnId, transferId, jobOrderId].filter(Boolean).length;
+  if (sourceCount === 0) return err('Choose the goods receipt, stock transfer or production batch this put-away comes from', 400);
+  if (sourceCount > 1) return err('A put-away comes from one source document only', 400);
 
   const client = await getPool().connect();
   try {
@@ -68,6 +71,10 @@ export async function POST(request: NextRequest) {
       if (!gr) return fail('Goods receipt not found', 404);
       if (gr.status !== 'posted') return fail('Post the goods receipt before putting it away', 400);
       if (String(gr.warehouse_id) !== warehouseId) return fail('Goods receipt was received into a different warehouse', 400);
+    } else if (jobOrderId) {
+      const { rows: [jo] } = await client.query(
+        `SELECT id FROM dp_job_orders WHERE id = $1 AND company_id = $2 FOR UPDATE`, [jobOrderId, companyId]);
+      if (!jo) return fail('Production batch not found', 404);
     } else {
       const { rows: [xfr] } = await client.query(
         `SELECT status, to_warehouse_id FROM stock_transfers WHERE id = $1 AND company_id = $2 FOR UPDATE`, [transferId, companyId]);
@@ -76,7 +83,7 @@ export async function POST(request: NextRequest) {
       if (String(xfr.to_warehouse_id) !== warehouseId) return fail('Transfer was received into a different warehouse', 400);
     }
 
-    const remaining = await putawaySourceRemaining(client, { grnId, transferId });
+    const remaining = await putawaySourceRemaining(client, { grnId, transferId, jobOrderId });
     const wanted = new Map<string, number>();
     for (const l of lines) wanted.set(String(l.item_id), (wanted.get(String(l.item_id)) ?? 0) + Number(l.qty));
     for (const [itemId, qty] of wanted) {
@@ -88,9 +95,9 @@ export async function POST(request: NextRequest) {
     const putawayNo = await nextDocNo(client, companyId, 'putaways', 'putaway_no', 'PA');
 
     const { rows: [header] } = await client.query(
-      `INSERT INTO putaways (company_id, putaway_no, grn_id, transfer_id, warehouse_id, notes, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,'draft',$7) RETURNING *`,
-      [companyId, putawayNo, grnId, transferId, warehouseId, dto.notes ?? null, auth.userId],
+      `INSERT INTO putaways (company_id, putaway_no, grn_id, transfer_id, job_order_id, warehouse_id, notes, status, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'draft',$8) RETURNING *`,
+      [companyId, putawayNo, grnId, transferId, jobOrderId, warehouseId, dto.notes ?? null, auth.userId],
     );
 
     for (let i = 0; i < lines.length; i++) {
