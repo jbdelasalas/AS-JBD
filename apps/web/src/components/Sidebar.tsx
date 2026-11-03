@@ -122,6 +122,8 @@ const NAV: NavItem[] = [
       { href: '/dashboard/dressing-plant/receiving',    label: 'Receiving' },
       { href: '/dashboard/dressing-plant/production',   label: 'Production Detail' },
       { href: '/dashboard/dressing-plant/production-report', label: 'Production Report' },
+      { href: '/dashboard/dressing-plant/live-harvest-report', label: 'Live Harvest Report' },
+      { href: '/dashboard/dressing-plant/basic-production-report', label: 'Basic Production Report' },
       { href: '/dashboard/dressing-plant/marination',   label: 'Marination' },
       { href: '/dashboard/dressing-plant/cold-chain',   label: 'Cold Chain' },
       { href: '/dashboard/dressing-plant/labels',       label: 'Product Labels' },

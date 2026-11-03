@@ -26,15 +26,16 @@ export async function GET(request: NextRequest) {
             jo.farm_location, jo.expected_arrival, jo.expected_truck_plate, jo.expected_heads,
             jo.expected_driver, jo.expected_helper,
             jo.client_id, c.name AS client_name, c.code AS client_code, c.customer_id,
-            rw.net_live_weight_kg, rw.head_count, rw.doa_count,
+            rw.net_live_weight_kg, rw.head_count, rw.doa_count, rw.trucks, jo.receiving_completed_at,
             yr.recovery_pct, yr.dressed_recovery_weight_kg,
             (SELECT COUNT(*)::int FROM dp_processed_output po WHERE po.job_order_id = jo.id) AS output_lines
        FROM dp_job_orders jo
        JOIN dp_clients c ON c.id = jo.client_id
+       -- All trucks of the batch, totalled (NULLs when nothing received yet).
        LEFT JOIN LATERAL (
-         SELECT net_live_weight_kg, head_count, doa_count
+         SELECT SUM(net_live_weight_kg) AS net_live_weight_kg, SUM(head_count)::int AS head_count,
+                SUM(doa_count)::int AS doa_count, COUNT(*)::int AS trucks
            FROM dp_receiving_weights WHERE job_order_id = jo.id
-           ORDER BY created_at DESC LIMIT 1
        ) rw ON true
        LEFT JOIN LATERAL (
          SELECT recovery_pct, dressed_recovery_weight_kg
