@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
 
-interface JobOrder { id: string; batch_no: string; client_name: string; locked: boolean; }
+interface JobOrder { id: string; batch_no: string; client_name: string; locked: boolean; head_count: number | null; }
 interface Receiving {
   id: string; batch_no: string; client_name: string;
   gross_weight_kg: string; tare_weight_kg: string; net_live_weight_kg: string;
@@ -33,17 +33,21 @@ export default function ReceivingPage() {
       .then((r) => setRows(r.data)).catch((e) => setError(e.message)).finally(() => setLoading(false));
   }, [companyId]);
 
-  useEffect(() => {
+  // Only batches not yet received (the job-orders feed carries the latest
+  // receiving's head_count, null when there is none).
+  const loadOrders = useCallback(() => {
     if (!companyId) return;
     api.get<{ data: JobOrder[] }>(`/dressing-plant/job-orders?company_id=${companyId}`)
       .then((r) => {
-        setOrders(r.data);
+        const open = r.data.filter((o) => o.head_count == null);
+        setOrders(open);
         const batch = new URLSearchParams(window.location.search).get('batch');
-        setJobOrderId(batch && r.data.some((o) => o.id === batch) ? batch : (r.data[0]?.id ?? ''));
+        setJobOrderId(batch && open.some((o) => o.id === batch) ? batch : (open[0]?.id ?? ''));
       })
       .catch(() => {});
-    load();
-  }, [companyId, load]);
+  }, [companyId]);
+
+  useEffect(() => { loadOrders(); load(); }, [loadOrders, load]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -57,7 +61,7 @@ export default function ReceivingPage() {
         coop_count: coops ? Number(coops) : 0, doa_count: doa ? Number(doa) : 0,
       });
       setGross(''); setTare(''); setHeads(''); setCoops(''); setDoa('');
-      load();
+      load(); loadOrders();
     } catch (e) { setError((e as Error).message); } finally { setSaving(false); }
   }
 
@@ -75,7 +79,7 @@ export default function ReceivingPage() {
           <label className="mb-1 block text-xs text-slate-600 dark:text-slate-400">Batch *</label>
           <select value={jobOrderId} onChange={(e) => setJobOrderId(e.target.value)}
             className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
-            {orders.length === 0 && <option value="">No batches yet</option>}
+            {orders.length === 0 && <option value="">No batches waiting to be received</option>}
             {orders.map((o) => <option key={o.id} value={o.id}>{o.batch_no} — {o.client_name}</option>)}
           </select>
         </div>

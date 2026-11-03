@@ -49,10 +49,12 @@ export async function POST(request: NextRequest) {
   if (!(headCount > 0)) return err('head_count must be greater than 0', 400);
 
   try {
+    // A batch is received once; a second weighing would double its live weight.
     const [row] = await query<{ id: string }>(
       `INSERT INTO dp_receiving_weights
          (job_order_id, gross_weight_kg, tare_weight_kg, coop_count, head_count, doa_count, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       SELECT $1::uuid, $2::numeric, $3::numeric, $4::int, $5::int, $6::int, $7::uuid
+        WHERE NOT EXISTS (SELECT 1 FROM dp_receiving_weights WHERE job_order_id = $1::uuid)
        RETURNING id`,
       [
         jobOrderId,
@@ -64,6 +66,7 @@ export async function POST(request: NextRequest) {
         auth.userId,
       ],
     );
+    if (!row) return err('This batch has already been received', 409);
     return ok(row, 201);
   } catch (e: unknown) {
     return err((e as Error).message ?? 'Failed to record receiving', 500);
