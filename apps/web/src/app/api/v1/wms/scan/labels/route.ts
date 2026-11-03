@@ -58,12 +58,14 @@ export async function GET(request: NextRequest) {
   if (!entity || entity === 'box') {
     const boxes = await query(
       `SELECT q.code, 'box' AS entity_type, x.id AS entity_id,
-              x.product AS title,
-              COALESCE(jo.batch_no, '') AS subtitle,
-              x.net_weight_kg::text || ' kg' AS detail, q.printed_at
+              x.product || COALESCE(' #' || po.line_no, '') AS title,
+              concat_ws(' · ', jo.batch_no, b.code) AS subtitle,
+              x.net_weight_kg::text || ' kg' || COALESCE(' · ' || NULLIF(po.head_count, 0) || ' hd', '') AS detail, q.printed_at
          FROM qr_labels q
          JOIN dp_storage_boxes x ON x.id = q.entity_id
          LEFT JOIN dp_job_orders jo ON jo.id = x.job_order_id
+         LEFT JOIN dp_processed_output po ON po.id = x.dp_output_id
+         LEFT JOIN bins b ON b.id = x.bin_id
         WHERE q.company_id = $1 AND q.entity_type = 'box' AND q.is_active
           AND x.status = 'in_storage'
         ORDER BY x.time_in DESC

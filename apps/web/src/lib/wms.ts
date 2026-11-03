@@ -89,6 +89,16 @@ export const SO_OPEN_TO_PICK_SQL = `
     FROM ordered o
     LEFT JOIN picking pk ON pk.order_id = o.order_id AND pk.item_id = o.item_id`;
 
+/**
+ * SQL condition: the box is held by a pick list — on one being picked, or
+ * picked on one that hasn't been cancelled. A pack left unscanned when the pick
+ * was confirmed (qty_picked 0) is free again.
+ */
+export const BOX_HELD_BY_PICK_SQL = (boxIdExpr: string) => `EXISTS (
+  SELECT 1 FROM pick_list_lines hpl JOIN pick_lists hp ON hp.id = hpl.pick_id
+   WHERE hpl.box_id = ${boxIdExpr} AND hp.status <> 'cancelled'
+     AND (hp.status IN ('draft', 'picking') OR COALESCE(hpl.qty_picked, 0) > 0))`;
+
 /** Find-or-create an item_lot, returning its id. Returns null when lotNo is blank. */
 export async function resolveLot(
   client: PoolClient, companyId: string, itemId: string,

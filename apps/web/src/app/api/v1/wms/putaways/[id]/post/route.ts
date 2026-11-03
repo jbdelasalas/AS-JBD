@@ -101,14 +101,24 @@ async function postFromProduction(client: PoolClient, pa: Row, lines: Row[], bat
   }
 
   // Cold-storage box per line (per pack/crate) so the storage clock/billing starts.
-  await client.query(
-    `INSERT INTO dp_storage_boxes (company_id, job_order_id, product, net_weight_kg, room, warehouse_id, bin_id, item_id, lot_id)
-     SELECT $1, $2, i.name, x.qty, b.code, $3, x.bin_id, x.item_id, x.lot_id
-       FROM unnest($4::uuid[], $5::uuid[], $6::uuid[], $7::numeric[]) AS x(item_id, bin_id, lot_id, qty)
+  // Each box gets its QR label straight away, so the pack can be stickered and
+  // scanned when it is picked.
+  const { rows: boxes } = await client.query(
+    `INSERT INTO dp_storage_boxes (company_id, job_order_id, product, net_weight_kg, room, warehouse_id, bin_id, item_id, lot_id, dp_output_id)
+     SELECT $1, $2, i.name, x.qty, b.code, $3, x.bin_id, x.item_id, x.lot_id, x.dp_output_id
+       FROM unnest($4::uuid[], $5::uuid[], $6::uuid[], $7::numeric[], $8::uuid[]) AS x(item_id, bin_id, lot_id, qty, dp_output_id)
        JOIN items i ON i.id = x.item_id
-       LEFT JOIN bins b ON b.id = x.bin_id`,
+       LEFT JOIN bins b ON b.id = x.bin_id
+     RETURNING id`,
     [pa.company_id, pa.job_order_id, pa.warehouse_id,
-      lines.map((l) => l.item_id), lines.map((l) => l.bin_id), lines.map((l) => l.lot_id ?? null), lines.map((l) => Number(l.qty))],
+      lines.map((l) => l.item_id), lines.map((l) => l.bin_id), lines.map((l) => l.lot_id ?? null), lines.map((l) => Number(l.qty)),
+      lines.map((l) => l.dp_output_id ?? null)],
+  );
+  await client.query(
+    `INSERT INTO qr_labels (company_id, code, entity_type, entity_id, created_by)
+     SELECT $1, 'BOX-' || replace(x.id::text, '-', ''), 'box', x.id, $3 FROM unnest($2::uuid[]) AS x(id)
+     ON CONFLICT (code) DO NOTHING`,
+    [pa.company_id, boxes.map((b) => b.id), userId],
   );
 
   // Lock the production lines this put-away covers, so a later save of

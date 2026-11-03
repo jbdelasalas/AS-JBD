@@ -3,7 +3,7 @@ import { type NextRequest } from 'next/server';
 import { query, getPool } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
-import { nextDocNo, PICKABLE_SO_STATUSES, SO_OPEN_TO_PICK_SQL } from '@/lib/wms';
+import { nextDocNo, PICKABLE_SO_STATUSES, SO_OPEN_TO_PICK_SQL, BOX_HELD_BY_PICK_SQL } from '@/lib/wms';
 
 export async function GET(request: NextRequest) {
   try { await requireAuth(request); } catch (e) { return e as Response; }
@@ -47,7 +47,10 @@ export async function POST(request: NextRequest) {
   // Picking is driven by the sales order: only its items, up to what is still open.
   if (!soId) return err('Choose the sales order this pick list is for', 400);
   if (!lines?.length) return err('At least one line required', 400);
+  // A line is either one pack (box_id: the whole pack is picked) or loose stock
+  // (item + bin + qty).
   for (const l of lines) {
+    if (l.box_id) continue;
     if (!l.item_id || !l.bin_id || !(Number(l.qty_to_pick) > 0)) return err('Each line needs item, bin, and positive qty', 400);
   }
 
@@ -63,14 +66,41 @@ export async function POST(request: NextRequest) {
     if (!PICKABLE_SO_STATUSES.includes(String(so.status))) return fail(`Sales order ${so.order_no} is ${so.status} — only approved orders can be picked`, 400);
     if (so.warehouse_id && String(so.warehouse_id) !== warehouseId) return fail(`Sales order ${so.order_no} ships from a different warehouse`, 400);
 
+    // Packs: lock them and take item/bin/lot/qty from the box itself.
+    const boxIds = lines.filter((l) => l.box_id).map((l) => String(l.box_id));
+    if (new Set(boxIds).size !== boxIds.length) return fail('The same pack is on the list twice', 400);
+    if (boxIds.length) {
+      const { rows: boxes } = await client.query(
+        `SELECT x.id, x.item_id, x.bin_id, x.lot_id, x.net_weight_kg, x.status, x.warehouse_id,
+                ${BOX_HELD_BY_PICK_SQL('x.id')} AS held
+           FROM dp_storage_boxes x WHERE x.id = ANY($1::uuid[]) AND x.company_id = $2 FOR UPDATE OF x`,
+        [boxIds, companyId]);
+      const byId = new Map(boxes.map((b) => [String(b.id), b]));
+      for (const l of lines.filter((x) => x.box_id)) {
+        const b = byId.get(String(l.box_id));
+        if (!b) return fail('A pack on the list no longer exists', 404);
+        if (b.status !== 'in_storage' || String(b.warehouse_id) !== warehouseId || !b.bin_id) return fail('A pack on the list is no longer in a bin of this warehouse', 409);
+        if (b.held) return fail('A pack on the list is already on another pick list', 409);
+        Object.assign(l, { item_id: b.item_id, bin_id: b.bin_id, lot_id: b.lot_id, qty_to_pick: Number(b.net_weight_kg) });
+      }
+    }
+
     const { rows: open } = await client.query(SO_OPEN_TO_PICK_SQL, [[soId]]);
     const openByItem = new Map(open.map((r) => [String(r.item_id), Number(r.open_qty)]));
     const wanted = new Map<string, number>();
-    for (const l of lines) wanted.set(String(l.item_id), (wanted.get(String(l.item_id)) ?? 0) + Number(l.qty_to_pick));
+    const smallestPack = new Map<string, number>();
+    for (const l of lines) {
+      const k = String(l.item_id), q = Number(l.qty_to_pick);
+      wanted.set(k, (wanted.get(k) ?? 0) + q);
+      if (l.box_id) smallestPack.set(k, Math.min(smallestPack.get(k) ?? Infinity, q));
+    }
     for (const [itemId, qty] of wanted) {
       if (!openByItem.has(itemId)) return fail(`A line has an item that is not on sales order ${so.order_no}`, 400);
       const left = Math.max(openByItem.get(itemId)!, 0);
-      if (qty > left + 1e-9) return fail(`Only ${left} still open to pick for one of the items on ${so.order_no} — lower the qty`, 400);
+      // Packs go whole, so the last one may take the item past the order — but
+      // only by less than a pack (dropping any pack would leave it short).
+      const slack = smallestPack.has(itemId) ? smallestPack.get(itemId)! - 1e-6 : 1e-9;
+      if (qty > left + slack) return fail(`Only ${left} still open to pick for one of the items on ${so.order_no} — ${smallestPack.has(itemId) ? 'take off a pack' : 'lower the qty'}`, 400);
     }
 
     const pickNo = await nextDocNo(client, companyId, 'pick_lists', 'pick_no', 'PCK');
@@ -82,9 +112,9 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < lines.length; i++) {
       const l = lines[i];
       await client.query(
-        `INSERT INTO pick_list_lines (pick_id, line_no, item_id, bin_id, lot_id, qty_to_pick)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
-        [header.id, i + 1, l.item_id, l.bin_id, l.lot_id ?? null, Number(l.qty_to_pick)],
+        `INSERT INTO pick_list_lines (pick_id, line_no, item_id, bin_id, lot_id, qty_to_pick, box_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [header.id, i + 1, l.item_id, l.bin_id, l.lot_id ?? null, Number(l.qty_to_pick), l.box_id ?? null],
       );
     }
     await client.query('COMMIT');

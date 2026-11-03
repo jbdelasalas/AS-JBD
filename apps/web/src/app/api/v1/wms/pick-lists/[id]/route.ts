@@ -8,8 +8,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   try { await requireAuth(request); } catch (e) { return e as Response; }
 
   const [header] = await query(
-    `SELECT p.*, w.name AS warehouse_name, so.order_no, c.name AS customer_name
+    `SELECT p.*, w.name AS warehouse_name, so.order_no, so.delivery_date, c.name AS customer_name,
+            uc.full_name AS created_by_name, up.full_name AS picked_by_name
        FROM pick_lists p
+       LEFT JOIN users uc ON uc.id = p.created_by
+       LEFT JOIN users up ON up.id = p.picked_by
        JOIN warehouses w ON w.id = p.warehouse_id
        LEFT JOIN sales_orders so ON so.id = p.so_id
        LEFT JOIN customers c ON c.id = so.customer_id
@@ -19,17 +22,21 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   if (!header) return err('Pick list not found', 404);
 
   const lines = await query(
-    `SELECT pl.*, i.sku, i.name AS item_name, i.uom, b.code AS bin_code, l.lot_no,
-            COALESCE(bsb.qty_on_hand, 0) AS bin_available
+    `SELECT pl.*, i.sku, i.name AS item_name, i.uom, b.code AS bin_code, b.zone AS bin_zone, l.lot_no,
+            COALESCE(bsb.qty_on_hand, 0) AS bin_available,
+            po.line_no AS pack_no, po.head_count AS heads, jo.batch_no
        FROM pick_list_lines pl
        JOIN items i ON i.id = pl.item_id
        JOIN bins b ON b.id = pl.bin_id
        LEFT JOIN item_lots l ON l.id = pl.lot_id
+       LEFT JOIN dp_storage_boxes x ON x.id = pl.box_id
+       LEFT JOIN dp_processed_output po ON po.id = x.dp_output_id
+       LEFT JOIN dp_job_orders jo ON jo.id = x.job_order_id
        LEFT JOIN bin_stock_balances bsb
          ON bsb.item_id = pl.item_id AND bsb.bin_id = pl.bin_id
          AND COALESCE(bsb.lot_id,'00000000-0000-0000-0000-000000000000'::uuid)
            = COALESCE(pl.lot_id,'00000000-0000-0000-0000-000000000000'::uuid)
-      WHERE pl.pick_id = $1 ORDER BY pl.line_no`,
+      WHERE pl.pick_id = $1 ORDER BY b.code, po.line_no NULLS LAST, pl.line_no`,
     [params.id],
   );
   return ok({ ...header, lines });

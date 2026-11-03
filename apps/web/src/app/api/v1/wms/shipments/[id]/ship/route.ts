@@ -44,6 +44,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       );
     }
 
+    // Packs picked for this shipment leave storage (stops their storage clock).
+    if (s.pick_id) {
+      await client.query(
+        `UPDATE dp_storage_boxes SET status = 'dispatched', time_out = now()
+          WHERE status = 'in_storage'
+            AND id IN (SELECT box_id FROM pick_list_lines WHERE pick_id = $1 AND box_id IS NOT NULL AND qty_picked > 0)`,
+        [s.pick_id],
+      );
+    }
+
     await client.query(
       `UPDATE shipments SET status='shipped', shipped_at=now(), shipped_by=$1, updated_at=now() WHERE id=$2`,
       [auth.userId, params.id],
