@@ -19,6 +19,7 @@ const TABS: { key: Entity | 'all'; label: string }[] = [
 export default function LabelsPage() {
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [rows, setRows] = useState<LabelRow[]>([]);
+  const [logo, setLogo] = useState<string | null>(null);
   const [tab, setTab] = useState<Entity | 'all'>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,8 +30,8 @@ export default function LabelsPage() {
 
   const load = useCallback((cid: string) => {
     setLoading(true);
-    api.get<{ data: LabelRow[] }>(`/wms/scan/labels?company_id=${cid}`)
-      .then((r) => setRows(r.data))
+    api.get<{ data: LabelRow[]; logo: string | null }>(`/wms/scan/labels?company_id=${cid}`)
+      .then((r) => { setRows(r.data); setLogo(r.logo ?? null); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
@@ -137,7 +138,7 @@ export default function LabelsPage() {
             <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
               {selected.size ? `${selected.size} selected · ` : ''}Click a label to select it for printing.
             </p>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="flex flex-wrap gap-3">
               {visible.map((r) => (
                 <button
                   key={r.code}
@@ -146,7 +147,7 @@ export default function LabelsPage() {
                     selected.has(r.code) ? 'ring-2 ring-brand-500' : 'ring-1 ring-transparent hover:ring-slate-300'
                   }`}
                 >
-                  <Label row={r} />
+                  <Label row={r} logo={logo} />
                   {r.printed_at && (
                     <p className="px-2 pb-1 text-[10px] text-slate-400">
                       printed {new Date(r.printed_at).toLocaleDateString()}
@@ -162,7 +163,7 @@ export default function LabelsPage() {
       {/* Print-only sheet: `hidden` keeps it off screen, and the print rules
           above flip it back to a grid on paper. */}
       <div id="print-sheet" className="hidden">
-        {toPrint.map((r) => <Label key={r.code} row={r} />)}
+        {toPrint.map((r) => <Label key={r.code} row={r} logo={logo} />)}
       </div>
     </div>
   );

@@ -12,6 +12,11 @@ interface Line {
 }
 interface Putaway { id: string; putaway_no: string; status: string; warehouse_id: string; created_at: string; posted_at: string | null; notes: string | null; warehouse_name: string; source_no: string | null; lines: Line[]; }
 interface Bin { id: string; code: string; zone: string | null; }
+interface PutawayLabels {
+  logo: string | null;
+  packs: (LabelRow & { dp_output_id: string | null })[];
+  bins: (LabelRow & { bin_id: string })[];
+}
 
 const STATUS_STYLES: Record<string, string> = {
   draft: 'bg-slate-100 text-slate-700', posted: 'bg-emerald-100 text-emerald-700', cancelled: 'bg-red-100 text-red-700',
@@ -26,9 +31,12 @@ export default function PutawayDetailPage() {
   const [bins, setBins] = useState<Bin[]>([]);
   // line id -> new bin id, while editing bins
   const [edit, setEdit] = useState<Record<string, string> | null>(null);
-  // QR labels for this put-away (packs + bins), and which kinds go to the printer.
-  const [labels, setLabels] = useState<{ packs: LabelRow[]; bins: LabelRow[] } | null>(null);
+  // QR labels for this put-away (packs + bins); the panel picks which kinds to
+  // print, and each line can print its own label. `sheet` is what goes to paper.
+  const [labels, setLabels] = useState<PutawayLabels | null>(null);
+  const [panel, setPanel] = useState(false);
   const [printKinds, setPrintKinds] = useState({ packs: true, bins: false });
+  const [sheet, setSheet] = useState<LabelRow[]>([]);
 
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('company_id') : null;
 
@@ -45,25 +53,35 @@ export default function PutawayDetailPage() {
   async function post() {
     if (!confirm('Post this put-away? Stock will be placed into the selected bins.')) return;
     setBusy(true); setError(null);
-    try { await api.post(`/wms/putaways/${id}/post`); load(); openLabels(); }
+    try { await api.post(`/wms/putaways/${id}/post`); load(); await loadLabels(); setPanel(true); }
     catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
   }
 
-  async function openLabels() {
-    setError(null);
+  // Issues any missing labels, so it is safe to call again after posting.
+  const loadLabels = useCallback(async () => {
     try {
-      const r = await api.post<{ packs: LabelRow[]; bins: LabelRow[] }>(`/wms/putaways/${id}/labels`, {});
+      const r = await api.post<PutawayLabels>(`/wms/putaways/${id}/labels`, {});
       setLabels(r);
       setPrintKinds({ packs: r.packs.length > 0, bins: r.packs.length === 0 });
     } catch (e) { setError((e as Error).message); }
-  }
+  }, [id]);
+  const status = pa?.status;
+  useEffect(() => { if (status === 'draft' || status === 'posted') loadLabels(); }, [status, loadLabels]);
+
   const toPrint = labels ? [...(printKinds.packs ? labels.packs : []), ...(printKinds.bins ? labels.bins : [])] : [];
-  function printLabels() {
-    if (!toPrint.length) return;
-    window.print();
-    if (companyId) api.patch('/wms/scan/labels', { company_id: companyId, codes: toPrint.map((l) => l.code) }).catch(() => {});
+  function printRows(rows: LabelRow[]) {
+    if (!rows.length) return;
+    setSheet(rows);
+    // Let the sheet render before the print dialog snapshots the page.
+    setTimeout(() => {
+      window.print();
+      if (companyId) api.patch('/wms/scan/labels', { company_id: companyId, codes: rows.map((l) => l.code) }).catch(() => {});
+    }, 50);
   }
+  // A pack line prints its pack's label; any other line prints its bin's.
+  const labelFor = (l: Line): LabelRow | undefined =>
+    l.dp_output_id ? labels?.packs.find((p) => p.dp_output_id === l.dp_output_id) : labels?.bins.find((b) => b.bin_id === l.bin_id);
 
   // A posted line can only move while its pack is still in storage.
   const movable = (l: Line) => pa?.status === 'draft' || !l.dp_output_id || l.box_status === 'in_storage';
@@ -101,7 +119,7 @@ export default function PutawayDetailPage() {
         <div className="flex flex-wrap items-center gap-2">
           <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[pa.status]}`}>{pa.status}</span>
           {['draft', 'posted'].includes(pa.status) && !editing && (
-            <button onClick={openLabels} className="rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">Print QR labels</button>
+            <button onClick={() => { setPanel(true); loadLabels(); }} className="rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">Print QR labels</button>
           )}
           {['draft', 'posted'].includes(pa.status) && !editing && (
             <button onClick={startEdit} className="rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">Edit bins</button>
@@ -124,7 +142,7 @@ export default function PutawayDetailPage() {
 
       {error && <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
       {notice && <div className="mb-3 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{notice}</div>}
-      {labels && (
+      {panel && labels && (
         <div className="mb-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-4 text-xs text-slate-700 dark:text-slate-300">
@@ -139,15 +157,15 @@ export default function PutawayDetailPage() {
               </label>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => setLabels(null)} className="rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">Close</button>
-              <button onClick={printLabels} disabled={!toPrint.length} className="rounded bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">Print {toPrint.length} label(s)</button>
+              <button onClick={() => setPanel(false)} className="rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">Close</button>
+              <button onClick={() => printRows(toPrint)} disabled={!toPrint.length} className="rounded bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">Print {toPrint.length} label(s)</button>
             </div>
           </div>
           {pa.status === 'draft' && <p className="mt-2 text-[11px] text-slate-500">Pack labels are made when the put-away is posted — post it first to print them.</p>}
           {pa.status === 'posted' && !labels.packs.length && <p className="mt-2 text-[11px] text-slate-500">No packs in storage from this put-away (shipped, or not a production put-away).</p>}
           {toPrint.length > 0 && (
-            <div className="mt-3 grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
-              {toPrint.slice(0, 6).map((r) => <QrLabel key={r.code} row={r} />)}
+            <div className="mt-3 flex max-h-80 flex-wrap gap-2 overflow-y-auto">
+              {toPrint.slice(0, 6).map((r) => <QrLabel key={r.code} row={r} logo={labels.logo} />)}
               {toPrint.length > 6 && <p className="self-center text-xs text-slate-500">…and {toPrint.length - 6} more</p>}
             </div>
           )}
@@ -162,7 +180,7 @@ export default function PutawayDetailPage() {
       <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-            <tr><th className="px-3 py-2 text-left">Item</th><th className="px-3 py-2 text-left">Bin</th><th className="px-3 py-2 text-left">Lot</th><th className="px-3 py-2 text-right">Qty</th></tr>
+            <tr><th className="px-3 py-2 text-left">Item</th><th className="px-3 py-2 text-left">Bin</th><th className="px-3 py-2 text-left">Lot</th><th className="px-3 py-2 text-right">Qty</th><th className="w-16 px-3 py-2" /></tr>
           </thead>
           <tbody>
             {pa.lines.map((l) => {
@@ -187,6 +205,18 @@ export default function PutawayDetailPage() {
                   </td>
                   <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{l.lot_no ?? '—'}</td>
                   <td className="px-3 py-2 text-right text-xs tabular-nums text-slate-900 dark:text-slate-100">{Number(l.qty).toLocaleString(undefined, { maximumFractionDigits: 3 })} {l.uom}</td>
+                  <td className="px-3 py-2 text-right">
+                    {(() => {
+                      const lbl = labelFor(l);
+                      const why = lbl ? undefined : l.dp_output_id ? (pa.status === 'draft' ? 'Post the put-away first — pack labels are made when it posts' : 'Pack is no longer in storage') : 'Loading…';
+                      return (
+                        <button onClick={() => lbl && printRows([lbl])} disabled={!lbl || editing} title={lbl ? `Print ${l.dp_output_id ? 'pack' : 'bin'} label` : why}
+                          className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-600 hover:bg-slate-50 disabled:opacity-40 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
+                          Label
+                        </button>
+                      );
+                    })()}
+                  </td>
                 </tr>
               );
             })}
@@ -198,7 +228,7 @@ export default function PutawayDetailPage() {
 
       {/* Print-only sticker sheet. */}
       <div id="print-sheet" className="hidden">
-        {toPrint.map((r) => <QrLabel key={r.code} row={r} />)}
+        {sheet.map((r) => <QrLabel key={r.code} row={r} logo={labels?.logo} />)}
       </div>
     </div>
   );

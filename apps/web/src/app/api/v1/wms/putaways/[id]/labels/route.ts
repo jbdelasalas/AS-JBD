@@ -36,7 +36,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     // Same shape as /wms/scan/labels, so the sticker component is shared.
     const { rows: packLabels } = await client.query(
-      `SELECT q.code, 'box' AS entity_type, x.id AS entity_id,
+      `SELECT q.code, 'box' AS entity_type, x.id AS entity_id, x.dp_output_id,
               x.product || COALESCE(' #' || po.line_no, '') AS title,
               concat_ws(' · ', jo.batch_no, b.code) AS subtitle,
               x.net_weight_kg::text || ' kg' || COALESCE(' · ' || NULLIF(po.head_count, 0) || ' hd', '') AS detail,
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         ORDER BY po.line_no NULLS LAST, x.time_in`,
       [boxes.map((b) => String(b.id))]);
     const { rows: binLabels } = await client.query(
-      `SELECT q.code, 'bin' AS entity_type, b.id AS entity_id, b.code AS title, w.name AS subtitle,
+      `SELECT q.code, 'bin' AS entity_type, b.id AS entity_id, b.id AS bin_id, b.code AS title, w.name AS subtitle,
               COALESCE(b.zone, b.bin_type) AS detail, q.printed_at
          FROM bins b
          JOIN warehouses w ON w.id = b.warehouse_id
@@ -59,8 +59,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         ORDER BY b.code`,
       [bins.map((b) => String(b.id))]);
 
+    const { rows: [co] } = await client.query(`SELECT logo FROM companies WHERE id = $1`, [pa.company_id]);
     await client.query('COMMIT');
-    return ok({ status: pa.status, packs: packLabels, bins: binLabels });
+    return ok({ status: pa.status, logo: co?.logo ?? null, packs: packLabels, bins: binLabels });
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});
     return err((e as Error).message ?? 'Failed to load labels', 500);

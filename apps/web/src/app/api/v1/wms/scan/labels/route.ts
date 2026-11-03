@@ -75,7 +75,10 @@ export async function GET(request: NextRequest) {
     out.push(...boxes);
   }
 
-  return ok({ data: out });
+  // Company logo for the sticker (the labels page can't read /companies when
+  // the user is confined to the warehouse module).
+  const [co] = await query(`SELECT logo FROM companies WHERE id = $1`, [companyId]);
+  return ok({ data: out, logo: co?.logo ?? null });
 }
 
 /**
