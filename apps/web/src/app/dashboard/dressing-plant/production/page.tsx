@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { parseWeighingFile, totalByProduct, matchItem, describeMachineBatch, type Weighing } from '@/lib/weigh-import';
 
-interface JobOrder { id: string; batch_no: string; client_name: string; }
+interface JobOrder { id: string; batch_no: string; client_name: string; head_count: number | null; output_lines: number; }
 interface Item { id: string; name: string; sku?: string; }
 interface OutputLine {
   id: string; batch_no: string; item_id: string; item_name: string; size_id: string | null;
@@ -27,6 +27,7 @@ export default function ProductionPage() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const [jobOrderId, setJobOrderId] = useState('');
+  const [showProduced, setShowProduced] = useState(false);
   const [saving, setSaving] = useState(false);
   // Weighing-machine upload holding more than one machine batch, waiting for a pick.
   const [pendingUpload, setPendingUpload] = useState<{ file: string; rows: Weighing[]; batches: string[] } | null>(null);
@@ -45,9 +46,18 @@ export default function ProductionPage() {
   useEffect(() => {
     if (!companyId) return;
     api.get<{ data: JobOrder[] }>(`/dressing-plant/job-orders?company_id=${companyId}`)
-      .then((r) => { setOrders(r.data); if (r.data[0]) { setJobOrderId(r.data[0].id); loadLines(r.data[0].id); } }).catch(() => {});
+      .then((r) => {
+        setOrders(r.data);
+        const first = r.data.find(isOpen);
+        if (first) { setJobOrderId(first.id); loadLines(first.id); }
+      }).catch(() => {});
     api.get<Item[]>(`/wms/items?company_id=${companyId}`).then(setItems).catch(() => {});
   }, [companyId, loadLines]);
+
+  // Batches still to produce: received, with no production saved yet. The one
+  // on screen stays listed so it doesn't vanish right after saving.
+  const isOpen = (o: JobOrder) => o.head_count != null && Number(o.output_lines) === 0;
+  const batchOptions = orders.filter((o) => showProduced ? o.head_count != null : (isOpen(o) || o.id === jobOrderId));
 
   function pickBatch(id: string) { setJobOrderId(id); setDrafts([]); setNotice(null); loadLines(id); }
 
@@ -97,6 +107,8 @@ export default function ProductionPage() {
       await api.post('/dressing-plant/production', { company_id: companyId, job_order_id: jobOrderId, lines: [...existing, ...newOnes] });
       setDrafts([]);
       loadLines(jobOrderId);
+      const saved = existing.length + newOnes.length;
+      setOrders((os) => os.map((o) => o.id === jobOrderId ? { ...o, output_lines: saved } : o));
       setNotice('Production detail saved.');
     } catch (e) { setError((e as Error).message); } finally { setSaving(false); }
   }
@@ -130,10 +142,14 @@ export default function ProductionPage() {
         <div className="min-w-[220px]">
           <label className="mb-1 block text-xs text-slate-600 dark:text-slate-400">Batch</label>
           <select value={jobOrderId} onChange={(e) => pickBatch(e.target.value)} className={inputCls}>
-            {orders.length === 0 && <option value="">No batches yet</option>}
-            {orders.map((o) => <option key={o.id} value={o.id}>{o.batch_no} — {o.client_name}</option>)}
+            {batchOptions.length === 0 && <option value="">No received batches waiting for production</option>}
+            {batchOptions.map((o) => <option key={o.id} value={o.id}>{o.batch_no} — {o.client_name}{Number(o.output_lines) > 0 ? ' (produced)' : ''}</option>)}
           </select>
         </div>
+        <label className="mb-1.5 flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+          <input type="checkbox" checked={showProduced} onChange={(e) => setShowProduced(e.target.checked)} />
+          Show produced batches
+        </label>
       </div>
 
       {/* Existing lines */}

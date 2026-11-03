@@ -27,7 +27,8 @@ export async function GET(request: NextRequest) {
             jo.expected_driver, jo.expected_helper,
             jo.client_id, c.name AS client_name, c.code AS client_code, c.customer_id,
             rw.net_live_weight_kg, rw.head_count, rw.doa_count,
-            yr.recovery_pct, yr.dressed_recovery_weight_kg
+            yr.recovery_pct, yr.dressed_recovery_weight_kg,
+            (SELECT COUNT(*)::int FROM dp_processed_output po WHERE po.job_order_id = jo.id) AS output_lines
        FROM dp_job_orders jo
        JOIN dp_clients c ON c.id = jo.client_id
        LEFT JOIN LATERAL (
