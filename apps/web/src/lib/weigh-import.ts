@@ -2,24 +2,33 @@
 // Date, Time, Batch Number, Product Code, Number of Heads, Weight) from .xlsx
 // or .csv, and total it per product for the Production Detail grid.
 
-export interface Weighing { machineBatch: string; productCode: string; heads: number; weight: number; }
+export interface Weighing { machineBatch: string; productCode: string; heads: number; weight: number; date: string; }
 export interface ProductTotal { productCode: string; packs: number; heads: number; weight: number; }
 
 const norm = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
 
 function cellText(v: unknown): string {
   if (v == null) return '';
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
   if (typeof v === 'object') {
     const o = v as { result?: unknown; text?: unknown; richText?: { text: string }[] };
     if (o.richText) return o.richText.map((r) => r.text).join('');
     if (o.result !== undefined) return cellText(o.result);
     if (o.text !== undefined) return cellText(o.text);
-    if (v instanceof Date) return v.toISOString();
   }
   return String(v).trim();
 }
 
 const toNum = (s: string) => Number(s.replace(/,/g, ''));
+
+/** "2026/04/30", "2026-04-30", "7/1/2025" or an ISO date → YYYY-MM-DD ('' when unreadable). */
+function toIsoDate(s: string): string {
+  let m = s.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m) return `${m[3].length === 2 ? '20' + m[3] : m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`;
+  return '';
+}
 
 function splitCsvLine(line: string, sep: string): string[] {
   const out: string[] = [];
@@ -64,7 +73,7 @@ export async function parseWeighingFile(file: File): Promise<Weighing[]> {
   if (headerAt < 0) throw new Error('Could not find the "Product Code" and "Weight" columns in this file');
   const head = grid[headerAt];
   const col = (re: RegExp) => head.findIndex((c) => re.test(c));
-  const cProduct = col(/product\s*code/i), cWeight = col(/weight/i), cHeads = col(/head/i), cBatch = col(/batch/i);
+  const cProduct = col(/product\s*code/i), cWeight = col(/weight/i), cHeads = col(/head/i), cBatch = col(/batch/i), cDate = col(/^date$/i);
 
   const out: Weighing[] = [];
   for (const r of grid.slice(headerAt + 1)) {
@@ -74,12 +83,18 @@ export async function parseWeighingFile(file: File): Promise<Weighing[]> {
     out.push({
       productCode,
       weight,
-      heads: cHeads >= 0 ? toNum(r[cHeads] ?? '') || 0 : 0,
+      heads: cHeads >= 0 ? toNum(r[cHeads] ?? '') || 0 : 0, // '--' = not counted
+      date: cDate >= 0 ? toIsoDate(r[cDate] ?? '') : '',
       machineBatch: cBatch >= 0 ? (r[cBatch] ?? '').trim() : '',
     });
   }
   if (!out.length) throw new Error('No weighing rows found under the header');
   return out;
+}
+
+/** One production line per weighing (1 pack, its heads and kg), product code folded to the item name. */
+export function linesPerWeighing(rows: Weighing[]): ProductTotal[] {
+  return rows.map((r) => ({ productCode: itemNameFor(r.productCode), packs: 1, heads: r.heads, weight: r.weight }));
 }
 
 /** Packs = number of weighings, heads and weight summed, per product (L/U bands folded together). */
