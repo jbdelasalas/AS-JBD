@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     },
     { rows: rows.length, head: 0, packs: 0, weight_kg: 0 },
   );
-  totals.weight_kg = Number(totals.weight_kg.toFixed(2));
+  totals.weight_kg = Number(totals.weight_kg.toFixed(3));
 
   return ok({ data: rows, totals });
 }
