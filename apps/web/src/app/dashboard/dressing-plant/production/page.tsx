@@ -345,6 +345,13 @@ export default function ProductionPage() {
           <p className="text-xs text-slate-400">Click “+ Row” to add a product line, or upload the weighing machine file.</p>
         ) : (
           <div className="space-y-2">
+            <div className="grid grid-cols-12 gap-2 px-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <div className="col-span-6">Product</div>
+              <div className="col-span-2">Packs</div>
+              <div className="col-span-1">Heads</div>
+              <div className="col-span-2">Weight (kg)</div>
+              <div className="col-span-1" />
+            </div>
             {drafts.map((d, i) => (
               <div key={i} className="grid grid-cols-12 items-center gap-2">
                 <select value={d.item_id} onChange={(e) => setDraft(i, { item_id: e.target.value })} className={`col-span-6 ${inputCls} ${!d.item_id && d.code ? 'border-red-400' : ''}`}>
