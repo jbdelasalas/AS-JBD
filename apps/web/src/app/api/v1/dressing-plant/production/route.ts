@@ -64,23 +64,24 @@ export async function POST(request: NextRequest) {
         WHERE job_order_id = $1 AND (transferred_kg IS NULL OR transferred_kg = 0)`,
       [jobOrderId],
     );
-    let inserted = 0;
-    for (const l of lines) {
-      if (!l.item_id) continue;
-      const weight = Number(l.weight_kg ?? 0);
-      const packs = Number(l.pack_count ?? 0);
-      const heads = Number(l.head_count ?? 0);
-      if (weight <= 0 && packs <= 0 && heads <= 0) continue;
+    const keep = lines
+      .map((l) => ({ ...l, weight: Number(l.weight_kg ?? 0), packs: Number(l.pack_count ?? 0), heads: Number(l.head_count ?? 0) }))
+      .filter((l) => l.item_id && (l.weight > 0 || l.packs > 0 || l.heads > 0));
+    // One statement for all lines — an uploaded weighing file is hundreds of
+    // lines, and a round trip per line made saving crawl.
+    if (keep.length) {
       await client.query(
         `INSERT INTO dp_processed_output
            (company_id, job_order_id, item_id, size_id, pack_count, head_count, weight_kg, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [companyId, jobOrderId, l.item_id, l.size_id || null, packs, heads, weight, auth.userId],
+         SELECT $1, $2, x.item_id, x.size_id, x.packs, x.heads, x.weight, $8
+           FROM unnest($3::uuid[], $4::uuid[], $5::numeric[], $6::numeric[], $7::numeric[])
+                AS x(item_id, size_id, packs, heads, weight)`,
+        [companyId, jobOrderId, keep.map((l) => l.item_id), keep.map((l) => l.size_id || null),
+          keep.map((l) => l.packs), keep.map((l) => l.heads), keep.map((l) => l.weight), auth.userId],
       );
-      inserted += 1;
     }
     await client.query('COMMIT');
-    return ok({ job_order_id: jobOrderId, lines: inserted }, 201);
+    return ok({ job_order_id: jobOrderId, lines: keep.length }, 201);
   } catch (e: unknown) {
     await client.query('ROLLBACK').catch(() => {});
     return err((e as Error).message ?? 'Failed to save production detail', 500);
