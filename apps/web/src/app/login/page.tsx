@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import type { LoginResponse } from '@perpet/shared';
 import { loadBranding, getBrandingBg } from '@/lib/branding';
-import { isLabelOnlyUser, LABELS_HOME } from '@/lib/permissions';
+import { isLabelOnlyUser, LABELS_HOME, getConfinedScopes } from '@/lib/permissions';
+import { pageAllowed, scopeHome } from '@/lib/access-scopes';
 
 type Company = { id: string; code: string; name: string };
 
@@ -79,6 +80,12 @@ export default function LoginPage() {
     // link to some other module would only land on a page that 403s.
     if (isLabelOnlyUser()) {
       router.replace(LABELS_HOME);
+      return;
+    }
+    const scopes = getConfinedScopes();
+    if (scopes) {
+      const next = new URLSearchParams(window.location.search).get('next');
+      router.replace(next && pageAllowed(scopes, next.split('?')[0]) ? safeNext(next) : scopeHome(scopes));
       return;
     }
 

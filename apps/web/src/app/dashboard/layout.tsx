@@ -7,7 +7,8 @@ import { TopBar } from '@/components/TopBar';
 import { TableResizer } from '@/components/TableResizer';
 import { SelectEnhancer } from '@/components/SelectEnhancer';
 import { loadBranding } from '@/lib/branding';
-import { isLabelOnlyUser, LABELS_HOME } from '@/lib/permissions';
+import { isLabelOnlyUser, LABELS_HOME, getConfinedScopes } from '@/lib/permissions';
+import { pageAllowed, scopeHome } from '@/lib/access-scopes';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -31,6 +32,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     // boundary; clearing this flag in the browser unlocks no data.
     if (isLabelOnlyUser() && pathname !== LABELS_HOME) {
       router.replace(LABELS_HOME);
+      return;
+    }
+
+    // Warehouse / dressing-plant staff stay inside their module(s).
+    const scopes = getConfinedScopes();
+    if (scopes && !pageAllowed(scopes, pathname)) {
+      router.replace(scopeHome(scopes));
       return;
     }
 

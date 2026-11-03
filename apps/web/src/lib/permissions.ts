@@ -4,6 +4,8 @@
 // enforces the same permissions server-side (see `requirePermission` in
 // auth-helpers), so a user who edits localStorage gains nothing but a menu.
 
+import { confinedScopes } from './access-scopes';
+
 export const LABEL_PRINT_PERMISSION = 'dressing_plant.label.print';
 
 /** Where a label-only operator lives. */
@@ -28,6 +30,11 @@ export function isSuperadmin(): boolean {
   } catch {
     return false;
   }
+}
+
+/** Modules a warehouse / dressing-plant staff account is confined to, or null. */
+export function getConfinedScopes(): string[] | null {
+  return confinedScopes(getPermissions(), isSuperadmin());
 }
 
 /**

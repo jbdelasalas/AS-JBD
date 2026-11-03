@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api, clearAuth } from '@/lib/api';
-import { isLabelOnlyUser, LABELS_HOME } from '@/lib/permissions';
+import { isLabelOnlyUser, LABELS_HOME, getConfinedScopes } from '@/lib/permissions';
+import { pageAllowed } from '@/lib/access-scopes';
 
 interface NavItem {
   href: string;
@@ -181,9 +182,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   // Resolved after mount: `permissions` lives in localStorage, which the server
   // render cannot see, so reading it during render would mismatch hydration.
   const [labelOnly, setLabelOnly] = useState(false);
+  const [scopes, setScopes] = useState<string[] | null>(null);
 
   useEffect(() => {
     setLabelOnly(isLabelOnlyUser());
+    setScopes(getConfinedScopes());
     const name = localStorage.getItem('company_name');
     if (name) setCompanyName(name);
     const mode = localStorage.getItem('db-mode');
@@ -212,8 +215,16 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   // A label-only operator gets a nav with exactly one entry. The nav is not the
   // security boundary — the API is — but offering an operator doors that will
   // 403 is just a worse experience.
+  // Warehouse / dressing-plant staff: just their module groups, flags aside —
+  // the role was assigned on purpose.
   const navItems = labelOnly
     ? [{ href: LABELS_HOME, label: 'Product Labels' }]
+    : scopes
+    ? [
+        ...NAV.filter((item) => item.children && pageAllowed(scopes, item.href)),
+        ...(pageAllowed(scopes, LABELS_HOME) && !pageAllowed(scopes, '/dashboard/dressing-plant')
+          ? [{ href: LABELS_HOME, label: 'Product Labels' }] : []),
+      ]
     : NAV.filter((item) => {
         if (!item.flag) return true;
         const state = flagStates.get(item.flag);
@@ -351,7 +362,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </div>
           {/* Environment toggle — a label-only operator has no business
               swinging the whole app between production and sandbox. */}
-          {!labelOnly && (
+          {!labelOnly && !scopes && (
           <button
             onClick={() => setShowConfirm(true)}
             disabled={switching}
