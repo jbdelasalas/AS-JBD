@@ -3,7 +3,7 @@ import { type NextRequest } from 'next/server';
 import { query, getPool } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
-import { nextDocNo, resolveLot, putawaySourceRemaining } from '@/lib/wms';
+import { nextDocNo, resolveLot, putawaySourceRemaining, DP_OUTPUT_PUTAWAY_ELIGIBLE } from '@/lib/wms';
 
 export async function GET(request: NextRequest) {
   try { await requireAuth(request); } catch (e) { return e as Response; }
@@ -75,6 +75,27 @@ export async function POST(request: NextRequest) {
       const { rows: [jo] } = await client.query(
         `SELECT id FROM dp_job_orders WHERE id = $1 AND company_id = $2 FOR UPDATE`, [jobOrderId, companyId]);
       if (!jo) return fail('Production batch not found', 404);
+      // Pack by pack: each line is one production line of this batch, not yet
+      // put away; item and qty come from the pack, not the client.
+      const ids = lines.map((l) => String(l.dp_output_id ?? ''));
+      if (ids.some((id) => !id)) return fail('Production put-aways go pack by pack — reload the page and pick the batch again', 400);
+      if (new Set(ids).size !== ids.length) return fail('The same pack is on two lines', 400);
+      const { rows: packs } = await client.query(
+        `SELECT po.id, po.item_id, po.weight_kg - COALESCE(po.transferred_kg, 0) AS left_kg,
+                EXISTS (SELECT 1 FROM putaway_lines pl JOIN putaways p ON p.id = pl.putaway_id
+                         WHERE pl.dp_output_id = po.id AND p.status <> 'cancelled') AS taken
+           FROM dp_processed_output po
+          WHERE po.id = ANY($1::uuid[]) AND po.job_order_id = $2 AND ${DP_OUTPUT_PUTAWAY_ELIGIBLE}
+          FOR UPDATE OF po`,
+        [ids, jobOrderId]);
+      const byId = new Map(packs.map((p) => [String(p.id), p]));
+      for (const l of lines) {
+        const p = byId.get(String(l.dp_output_id));
+        if (!p) return fail('A pack is not part of this batch', 400);
+        if (p.taken || !(Number(p.left_kg) > 0)) return fail('A pack is already on another put-away — reload the page', 409);
+        l.item_id = p.item_id;
+        l.qty = Number(p.left_kg);
+      }
     } else {
       const { rows: [xfr] } = await client.query(
         `SELECT status, to_warehouse_id FROM stock_transfers WHERE id = $1 AND company_id = $2 FOR UPDATE`, [transferId, companyId]);
@@ -100,16 +121,30 @@ export async function POST(request: NextRequest) {
       [companyId, putawayNo, grnId, transferId, jobOrderId, warehouseId, dto.notes ?? null, auth.userId],
     );
 
-    for (let i = 0; i < lines.length; i++) {
-      const l = lines[i];
-      const lotId = await resolveLot(client, companyId, l.item_id as string, l.lot_no as string | undefined, l.expiry_date as string | undefined);
-      await client.query(
-        `INSERT INTO putaway_lines (putaway_id, line_no, item_id, bin_id, lot_id, qty, unit_cost)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        // Cost comes from the source document, not the client.
-        [header.id, i + 1, l.item_id, l.bin_id, lotId, Number(l.qty), remaining.get(String(l.item_id))!.unitCost],
-      );
+    // One insert for all lines (a production batch is hundreds of packs); lots
+    // resolved once per item + lot.
+    const lotIds = new Map<string, string | null>();
+    for (const l of lines) {
+      const key = `${l.item_id}|${l.lot_no ?? ''}|${l.expiry_date ?? ''}`;
+      if (!lotIds.has(key)) lotIds.set(key, await resolveLot(client, companyId, l.item_id as string, l.lot_no as string | undefined, l.expiry_date as string | undefined));
     }
+    await client.query(
+      `INSERT INTO putaway_lines (putaway_id, line_no, item_id, bin_id, lot_id, qty, unit_cost, dp_output_id)
+       SELECT $1, x.line_no, x.item_id, x.bin_id, x.lot_id, x.qty, x.unit_cost, x.dp_output_id
+         FROM unnest($2::int[], $3::uuid[], $4::uuid[], $5::uuid[], $6::numeric[], $7::numeric[], $8::uuid[])
+              AS x(line_no, item_id, bin_id, lot_id, qty, unit_cost, dp_output_id)`,
+      [
+        header.id,
+        lines.map((_, i) => i + 1),
+        lines.map((l) => l.item_id),
+        lines.map((l) => l.bin_id),
+        lines.map((l) => lotIds.get(`${l.item_id}|${l.lot_no ?? ''}|${l.expiry_date ?? ''}`) ?? null),
+        lines.map((l) => Number(l.qty)),
+        // Cost comes from the source document, not the client.
+        lines.map((l) => remaining.get(String(l.item_id))!.unitCost),
+        lines.map((l) => (jobOrderId ? String(l.dp_output_id) : null)),
+      ],
+    );
 
     await client.query('COMMIT');
     return ok(header, 201);

@@ -5,10 +5,14 @@ import { requireAuth } from '@/lib/auth-helpers';
 import { ok, err } from '@/lib/api-response';
 import { DP_OUTPUT_PUTAWAY_ELIGIBLE } from '@/lib/wms';
 
-// Dressing-plant batches with production output waiting to go into a warehouse.
-// The put-away is what moves it from DP into the warehouse, so any warehouse can
-// take it. Lines show what is still left after draft/posted put-aways, and fully
-// put-away batches are left out, so the same output can't be binned twice.
+// Dressing-plant batches with production output waiting to go into a warehouse,
+// pack by pack: each production line (one weighing = one pack/crate) is put
+// away on its own. Packs already on a draft/posted put-away are left out, so the
+// same pack can't be binned twice. The put-away is what moves output from DP
+// into the warehouse, so any warehouse can take it.
+//
+// A batch with an open put-away made before packs were tracked (lines without
+// dp_output_id) is held back until that put-away is posted or cancelled.
 export async function GET(request: NextRequest) {
   try { await requireAuth(request); } catch (e) { return e as Response; }
 
@@ -16,39 +20,34 @@ export async function GET(request: NextRequest) {
   const companyId = searchParams.get('company_id');
   if (!companyId) return err('company_id is required', 400);
 
-  const lines = await query(
-    `WITH made AS (
-       SELECT po.job_order_id, po.item_id, SUM(po.weight_kg) AS qty, MAX(po.created_at) AS produced_at
-         FROM dp_processed_output po
-         JOIN dp_job_orders jo ON jo.id = po.job_order_id
-        WHERE jo.company_id = $1 AND ${DP_OUTPUT_PUTAWAY_ELIGIBLE}
-        GROUP BY po.job_order_id, po.item_id
-     ), used AS (
-       SELECT p.job_order_id, pl.item_id, SUM(pl.qty) AS qty
-         FROM putaway_lines pl JOIN putaways p ON p.id = pl.putaway_id
-        WHERE p.job_order_id IN (SELECT job_order_id FROM made) AND p.status <> 'cancelled'
-        GROUP BY p.job_order_id, pl.item_id
-     )
-     SELECT made.job_order_id, jo.batch_no, c.name AS client_name, made.produced_at,
-            made.qty - COALESCE(used.qty, 0) AS qty,
-            made.item_id, i.sku, i.name AS item_name, i.uom, i.tracking_mode
-       FROM made
-       JOIN dp_job_orders jo ON jo.id = made.job_order_id
+  const packs = await query(
+    `SELECT po.id, po.job_order_id, jo.batch_no, c.name AS client_name,
+            po.item_id, i.sku, i.name AS item_name, i.uom, i.tracking_mode,
+            po.weight_kg - COALESCE(po.transferred_kg, 0) AS qty, po.head_count, po.pack_count,
+            COALESCE(po.line_no, 0) AS pack_no
+       FROM dp_processed_output po
+       JOIN dp_job_orders jo ON jo.id = po.job_order_id
        JOIN dp_clients c ON c.id = jo.client_id
-       JOIN items i ON i.id = made.item_id
-       LEFT JOIN used ON used.job_order_id = made.job_order_id AND used.item_id = made.item_id
-      WHERE made.qty - COALESCE(used.qty, 0) > 0
-      ORDER BY made.produced_at DESC, i.name`,
+       JOIN items i ON i.id = po.item_id
+      WHERE jo.company_id = $1 AND ${DP_OUTPUT_PUTAWAY_ELIGIBLE}
+        AND po.weight_kg > COALESCE(po.transferred_kg, 0)
+        AND NOT EXISTS (
+          SELECT 1 FROM putaway_lines pl JOIN putaways p ON p.id = pl.putaway_id
+           WHERE pl.dp_output_id = po.id AND p.status <> 'cancelled')
+        AND NOT EXISTS (
+          SELECT 1 FROM putaway_lines pl JOIN putaways p ON p.id = pl.putaway_id
+           WHERE p.job_order_id = po.job_order_id AND p.status = 'draft' AND pl.dp_output_id IS NULL)
+      ORDER BY jo.batch_no DESC, po.line_no NULLS LAST, po.created_at, po.id`,
     [companyId],
   );
 
-  const batches = new Map<string, { id: string; batch_no: string; client_name: string; lines: unknown[] }>();
-  for (const l of lines) {
-    const id = String(l.job_order_id);
-    if (!batches.has(id)) batches.set(id, { id, batch_no: String(l.batch_no), client_name: String(l.client_name), lines: [] });
-    batches.get(id)!.lines.push({
-      item_id: l.item_id, sku: l.sku, item_name: l.item_name, uom: l.uom,
-      tracking_mode: l.tracking_mode, qty: Number(l.qty), unit_cost: 0,
+  const batches = new Map<string, { id: string; batch_no: string; client_name: string; packs: unknown[] }>();
+  for (const p of packs) {
+    const id = String(p.job_order_id);
+    if (!batches.has(id)) batches.set(id, { id, batch_no: String(p.batch_no), client_name: String(p.client_name), packs: [] });
+    batches.get(id)!.packs.push({
+      id: p.id, pack_no: Number(p.pack_no), item_id: p.item_id, sku: p.sku, item_name: p.item_name, uom: p.uom,
+      tracking_mode: p.tracking_mode, qty: Number(p.qty), heads: Number(p.head_count || 0), unit_cost: 0,
     });
   }
   return ok([...batches.values()]);

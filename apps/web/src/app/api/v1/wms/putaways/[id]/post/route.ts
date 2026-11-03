@@ -39,11 +39,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       }
       await postFromProduction(client, pa, lines, String(jo.batch_no), auth.userId);
     }
-    for (const l of lines) {
+    // One bin update per item + bin + lot (a production batch is hundreds of
+    // packs); same result as line by line, cost weighted across the merged lines.
+    for (const g of groupBy(lines, (l) => `${l.item_id}|${l.bin_id}|${l.lot_id ?? ''}`)) {
+      const qty = g.reduce((a, l) => a + Number(l.qty), 0);
+      const cost = qty > 0 ? g.reduce((a, l) => a + Number(l.qty) * Number(l.unit_cost), 0) / qty : 0;
       await adjustBinBalance(
-        client, String(pa.company_id), String(l.item_id), String(pa.warehouse_id),
-        String(l.bin_id), l.lot_id ? String(l.lot_id) : null,
-        Number(l.qty), Number(l.unit_cost),
+        client, String(pa.company_id), String(g[0].item_id), String(pa.warehouse_id),
+        String(g[0].bin_id), g[0].lot_id ? String(g[0].lot_id) : null, qty, cost,
       );
     }
     await client.query(
@@ -62,13 +65,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
 type Row = Record<string, unknown>;
 
-async function postFromProduction(client: PoolClient, pa: Row, lines: Row[], batchNo: string, userId: string) {
-  const qtyByItem = new Map<string, number>();
-  for (const l of lines) {
-    const itemId = String(l.item_id), qty = Number(l.qty);
-    qtyByItem.set(itemId, (qtyByItem.get(itemId) ?? 0) + qty);
+function groupBy(rows: Row[], key: (r: Row) => string): Row[][] {
+  const m = new Map<string, Row[]>();
+  for (const r of rows) { const k = key(r); (m.get(k) ?? m.set(k, []).get(k)!).push(r); }
+  return [...m.values()];
+}
 
-    // Warehouse total. Output carries no cost yet, so it comes in at 0.
+async function postFromProduction(client: PoolClient, pa: Row, lines: Row[], batchNo: string, userId: string) {
+  // Warehouse total per item. Output carries no cost yet, so it comes in at 0.
+  for (const g of groupBy(lines, (l) => String(l.item_id))) {
+    const qty = g.reduce((a, l) => a + Number(l.qty), 0);
     await client.query(
       `INSERT INTO stock_balances (item_id, warehouse_id, qty_on_hand, avg_cost, last_movement_at)
        VALUES ($1, $2, $3, 0, now())
@@ -78,35 +84,55 @@ async function postFromProduction(client: PoolClient, pa: Row, lines: Row[], bat
                THEN (stock_balances.qty_on_hand * stock_balances.avg_cost) / (stock_balances.qty_on_hand + $3)
                ELSE 0 END,
              last_movement_at = now()`,
-      [itemId, pa.warehouse_id, qty],
+      [g[0].item_id, pa.warehouse_id, qty],
     );
+  }
+
+  // Stock movement per item + bin + lot.
+  for (const g of groupBy(lines, (l) => `${l.item_id}|${l.bin_id}|${l.lot_id ?? ''}`)) {
+    const qty = g.reduce((a, l) => a + Number(l.qty), 0);
     await client.query(
       `INSERT INTO stock_movements
          (company_id, item_id, warehouse_id, movement_type, quantity, unit_cost, total_cost,
           reference_type, reference_id, reference_no, bin_id, lot_id, created_by)
        VALUES ($1,$2,$3,'receipt',$4,0,0,'putaway',$5,$6,$7,$8,$9)`,
-      [pa.company_id, itemId, pa.warehouse_id, qty, pa.id, `${pa.putaway_no} · ${batchNo}`, l.bin_id, l.lot_id ?? null, userId],
-    );
-
-    // Cold-storage box so the storage clock/billing starts.
-    await client.query(
-      `INSERT INTO dp_storage_boxes (company_id, job_order_id, product, net_weight_kg, room, warehouse_id, bin_id, item_id, lot_id)
-       VALUES ($1,$2,(SELECT name FROM items WHERE id = $3),$4,
-               (SELECT code FROM bins WHERE id = $5),$6,$5,$3,$7)`,
-      [pa.company_id, pa.job_order_id, itemId, qty, l.bin_id, pa.warehouse_id, l.lot_id ?? null],
+      [pa.company_id, g[0].item_id, pa.warehouse_id, qty, pa.id, `${pa.putaway_no} · ${batchNo}`, g[0].bin_id, g[0].lot_id ?? null, userId],
     );
   }
 
-  // Lock the production lines this put-away covers (oldest first), so a later
-  // save of Production Detail can't rewrite output that is already in a bin.
-  for (const [itemId, qty] of qtyByItem) {
-    let left = qty;
+  // Cold-storage box per line (per pack/crate) so the storage clock/billing starts.
+  await client.query(
+    `INSERT INTO dp_storage_boxes (company_id, job_order_id, product, net_weight_kg, room, warehouse_id, bin_id, item_id, lot_id)
+     SELECT $1, $2, i.name, x.qty, b.code, $3, x.bin_id, x.item_id, x.lot_id
+       FROM unnest($4::uuid[], $5::uuid[], $6::uuid[], $7::numeric[]) AS x(item_id, bin_id, lot_id, qty)
+       JOIN items i ON i.id = x.item_id
+       LEFT JOIN bins b ON b.id = x.bin_id`,
+    [pa.company_id, pa.job_order_id, pa.warehouse_id,
+      lines.map((l) => l.item_id), lines.map((l) => l.bin_id), lines.map((l) => l.lot_id ?? null), lines.map((l) => Number(l.qty))],
+  );
+
+  // Lock the production lines this put-away covers, so a later save of
+  // Production Detail can't rewrite output that is already in a bin.
+  const packed = lines.filter((l) => l.dp_output_id);
+  if (packed.length) {
+    await client.query(
+      `UPDATE dp_processed_output po
+          SET transferred_kg = COALESCE(po.transferred_kg, 0) + x.qty, transferred_at = now(), transferred_warehouse_id = $1
+         FROM unnest($2::uuid[], $3::numeric[]) AS x(id, qty)
+        WHERE po.id = x.id`,
+      [pa.warehouse_id, packed.map((l) => l.dp_output_id), packed.map((l) => Number(l.qty))],
+    );
+  }
+
+  // Put-aways made before packs were tracked: spread per item, oldest line first.
+  for (const g of groupBy(lines.filter((l) => !l.dp_output_id), (l) => String(l.item_id))) {
+    let left = g.reduce((a, l) => a + Number(l.qty), 0);
     const { rows } = await client.query(
       `SELECT id, weight_kg, COALESCE(transferred_kg, 0) AS done FROM dp_processed_output
         WHERE job_order_id = $1 AND item_id = $2 AND weight_kg > COALESCE(transferred_kg, 0)
           AND NOT (COALESCE(transferred_kg, 0) > 0 AND transferred_warehouse_id IS NULL)
         ORDER BY created_at, id FOR UPDATE`,
-      [pa.job_order_id, itemId],
+      [pa.job_order_id, g[0].item_id],
     );
     for (const r of rows) {
       if (left <= 1e-9) break;

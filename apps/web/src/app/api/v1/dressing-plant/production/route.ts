@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
        JOIN items i ON i.id = po.item_id
        LEFT JOIN dp_sizes s ON s.id = po.size_id
       WHERE ${where}
-      ORDER BY i.name, s.sort_order`,
+      ORDER BY po.line_no NULLS LAST, po.created_at, i.name`,
     params,
   );
   return ok({ data: rows });
@@ -58,6 +58,17 @@ export async function POST(request: NextRequest) {
   const client = await getPool().connect();
   try {
     await client.query('BEGIN');
+    // Packs on a draft put-away can't be rewritten (saving replaces the lines).
+    const { rows: [held] } = await client.query(
+      `SELECT p.putaway_no FROM putaway_lines pl JOIN putaways p ON p.id = pl.putaway_id
+         JOIN dp_processed_output po ON po.id = pl.dp_output_id
+        WHERE po.job_order_id = $1 AND p.status = 'draft' LIMIT 1`,
+      [jobOrderId],
+    );
+    if (held) {
+      await client.query('ROLLBACK');
+      return err(`Packs of this batch are on draft put-away ${held.putaway_no} — post or cancel it before changing production lines`, 409);
+    }
     // Preserve already-transferred lines; only replace the untransferred ones.
     await client.query(
       `DELETE FROM dp_processed_output
@@ -72,10 +83,11 @@ export async function POST(request: NextRequest) {
     if (keep.length) {
       await client.query(
         `INSERT INTO dp_processed_output
-           (company_id, job_order_id, item_id, size_id, pack_count, head_count, weight_kg, created_by)
-         SELECT $1, $2, x.item_id, x.size_id, x.packs, x.heads, x.weight, $8
-           FROM unnest($3::uuid[], $4::uuid[], $5::numeric[], $6::numeric[], $7::numeric[])
-                AS x(item_id, size_id, packs, heads, weight)`,
+           (company_id, job_order_id, item_id, size_id, pack_count, head_count, weight_kg, created_by, line_no)
+         SELECT $1, $2, x.item_id, x.size_id, x.packs, x.heads, x.weight, $8,
+                x.ord + (SELECT COALESCE(MAX(line_no), 0) FROM dp_processed_output WHERE job_order_id = $2)
+           FROM unnest($3::uuid[], $4::uuid[], $5::numeric[], $6::numeric[], $7::numeric[]) WITH ORDINALITY
+                AS x(item_id, size_id, packs, heads, weight, ord)`,
         [companyId, jobOrderId, keep.map((l) => l.item_id), keep.map((l) => l.size_id || null),
           keep.map((l) => l.packs), keep.map((l) => l.heads), keep.map((l) => l.weight), auth.userId],
       );

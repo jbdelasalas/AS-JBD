@@ -9,9 +9,11 @@ interface Bin { id: string; code: string; warehouse_id: string; }
 type SourceLine = { item_id: string; sku: string; item_name: string; uom: string; tracking_mode: string; qty: number; unit_cost: number };
 interface Grn { id: string; grn_no: string; warehouse_id: string; lines: SourceLine[]; }
 interface Transfer { id: string; transfer_no: string; from_warehouse_name: string; lines: SourceLine[]; }
-interface Batch { id: string; batch_no: string; client_name: string; lines: SourceLine[]; }
+// One production line = one weighed pack/crate; production put-aways go pack by pack.
+interface Pack { id: string; pack_no: number; item_id: string; sku: string; item_name: string; uom: string; tracking_mode: string; qty: number; heads: number; }
+interface Batch { id: string; batch_no: string; client_name: string; packs: Pack[]; }
 type Source = 'grn' | 'transfer' | 'production';
-interface Line { item_id: string; bin_id: string; lot_no: string; qty: string; unit_cost: string; tracking_mode: string; }
+interface Line { item_id: string; bin_id: string; lot_no: string; qty: string; unit_cost: string; tracking_mode: string; pack?: Pack; }
 
 const blank: Line = { item_id: '', bin_id: '', lot_no: '', qty: '', unit_cost: '0', tracking_mode: 'none' };
 
@@ -65,7 +67,7 @@ export default function NewPutawayPage() {
     : source === 'transfer'
       ? transfers.map((t) => ({ id: t.id, label: `${t.transfer_no} · from ${t.from_warehouse_name}`, lotNo: '', lines: t.lines }))
       // Production output is lotted by batch so binned stock traces back to it.
-      : batches.map((b) => ({ id: b.id, label: `${b.batch_no} · ${b.client_name}`, lotNo: b.batch_no, lines: b.lines }));
+      : batches.map((b) => ({ id: b.id, label: `${b.batch_no} · ${b.client_name} (${b.packs.length} packs)`, lotNo: b.batch_no, lines: [] as SourceLine[] }));
   // Lines can only use items on the chosen document (add a line to split one item across bins).
   const docLines = docs.find((d) => d.id === docId)?.lines ?? [];
 
@@ -88,6 +90,13 @@ export default function NewPutawayPage() {
     setDocId(id);
     const doc = docs.find((d) => d.id === id);
     if (!doc) { setLines([{ ...blank }]); return; }
+    if (source === 'production') {
+      const b = batches.find((x) => x.id === id);
+      setLines((b?.packs ?? []).map((pk) => ({
+        item_id: pk.item_id, bin_id: '', lot_no: doc.lotNo, qty: String(pk.qty), unit_cost: '0', tracking_mode: pk.tracking_mode ?? 'none', pack: pk,
+      })));
+      return;
+    }
     setLines(doc.lines.map((l) => ({
       item_id: l.item_id, bin_id: '', lot_no: doc.lotNo, qty: String(l.qty),
       unit_cost: String(l.unit_cost), tracking_mode: l.tracking_mode ?? 'none',
@@ -104,6 +113,9 @@ export default function NewPutawayPage() {
     }));
   }
   const addLine = () => setLines((p) => [...p, { ...blank }]);
+  const isPacks = source === 'production';
+  const allBins = (binId: string) => setLines((p) => p.map((l) => ({ ...l, bin_id: binId })));
+  const packKg = lines.reduce((a, l) => a + Number(l.qty || 0), 0);
   const removeLine = (i: number) => setLines((p) => p.filter((_, idx) => idx !== i));
 
   async function submit(e: React.FormEvent) {
@@ -113,6 +125,7 @@ export default function NewPutawayPage() {
     if (!docId) { setError(source === 'grn' ? 'Select a goods receipt' : source === 'transfer' ? 'Select a transfer' : 'Select a production batch'); return; }
     const valid = lines.filter((l) => l.item_id && l.bin_id && Number(l.qty) > 0);
     if (!valid.length) { setError('Each line needs an item, a bin, and a positive qty'); return; }
+    if (isPacks && valid.length < lines.length) { setError(`${lines.length - valid.length} pack(s) have no bin — pick one, use "Bin for all packs", or remove them to put away later`); return; }
 
     setSaving(true);
     try {
@@ -121,7 +134,7 @@ export default function NewPutawayPage() {
         grn_id: source === 'grn' ? docId : null,
         transfer_id: source === 'transfer' ? docId : null,
         job_order_id: source === 'production' ? docId : null,
-        lines: valid.map((l) => ({ item_id: l.item_id, bin_id: l.bin_id, lot_no: l.lot_no || null, qty: Number(l.qty), unit_cost: Number(l.unit_cost) })),
+        lines: valid.map((l) => ({ item_id: l.item_id, bin_id: l.bin_id, lot_no: l.lot_no || null, qty: Number(l.qty), unit_cost: Number(l.unit_cost), dp_output_id: l.pack?.id ?? null })),
       });
       router.push(`/dashboard/wms/putaways/${res.id}`);
     } catch (e) { setError((e as Error).message); setSaving(false); }
@@ -175,22 +188,39 @@ export default function NewPutawayPage() {
 
         <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300">Lines</h2>
-            <button type="button" onClick={addLine} className="text-xs text-brand-600 hover:underline">+ Add line</button>
+            <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              {isPacks ? <>Packs / crates{lines.length > 0 && lines[0].pack && <span className="ml-2 font-normal text-slate-500">{lines.length} packs · {packKg.toLocaleString(undefined, { maximumFractionDigits: 3 })} kg</span>}</> : 'Lines'}
+            </h2>
+            {isPacks ? (
+              <select value="" onChange={(e) => e.target.value && allBins(e.target.value)} disabled={!docId || !bins.length}
+                className="rounded border border-slate-300 px-2 py-1 text-xs disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                <option value="">Bin for all packs…</option>
+                {bins.map((b) => <option key={b.id} value={b.id}>{b.code}</option>)}
+              </select>
+            ) : (
+              <button type="button" onClick={addLine} className="text-xs text-brand-600 hover:underline">+ Add line</button>
+            )}
           </div>
           <div className="space-y-2">
             <div className="grid grid-cols-12 gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-              <div className="col-span-4">Item</div><div className="col-span-3">Bin</div>
+              <div className="col-span-4">{isPacks ? 'Pack · product' : 'Item'}</div><div className="col-span-3">Bin</div>
               <div className="col-span-2">Lot</div><div className="col-span-2">Qty</div><div className="col-span-1" />
             </div>
             {lines.map((l, i) => (
               <div key={i} className="grid grid-cols-12 gap-2">
                 <div className="col-span-4">
+                  {l.pack ? (
+                    <div className="py-1 text-xs text-slate-800 dark:text-slate-200">
+                      <span className="mr-1 font-mono text-slate-400">#{l.pack.pack_no}</span>{l.pack.item_name}
+                      {l.pack.heads > 0 && <span className="text-slate-500"> · {l.pack.heads} hd</span>}
+                    </div>
+                  ) : (
                   <select value={l.item_id} onChange={(e) => setLine(i, 'item_id', e.target.value)} disabled={!docId}
                     className="w-full rounded border border-slate-300 px-2 py-1 text-xs disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                     <option value="">{docId ? 'Select…' : 'Pick a document first'}</option>
                     {docLines.map((dl) => <option key={dl.item_id} value={dl.item_id}>{dl.sku} – {dl.item_name} ({dl.qty} {dl.uom} left)</option>)}
                   </select>
+                  )}
                 </div>
                 <div className="col-span-3">
                   <select value={l.bin_id} onChange={(e) => setLine(i, 'bin_id', e.target.value)}
@@ -206,10 +236,11 @@ export default function NewPutawayPage() {
                 </div>
                 <div className="col-span-2">
                   <input type="number" step="0.0001" min="0.0001" value={l.qty} onChange={(e) => setLine(i, 'qty', e.target.value)} placeholder="0"
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+                    readOnly={!!l.pack} title={l.pack ? 'A pack goes in whole' : undefined}
+                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs read-only:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
                 </div>
                 <div className="col-span-1 flex items-center">
-                  {lines.length > 1 && <button type="button" onClick={() => removeLine(i)} className="text-xs text-red-500 hover:text-red-700">✕</button>}
+                  {lines.length > 1 && <button type="button" onClick={() => removeLine(i)} title={l.pack ? 'Leave this pack for a later put-away' : undefined} className="text-xs text-red-500 hover:text-red-700">✕</button>}
                 </div>
               </div>
             ))}

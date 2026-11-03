@@ -37,3 +37,17 @@ UPDATE dp_job_orders jo
  WHERE r.job_order_id = jo.id AND jo.receiving_completed_at IS NULL;
 
 UPDATE dp_receiving_weights SET seq = 1 WHERE seq IS NULL;
+
+-- Production put-aways go pack by pack: each put-away line names the production
+-- line (one weighing = one pack/crate) it bins. SET NULL so re-saving production
+-- after a put-away was cancelled doesn't trip over the old reference.
+ALTER TABLE putaway_lines
+  ADD COLUMN IF NOT EXISTS dp_output_id uuid REFERENCES dp_processed_output(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_putaway_lines_dp_output ON putaway_lines(dp_output_id);
+
+-- Weighing order within a batch (pack #1 = first weighing); lines are saved in
+-- one statement, so created_at can't tell them apart.
+ALTER TABLE dp_processed_output ADD COLUMN IF NOT EXISTS line_no integer;
+UPDATE dp_processed_output po SET line_no = x.n
+  FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY job_order_id ORDER BY created_at, id) AS n FROM dp_processed_output) x
+ WHERE x.id = po.id AND po.line_no IS NULL;
