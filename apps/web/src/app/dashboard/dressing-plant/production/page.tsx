@@ -170,13 +170,25 @@ export default function ProductionPage() {
     },
     { packs: 0, heads: 0, weight: 0 },
   );
-  // Per-product summary of the saved lines (each weighing is its own line).
-  const summary = [...lines.reduce((m, l) => {
-    const s = m.get(l.item_name) ?? { product: l.item_name, packs: 0, heads: 0, weight: 0 };
-    s.packs += Number(l.pack_count || 0); s.heads += Number(l.head_count || 0); s.weight += Number(l.weight_kg || 0);
-    return m.set(l.item_name, s);
+  // Unsaved rows in the editor, totalled for its header.
+  const filledDrafts = drafts.filter((d) => Number(d.weight_kg) > 0 || Number(d.pack_count) > 0 || Number(d.head_count) > 0);
+  const draftTotals = filledDrafts.reduce(
+    (a, d) => ({ packs: a.packs + Number(d.pack_count || 0), heads: a.heads + Number(d.head_count || 0), weight: a.weight + Number(d.weight_kg || 0) }),
+    { packs: 0, heads: 0, weight: 0 },
+  );
+  // Per-product summary of saved lines plus unsaved ones (each weighing is its own line).
+  const summary = [...[
+    ...lines.map((l) => ({ name: l.item_name, packs: l.pack_count, heads: l.head_count, weight: l.weight_kg })),
+    ...filledDrafts.map((d) => ({ name: items.find((it) => it.id === d.item_id)?.name ?? d.code ?? '(no product)', packs: d.pack_count, heads: d.head_count, weight: d.weight_kg })),
+  ].reduce((m, l) => {
+    const s = m.get(l.name) ?? { product: l.name, packs: 0, heads: 0, weight: 0 };
+    s.packs += Number(l.packs || 0); s.heads += Number(l.heads || 0); s.weight += Number(l.weight || 0);
+    return m.set(l.name, s);
   }, new Map<string, { product: string; packs: number; heads: number; weight: number }>()).values()]
     .sort((a, b) => a.product.localeCompare(b.product, undefined, { numeric: true }));
+  const sumTotals = {
+    packs: totals.packs + draftTotals.packs, heads: totals.heads + draftTotals.heads, weight: totals.weight + draftTotals.weight,
+  };
   const kgFmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 3 });
   const inputCls = 'w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100';
 
@@ -210,7 +222,7 @@ export default function ProductionPage() {
       {/* Summary per product */}
       {summary.length > 0 && (
         <div className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
-          <div className="border-b border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 dark:border-slate-700 dark:text-slate-200">Summary per product</div>
+          <div className="border-b border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 dark:border-slate-700 dark:text-slate-200">Summary per product{filledDrafts.length > 0 && <span className="ml-2 text-xs font-normal text-amber-600">includes {filledDrafts.length} unsaved line(s) — press Save production detail</span>}</div>
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
               <tr>
@@ -228,16 +240,16 @@ export default function ProductionPage() {
                   <td className="px-3 py-1.5 text-right text-slate-700 dark:text-slate-300">{s.packs.toLocaleString()}</td>
                   <td className="px-3 py-1.5 text-right text-slate-700 dark:text-slate-300">{s.heads.toLocaleString()}</td>
                   <td className="px-3 py-1.5 text-right font-medium text-slate-900 dark:text-slate-100">{kgFmt(s.weight)}</td>
-                  <td className="px-3 py-1.5 text-right text-slate-500">{totals.weight ? ((s.weight / totals.weight) * 100).toFixed(1) : '0.0'}%</td>
+                  <td className="px-3 py-1.5 text-right text-slate-500">{sumTotals.weight ? ((s.weight / sumTotals.weight) * 100).toFixed(1) : '0.0'}%</td>
                 </tr>
               ))}
             </tbody>
             <tfoot className="border-t-2 border-slate-200 bg-slate-50 text-xs font-semibold dark:border-slate-700 dark:bg-slate-800">
               <tr>
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300">TOTAL — {summary.length} products</td>
-                <td className="px-3 py-2 text-right text-slate-900 dark:text-slate-100">{totals.packs.toLocaleString()}</td>
-                <td className="px-3 py-2 text-right text-slate-900 dark:text-slate-100">{totals.heads.toLocaleString()}</td>
-                <td className="px-3 py-2 text-right text-slate-900 dark:text-slate-100">{kgFmt(totals.weight)}</td>
+                <td className="px-3 py-2 text-right text-slate-900 dark:text-slate-100">{sumTotals.packs.toLocaleString()}</td>
+                <td className="px-3 py-2 text-right text-slate-900 dark:text-slate-100">{sumTotals.heads.toLocaleString()}</td>
+                <td className="px-3 py-2 text-right text-slate-900 dark:text-slate-100">{kgFmt(sumTotals.weight)}</td>
                 <td className="px-3 py-2 text-right text-slate-500">100%</td>
               </tr>
             </tfoot>
@@ -347,9 +359,9 @@ export default function ProductionPage() {
           <div className="space-y-2">
             <div className="grid grid-cols-12 gap-2 px-1 text-xs font-medium text-slate-500 dark:text-slate-400">
               <div className="col-span-6">Product</div>
-              <div className="col-span-2">Packs</div>
-              <div className="col-span-1">Heads</div>
-              <div className="col-span-2">Weight (kg)</div>
+              <div className="col-span-2">Packs <span className="text-slate-800 dark:text-slate-200">({draftTotals.packs.toLocaleString()})</span></div>
+              <div className="col-span-1">Heads <span className="text-slate-800 dark:text-slate-200">({draftTotals.heads.toLocaleString()})</span></div>
+              <div className="col-span-2">Weight (kg) <span className="text-slate-800 dark:text-slate-200">({kgFmt(draftTotals.weight)})</span></div>
               <div className="col-span-1" />
             </div>
             {drafts.map((d, i) => (
