@@ -100,6 +100,7 @@ export function totalByProduct(rows: Weighing[]): ProductTotal[] {
  * "NL 0.9L"; items only go down to the size, so both fold into FCA 0.9 / FCA 0.9 NL.
  */
 export function itemNameFor(code: string): string {
+  if (norm(code) === 'FCC') return 'FCC ASSORTED';
   const m = norm(code).match(/^(FCA|NL)\s*(\d+(?:\.\d+)?)\s*[LU]?$/);
   if (!m) return norm(code);
   return `FCA ${m[2]}${m[1] === 'NL' ? ' NL' : ''}`;
