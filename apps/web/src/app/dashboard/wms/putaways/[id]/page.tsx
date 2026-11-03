@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
+import { QrLabel, LABEL_PRINT_CSS, type LabelRow } from '@/components/QrLabel';
 
 interface Line {
   id: string; line_no: number; sku: string; item_name: string; uom: string; bin_id: string; bin_code: string; lot_no: string | null; qty: number; unit_cost: number;
@@ -25,6 +26,9 @@ export default function PutawayDetailPage() {
   const [bins, setBins] = useState<Bin[]>([]);
   // line id -> new bin id, while editing bins
   const [edit, setEdit] = useState<Record<string, string> | null>(null);
+  // QR labels for this put-away (packs + bins), and which kinds go to the printer.
+  const [labels, setLabels] = useState<{ packs: LabelRow[]; bins: LabelRow[] } | null>(null);
+  const [printKinds, setPrintKinds] = useState({ packs: true, bins: false });
 
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('company_id') : null;
 
@@ -41,9 +45,24 @@ export default function PutawayDetailPage() {
   async function post() {
     if (!confirm('Post this put-away? Stock will be placed into the selected bins.')) return;
     setBusy(true); setError(null);
-    try { await api.post(`/wms/putaways/${id}/post`); load(); }
+    try { await api.post(`/wms/putaways/${id}/post`); load(); openLabels(); }
     catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
+  }
+
+  async function openLabels() {
+    setError(null);
+    try {
+      const r = await api.post<{ packs: LabelRow[]; bins: LabelRow[] }>(`/wms/putaways/${id}/labels`, {});
+      setLabels(r);
+      setPrintKinds({ packs: r.packs.length > 0, bins: r.packs.length === 0 });
+    } catch (e) { setError((e as Error).message); }
+  }
+  const toPrint = labels ? [...(printKinds.packs ? labels.packs : []), ...(printKinds.bins ? labels.bins : [])] : [];
+  function printLabels() {
+    if (!toPrint.length) return;
+    window.print();
+    if (companyId) api.patch('/wms/scan/labels', { company_id: companyId, codes: toPrint.map((l) => l.code) }).catch(() => {});
   }
 
   // A posted line can only move while its pack is still in storage.
@@ -72,6 +91,8 @@ export default function PutawayDetailPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
+      <style>{LABEL_PRINT_CSS}</style>
+      <div className="qr-screen-only">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
         <div>
           <h1 className="font-mono text-lg font-semibold text-slate-900 dark:text-slate-100">{pa.putaway_no}</h1>
@@ -79,6 +100,9 @@ export default function PutawayDetailPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[pa.status]}`}>{pa.status}</span>
+          {['draft', 'posted'].includes(pa.status) && !editing && (
+            <button onClick={openLabels} className="rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">Print QR labels</button>
+          )}
           {['draft', 'posted'].includes(pa.status) && !editing && (
             <button onClick={startEdit} className="rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">Edit bins</button>
           )}
@@ -100,6 +124,35 @@ export default function PutawayDetailPage() {
 
       {error && <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
       {notice && <div className="mb-3 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{notice}</div>}
+      {labels && (
+        <div className="mb-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-700 dark:text-slate-300">
+              <span className="font-medium">QR labels</span>
+              <label className="flex items-center gap-1.5">
+                <input type="checkbox" checked={printKinds.packs} disabled={!labels.packs.length} onChange={(e) => setPrintKinds((k) => ({ ...k, packs: e.target.checked }))} />
+                Pack labels ({labels.packs.length})
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input type="checkbox" checked={printKinds.bins} disabled={!labels.bins.length} onChange={(e) => setPrintKinds((k) => ({ ...k, bins: e.target.checked }))} />
+                Bin labels ({labels.bins.length})
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setLabels(null)} className="rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">Close</button>
+              <button onClick={printLabels} disabled={!toPrint.length} className="rounded bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">Print {toPrint.length} label(s)</button>
+            </div>
+          </div>
+          {pa.status === 'draft' && <p className="mt-2 text-[11px] text-slate-500">Pack labels are made when the put-away is posted — post it first to print them.</p>}
+          {pa.status === 'posted' && !labels.packs.length && <p className="mt-2 text-[11px] text-slate-500">No packs in storage from this put-away (shipped, or not a production put-away).</p>}
+          {toPrint.length > 0 && (
+            <div className="mt-3 grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
+              {toPrint.slice(0, 6).map((r) => <QrLabel key={r.code} row={r} />)}
+              {toPrint.length > 6 && <p className="self-center text-xs text-slate-500">…and {toPrint.length - 6} more</p>}
+            </div>
+          )}
+        </div>
+      )}
       {editing && pa.status === 'posted' && (
         <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
           This put-away is posted — changing a bin moves the stock (and the pack) from its current bin to the new one. Packs that shipped or are on a pick list can't be moved here.
@@ -141,6 +194,12 @@ export default function PutawayDetailPage() {
         </table>
       </div>
       {pa.notes && <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Notes: {pa.notes}</p>}
+      </div>
+
+      {/* Print-only sticker sheet. */}
+      <div id="print-sheet" className="hidden">
+        {toPrint.map((r) => <QrLabel key={r.code} row={r} />)}
+      </div>
     </div>
   );
 }
