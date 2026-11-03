@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { parseWeighingFile, totalByProduct, matchItem, describeMachineBatch, type Weighing } from '@/lib/weigh-import';
 
 interface JobOrder { id: string; batch_no: string; client_name: string; }
 interface Item { id: string; name: string; sku?: string; }
@@ -13,7 +14,8 @@ interface OutputLine {
   transferred_kg: string; transferred_at: string | null;
 }
 // Editable draft row in the grid
-interface Draft { item_id: string; pack_count: string; head_count: string; weight_kg: string; }
+// `code` = the weighing machine's product code, kept when an upload can't match it to an item.
+interface Draft { item_id: string; pack_count: string; head_count: string; weight_kg: string; code?: string; }
 
 export default function ProductionPage() {
   const [orders, setOrders] = useState<JobOrder[]>([]);
@@ -26,6 +28,8 @@ export default function ProductionPage() {
 
   const [jobOrderId, setJobOrderId] = useState('');
   const [saving, setSaving] = useState(false);
+  // Weighing-machine upload holding more than one machine batch, waiting for a pick.
+  const [pendingUpload, setPendingUpload] = useState<{ file: string; rows: Weighing[]; batches: string[] } | null>(null);
 
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('company_id') : null;
 
@@ -50,6 +54,35 @@ export default function ProductionPage() {
   function addDraft() { setDrafts((d) => [...d, emptyDraft()]); }
   function setDraft(i: number, patch: Partial<Draft>) { setDrafts((d) => d.map((row, idx) => idx === i ? { ...row, ...patch } : row)); }
   function removeDraft(i: number) { setDrafts((d) => d.filter((_, idx) => idx !== i)); }
+
+  async function upload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setError(null); setNotice(null); setPendingUpload(null);
+    try {
+      const rows = await parseWeighingFile(file);
+      const batches = [...new Set(rows.map((r) => r.machineBatch))];
+      if (batches.length > 1) setPendingUpload({ file: file.name, rows, batches });
+      else applyUpload(batches[0] ? `${file.name} — machine batch ${batches[0]}${describeMachineBatch(batches[0]) ? ` (${describeMachineBatch(batches[0])})` : ''}` : file.name, rows);
+    } catch (err) { setError((err as Error).message); }
+  }
+
+  // Total the weighings per product and add them as draft rows to review before saving.
+  function applyUpload(fileName: string, rows: Weighing[]) {
+    const totals = totalByProduct(rows);
+    const unmatched: string[] = [];
+    const added: Draft[] = totals.map((t) => {
+      const item = matchItem(items, t.productCode);
+      if (!item) unmatched.push(t.productCode);
+      return { item_id: item?.id ?? '', pack_count: String(t.packs), head_count: String(t.heads), weight_kg: String(t.weight), code: item ? undefined : t.productCode };
+    });
+    setDrafts((d) => [...d.filter((x) => x.item_id || x.weight_kg || x.pack_count || x.head_count), ...added]);
+    setPendingUpload(null);
+    const kg = totals.reduce((a, t) => a + t.weight, 0);
+    setNotice(`${fileName}: ${rows.length} weighings → ${totals.length} product line(s), ${+kg.toFixed(3)} kg. Review below, then Save production detail.`);
+    if (unmatched.length) setError(`No item matches ${unmatched.join(', ')} — pick the product on those rows.`);
+  }
 
   async function save() {
     if (!companyId || !jobOrderId) return;
@@ -154,16 +187,35 @@ export default function ProductionPage() {
       <div className="mb-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-sm font-medium text-slate-800 dark:text-slate-200">Add production lines</span>
-          <button onClick={addDraft} disabled={!jobOrderId} className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 disabled:opacity-50">+ Row</button>
+          <div className="flex gap-2">
+            <label className={`cursor-pointer rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 ${!jobOrderId ? 'pointer-events-none opacity-50' : ''}`}
+              title="Weighing machine export (.xlsx or .csv): Batch Number, Product Code, Number of Heads, Weight">
+              Upload weighing file
+              <input type="file" accept=".xlsx,.csv,.txt" onChange={upload} className="hidden" />
+            </label>
+            <button onClick={addDraft} disabled={!jobOrderId} className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 disabled:opacity-50">+ Row</button>
+          </div>
         </div>
+        {pendingUpload && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <span>{pendingUpload.file} has {pendingUpload.batches.length} machine batches. Load which one into {orders.find((o) => o.id === jobOrderId)?.batch_no}?</span>
+            {pendingUpload.batches.map((b) => (
+              <button key={b} onClick={() => applyUpload(`${pendingUpload.file} (${b || 'no batch'})`, pendingUpload.rows.filter((r) => r.machineBatch === b))}
+                className="rounded border border-amber-300 bg-white px-2 py-0.5 font-medium hover:bg-amber-100">
+                {b || '(blank)'}{describeMachineBatch(b) ? ` (${describeMachineBatch(b)})` : ''} · {pendingUpload.rows.filter((r) => r.machineBatch === b).length} rows
+              </button>
+            ))}
+            <button onClick={() => setPendingUpload(null)} className="ml-auto text-amber-700 hover:underline">Cancel</button>
+          </div>
+        )}
         {drafts.length === 0 ? (
-          <p className="text-xs text-slate-400">Click “+ Row” to add a product line.</p>
+          <p className="text-xs text-slate-400">Click “+ Row” to add a product line, or upload the weighing machine file.</p>
         ) : (
           <div className="space-y-2">
             {drafts.map((d, i) => (
               <div key={i} className="grid grid-cols-12 items-center gap-2">
-                <select value={d.item_id} onChange={(e) => setDraft(i, { item_id: e.target.value })} className={`col-span-6 ${inputCls}`}>
-                  <option value="">Product…</option>
+                <select value={d.item_id} onChange={(e) => setDraft(i, { item_id: e.target.value })} className={`col-span-6 ${inputCls} ${!d.item_id && d.code ? 'border-red-400' : ''}`}>
+                  <option value="">{d.code ? `${d.code} — pick product…` : 'Product…'}</option>
                   {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
                 </select>
                 <input value={d.pack_count} onChange={(e) => setDraft(i, { pack_count: e.target.value })} type="number" min="0" placeholder="packs" className={`col-span-2 ${inputCls}`} />
