@@ -14,19 +14,16 @@ export interface LabelRow {
   printed_at: string | null;
 }
 
-const KIND_LABEL: Record<LabelEntity, string> = { bin: 'BIN', box: 'PACK', pallet: 'PALLET' };
-
 export function QrLabel({ row, logo }: { row: LabelRow; logo?: string | null }) {
-  // 2in x 3in portrait sticker: small company logo and kind on top, QR, then
+  // 2in x 3in portrait sticker: small company logo centred on top, QR, then
   // the human-readable identity, so a picker can read it without scanning.
   // Sized in inches so the on-screen preview matches the printed label.
   const svg = useMemo(() => qrSvg(row.code, 160), [row.code]);
   return (
     <div className="qr-label flex flex-col items-center overflow-hidden rounded border border-slate-300 bg-white text-center"
       style={{ width: '2in', height: '3in', padding: '0.1in', boxSizing: 'border-box' }}>
-      <div className="flex w-full shrink-0 items-center justify-between" style={{ height: '0.32in' }}>
-        {logo ? <img src={logo} alt="" style={{ height: '0.3in', maxWidth: '1.1in', objectFit: 'contain' }} /> : <span />}
-        <span className="text-[9px] font-semibold uppercase tracking-widest text-slate-500">{KIND_LABEL[row.entity_type]}</span>
+      <div className="flex w-full shrink-0 items-center justify-center" style={{ height: '0.32in' }}>
+        {logo && <img src={logo} alt="" style={{ height: '0.3in', maxWidth: '1.6in', objectFit: 'contain' }} />}
       </div>
       <div className="qr-label-code shrink-0" style={{ width: '1.55in', height: '1.55in' }} dangerouslySetInnerHTML={{ __html: svg }} />
       <div className="mt-0.5 flex min-h-0 w-full flex-1 flex-col items-center">
