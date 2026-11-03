@@ -3,9 +3,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { BatchYieldStrip } from '@/components/BatchYield';
 import { parseWeighingFile, linesPerWeighing, matchItem, describeMachineBatch, type Weighing } from '@/lib/weigh-import';
 
-interface JobOrder { id: string; batch_no: string; client_name: string; head_count: number | null; output_lines: number; received_at: string | null; }
+interface JobOrder {
+  id: string; batch_no: string; client_name: string; head_count: number | null; output_lines: number; received_at: string | null;
+  doa_count: number | null; net_live_weight_kg: string | null;
+}
 interface Item { id: string; name: string; sku?: string; }
 interface OutputLine {
   id: string; batch_no: string; item_id: string; item_name: string; size_id: string | null;
@@ -218,6 +222,18 @@ export default function ProductionPage() {
           Show produced batches
         </label>
       </div>
+
+      {/* Short/over heads and reseko for the batch on screen (unsaved lines included) */}
+      {(() => {
+        const jo = orders.find((o) => o.id === jobOrderId);
+        if (!jo || jo.head_count == null) return null;
+        return (
+          <BatchYieldStrip
+            input={{ received: Number(jo.head_count), doa: Number(jo.doa_count || 0), liveKg: Number(jo.net_live_weight_kg || 0), producedHeads: sumTotals.heads, dressedKg: sumTotals.weight }}
+            note={filledDrafts.length ? 'Includes unsaved lines.' : undefined}
+          />
+        );
+      })()}
 
       {/* Summary per product */}
       {summary.length > 0 && (

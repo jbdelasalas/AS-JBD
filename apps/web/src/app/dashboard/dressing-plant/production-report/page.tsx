@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
+import { BatchYieldStrip, ShortOver, batchYield } from '@/components/BatchYield';
 
 interface Row {
   id: string;
@@ -16,7 +17,10 @@ interface Row {
   weight_kg: string;
 }
 interface Totals { rows: number; head: number; packs: number; weight_kg: number; }
-interface Batch { id: string; batch_no: string; client_name: string; received_at: string | null; output_lines: number; }
+interface Batch {
+  id: string; batch_no: string; client_name: string; received_at: string | null; output_lines: number;
+  head_count: number | null; doa_count: number | null; net_live_weight_kg: string | null;
+}
 
 const kg3 = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
@@ -64,6 +68,18 @@ export default function ProductionReportPage() {
     return m.set(r.product_name, t);
   }, new Map<string, { product: string; packs: number; head: number; weight: number }>()).values()]
     .sort((a, b) => a.product.localeCompare(b.product, undefined, { numeric: true }));
+
+  // Per batch: produced heads/kg from the rows on screen against what was received.
+  const perBatch = batches
+    .map((b) => {
+      const mine = rows.filter((r) => r.batch_number === b.batch_no);
+      const input = {
+        received: b.head_count == null ? null : Number(b.head_count), doa: Number(b.doa_count || 0), liveKg: Number(b.net_live_weight_kg || 0),
+        producedHeads: mine.reduce((a, r) => a + Number(r.head || 0), 0), dressedKg: mine.reduce((a, r) => a + Number(r.weight_kg || 0), 0),
+      };
+      return { b, input, lines: mine.length, ...batchYield(input) };
+    })
+    .filter((x) => x.lines > 0);
 
   function exportCsv() {
     const header = ['Date', 'Time', 'Batch Number', 'Product Code', 'Head', 'Packs', 'Weight(kg)'];
@@ -121,6 +137,50 @@ export default function ProductionReportPage() {
         <button onClick={load} className="rounded bg-brand-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-700">Run</button>
         <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">{totals.rows} rows</span>
       </div>
+
+      {batch && batch.head_count != null && rows.length > 0 && (
+        <BatchYieldStrip input={{
+          received: Number(batch.head_count), doa: Number(batch.doa_count || 0), liveKg: Number(batch.net_live_weight_kg || 0),
+          producedHeads: totals.head, dressedKg: totals.weight_kg,
+        }} />
+      )}
+
+      {!batch && perBatch.length > 0 && (
+        <div className="mb-4 overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+          <div className="border-b border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 dark:border-slate-700 dark:text-slate-200">Per batch — short/over heads and reseko</div>
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+              <tr>
+                <th className="px-3 py-2 text-left">Batch</th>
+                <th className="px-3 py-2 text-right">Received</th>
+                <th className="px-3 py-2 text-right">DOA</th>
+                <th className="px-3 py-2 text-right">Expected</th>
+                <th className="px-3 py-2 text-right">Produced</th>
+                <th className="px-3 py-2 text-right">Short / over</th>
+                <th className="px-3 py-2 text-right">Live kg</th>
+                <th className="px-3 py-2 text-right">Dressed kg</th>
+                <th className="px-3 py-2 text-right">Reseko</th>
+              </tr>
+            </thead>
+            <tbody>
+              {perBatch.map(({ b, input, expected, diff, reseko }) => (
+                <tr key={b.id} className="border-t border-slate-100 text-xs dark:border-slate-800">
+                  <td className="px-3 py-1.5"><button onClick={() => setBatchId(b.id)} className="text-brand-600 hover:underline">{b.batch_no}</button></td>
+                  <td className="px-3 py-1.5 text-right">{input.received == null ? '—' : input.received.toLocaleString()}</td>
+                  <td className="px-3 py-1.5 text-right">{input.doa.toLocaleString()}</td>
+                  <td className="px-3 py-1.5 text-right">{expected == null ? '—' : expected.toLocaleString()}</td>
+                  <td className="px-3 py-1.5 text-right">{input.producedHeads.toLocaleString()}</td>
+                  <td className="px-3 py-1.5 text-right"><ShortOver diff={diff} /></td>
+                  <td className="px-3 py-1.5 text-right">{kg3(input.liveKg)}</td>
+                  <td className="px-3 py-1.5 text-right">{kg3(input.dressedKg)}</td>
+                  <td className="px-3 py-1.5 text-right font-medium">{reseko == null ? '—' : `${reseko.toFixed(2)}%`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="border-t border-slate-100 px-3 py-1.5 text-[11px] text-slate-500 dark:border-slate-800">Covers the production in the date range above; pick a batch for its full figures.</p>
+        </div>
+      )}
 
       {summary.length > 0 && (
         <div className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
